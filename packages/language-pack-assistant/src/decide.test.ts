@@ -6,7 +6,7 @@ import { type ClassifierComplement, loadComplement, type NumbersComplement } fro
 import { type DecideCtx, decide, decideStep, DEFAULT_MARGIN } from './decide'
 import { buildLexicon } from './lexicon'
 import { phrasesFor } from './phrases'
-import { ES } from './rules.fixture'
+import { EN, ES } from './rules.fixture'
 
 const file = (name: string) => new Uint8Array(readFileSync(join(import.meta.dir, '../complements', name)))
 const nums = loadComplement(file('es.numbers.json'))
@@ -101,4 +101,15 @@ test('R37 f: a name inside a free description goes to search, not to the classif
   expect(decideStep('quién fue Moisés el que vio la zarza ardiente', ctx)).toMatchObject({ step: 'rule', decision: { call: { query: 'concept' } } })
   // No name: unchanged.
   expect(decideStep('la gracia y la fe de los creyentes', ctx).step).toBe(decideStep('la gracia y la fe de los creyentes', { ...ctx, descriptionWords: 99 }).step)
+})
+
+test('fix round 1: a request word around a name is no description', () => {
+  const es = JSON.parse(new TextDecoder().decode(file('es.classifier.json'))) as ClassifierComplement
+  const ctx: DecideCtx = { ...base, classifier: es, tag: 'es-419' }
+  expect(decideStep('dame info de Moisés', ctx).step).not.toBe('search')
+  expect(decide('dame info de Moisés', ctx)).toMatchObject({ kind: 'call', call: { query: 'concept', args: { id: 'tw:names/moses' } } })
+  const en = JSON.parse(new TextDecoder().decode(file('en.classifier.json'))) as ClassifierComplement
+  const enNums = loadComplement(file('en.numbers.json'))
+  const ctxEn: DecideCtx = { ...base, lexicon: buildLexicon(EN, 'en', (enNums.ok ? enNums.value : undefined) as NumbersComplement), phrases: phrasesFor('en'), classifier: en, tag: 'en' }
+  expect(decide('Moses please', ctxEn)).toMatchObject({ kind: 'call', call: { query: 'concept', args: { id: 'tw:names/moses' } } })
 })

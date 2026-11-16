@@ -289,3 +289,22 @@ describe('Review Focus 3: book names once the map carries them', () => {
     expect(ask('Génesis 1')).toEqual({ query: 'passage', args: { ref: 'gen 1:1-999' } })
   })
 })
+
+describe('fix round 1: question words leave a plain list question a list', () => {
+  test('nothing left over gives one topics call', () => {
+    expect(callOf(es('¿cuáles son los personajes de Rut?'))).toEqual({ query: 'topics', args: { book: 'rut' } })
+    expect(callOf(en('what places are there in Ruth'))).toEqual({ query: 'topics', args: { book: 'rut' } })
+    expect(callOf(es('dame la lista de lugares por favor'))).toEqual({ query: 'topics', args: { category: 'place' } })
+    const ptMaps = fixtureMaps('es-419', { rut: ['O Livro de Rute', 'Rute', 'Rt'] }, {}, {})
+    const lexicon = buildLexicon(ptMaps, 'pt-BR', numbers('pt'))
+    const ctx: RuleCtx = { phrases: phrasesFor('pt-BR'), listed: () => false, lastVerse: () => undefined, strongsOf: () => [], tag: 'pt-BR' }
+    const q = 'quais são os personagens de Rute'
+    const r = applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)
+    expect('decided' in r && r.decided.kind === 'call' ? r.decided.call : r).toEqual({ query: 'topics', args: { book: 'rut' } })
+  })
+  test('several concepts: the first id of each comes before the other ids', () => {
+    const c = (id: string) => ({ query: 'concept', args: { id } })
+    // Juan has two people; Moisés must not be crowded out of the 3 options.
+    expect(es('¿quién es Juan o Moisés?')).toEqual(choose(c('tw:names/johntheapostle'), c('tw:names/moses'), c('tw:names/johnthebaptist')))
+  })
+})

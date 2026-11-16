@@ -31,11 +31,21 @@ export const STOP: Record<string, Set<string>> = {
   en: new Set(words('a an the of in on to for with and or is are was were what who whom where when which how does do did it its his her their this that')),
 }
 
+/**
+ * Question and request words ("cuáles", "dame", "info", "por favor", "about", "please"): they ask, they name nothing, so they are frame
+ * words. Folded forms (dame/damé, mas/más, sao/são, ha/há fold alike).
+ */
+const ASK: Record<string, string> = {
+  es: ' cuales cual dame mas info informacion porfa favor sobre acerca todos todas',
+  pt: ' quais qual sao ha me mais info informacao sobre acerca favor todos todas',
+  en: ' there give me about please info information tell show list',
+}
+
 /** Words of the question's frame ("which books", "the word"): never a concept by themselves. */
 export const FRAME: Record<string, Set<string>> = {
-  es: new Set(words('palabra palabras libro libros biblia texto textos veces traduccion traducciones traducir traduce traducen tradujo nombre nombres lugar lugares persona personas personaje personajes evento eventos tema temas articulo articulos nota notas pasaje pasajes versiculo versiculos parte partes dice decir significa significado ayuda ayudas pregunta preguntas lista importante importantes principales muestrame antiguo testamento aparece aparecen menciona usa usan sale hay tiene tienen')),
-  pt: new Set(words('palavra palavras livro livros biblia texto textos vezes traducao traducoes traduzir traduz nome nomes local locais pessoa pessoas personagem personagens evento eventos tema temas artigo artigos nota notas passagem passagens versiculo versiculos diz dizer significa significado ajuda ajudas pergunta perguntas lista importante importantes principais mostre antigo testamento aparece aparecem menciona usa usam fala falar usado')),
-  en: new Set(words('word words book books bible text texts times translation translations translate translates translated name names place places person people character characters event events topic topics article articles note notes passage passages verse verses says say mean means meaning help question questions list important main show appear appears mentioned uses used old testament')),
+  es: new Set(words('palabra palabras libro libros biblia texto textos veces traduccion traducciones traducir traduce traducen tradujo nombre nombres lugar lugares persona personas personaje personajes evento eventos tema temas articulo articulos nota notas pasaje pasajes versiculo versiculos parte partes dice decir significa significado ayuda ayudas pregunta preguntas lista importante importantes principales muestrame antiguo testamento aparece aparecen menciona usa usan sale hay tiene tienen' + ASK.es)),
+  pt: new Set(words('palavra palavras livro livros biblia texto textos vezes traducao traducoes traduzir traduz nome nomes local locais pessoa pessoas personagem personagens evento eventos tema temas artigo artigos nota notas passagem passagens versiculo versiculos diz dizer significa significado ajuda ajudas pergunta perguntas lista importante importantes principais mostre antigo testamento aparece aparecem menciona usa usam fala falar usado' + ASK.pt)),
+  en: new Set(words('word words book books bible text texts times translation translations translate translates translated name names place places person people character characters event events topic topics article articles note notes passage passages verse verses says say mean means meaning help question questions list important main show appear appears mentioned uses used old testament' + ASK.en)),
 }
 
 /** Category words by base language. */

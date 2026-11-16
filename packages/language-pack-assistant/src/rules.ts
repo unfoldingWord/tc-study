@@ -6,7 +6,7 @@ import type { Call, Decision, QueryName } from './decision'
 import { type Entity, FILLERS, type Lexicon } from './lexicon'
 import { fold } from './fold'
 import { matchPhrases, type PhraseKind, type Phrases } from './phrases'
-import { contentWords } from './words'
+import { contentWordsOutside } from './words'
 
 export type RuleCtx = {
   phrases: Phrases
@@ -113,7 +113,10 @@ function overConcepts(all: Concept[], prefer: (ids: string[]) => string[], make:
   const strong = all.filter((c) => c.cls !== 'topic')
   const cs = strong.length > 0 ? strong : all
   if (cs.length <= 1) return cs[0] === undefined ? undefined : overIds(prefer(cs[0].ids), make)
-  const ids = [...new Set(cs.flatMap((c) => preferTw(prefer(c.ids))))]
+  // The first id of each concept, then the second of each, and so on: a second concept is never crowded out by the first one's ids.
+  const lists = cs.map((c) => preferTw(prefer(c.ids)))
+  const longest = Math.max(...lists.map((l) => l.length))
+  const ids = [...new Set(Array.from({ length: longest }, (_, k) => lists.flatMap((l) => (l[k] === undefined ? [] : [l[k]!]))).flat())]
   return ids.length === 1 ? { kind: 'call', call: make(ids[0]!) } : { kind: 'choose', options: ids.slice(0, MAX_OPTIONS).map(make) }
 }
 
@@ -182,8 +185,7 @@ function ambiguousBook(question: string, tokens: string[], v: View, ctx: RuleCtx
  */
 function leftoverWords(question: string, tokens: string[], entities: Entity[], ctx: RuleCtx): string[] {
   if (ctx.tag === undefined) return []
-  const inside = new Set(entities.flatMap((e) => tokens.slice(e.start, e.end)))
-  return contentWords(question, ctx.tag).filter((w) => !inside.has(w))
+  return contentWordsOutside(question, ctx.tag, tokens, entities)
 }
 
 /** A question read for the rules: its folded tokens, the phrase kinds it holds, and its entities. */

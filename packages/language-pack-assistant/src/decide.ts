@@ -10,7 +10,7 @@ import { interpret } from './interpret'
 import type { Lexicon } from './lexicon'
 import type { Phrases } from './phrases'
 import { MAX_OPTIONS, outcomeFor, readQuestion, type Reading, ruleOutcome, type Outcome, type RuleCtx, view } from './rules'
-import { contentWords } from './words'
+import { contentWordsOutside } from './words'
 
 /**
  * The classifier's answer is taken alone when its best probability leads the second by at least this much; below it, the two best
@@ -36,8 +36,7 @@ export function describesWithName(question: string, reading: Reading, tag: strin
   if (reading.kinds.has('concept') || reading.kinds.has('books') || reading.kinds.has('renderings')) return false
   const named = reading.entities.filter((e) => e.kind === 'concept' && e.cls !== 'ta')
   if (named.length === 0) return false
-  const inName = new Set(named.flatMap((e) => reading.tokens.slice(e.start, e.end)))
-  return contentWords(question, tag).filter((w) => !inName.has(w)).length >= n
+  return contentWordsOutside(question, tag, reading.tokens, named).length >= n
 }
 
 export type DecideCtx = {
