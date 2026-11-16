@@ -12,7 +12,7 @@
  */
 import { bookNumber, bookSet } from '../ids'
 import type { About, BookModel, CatalogResource, HelpTable, ReviewLevel } from '../model'
-import { type AquiferArticle, aquiferNotes, aquiferQuestions, decodeEntities } from './aquiferHelps'
+import { type AquiferArticle, aquiferNotes, type NoteCounts, aquiferQuestions, decodeEntities } from './aquiferHelps'
 import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, needsOfBook } from './catalog'
 import { BUILDER, inputsOf, licenseId } from './language'
@@ -62,8 +62,8 @@ export type PatchBuild = {
   rows: Record<PatchKind, number>
   /** What was worked around, one line each (the issues of the converter, books left out). */
   report: string[]
-  /** How many links to a Manual article had no `ta:` id and stayed as text. */
-  unmatchedTaLinks: number
+  /** From the converter: links in the notes left as plain text, and associated Manual articles with no `ta:` id (so no concept). */
+  taLinks: NoteCounts
 }
 
 /** The HTML of an `adaptation_notice` as plain text: inline tags gone, block tags as a space, entities decoded, white space collapsed. */
@@ -118,6 +118,7 @@ export async function buildPatch(o: PatchInput): Promise<PatchBuild> {
   const keys: Record<PatchKind, string> = { tn: `${o.source}/${o.lang}/tn`, tq: `${o.source}/${o.lang}/tq` }
   const report: string[] = []
   const issues: string[] = []
+  const taLinks: NoteCounts = { inlineLinks: 0, conceptArticles: 0 }
   const wanted = o.books === undefined ? undefined : new Set(o.books)
 
   const candidates = canon(sources.flatMap(([, s]) => (s === undefined ? [] : [...s.books.keys()])))
@@ -136,7 +137,7 @@ export async function buildPatch(o: PatchInput): Promise<PatchBuild> {
         report.push(`book ${book}: ${kind} left out, Door43 has it`)
         continue
       }
-      const table = kind === 'tn' ? aquiferNotes(items, book, keys.tn, o.taMap, issues) : aquiferQuestions(items, book, keys.tq, issues)
+      const table = kind === 'tn' ? aquiferNotes(items, book, keys.tn, o.taMap, issues, taLinks) : aquiferQuestions(items, book, keys.tq, issues)
       tables[kind] = { table, items }
     }
     if (tables.tn === undefined && tables.tq === undefined) continue
@@ -198,7 +199,6 @@ export async function buildPatch(o: PatchInput): Promise<PatchBuild> {
     patch: true,
   })
 
-  const unmatchedTaLinks = issues.filter((line) => line.includes('has no ta: id')).length
   report.push(...issues.map((line) => `converter: ${line}`))
-  return { catalog, segments, resources, built: { tn: canon(built.tn), tq: canon(built.tq) }, rows, report, unmatchedTaLinks }
+  return { catalog, segments, resources, built: { tn: canon(built.tn), tq: canon(built.tq) }, rows, report, taLinks }
 }

@@ -3,7 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/door43-books.ts --lang hi [--out <file.json>]
  *
- * Reads `https://git.door43.org/api/v1/catalog/search?lang=<lang>&stage=prod&limit=100` (every page) and counts only the subjects
+ * Reads `https://git.door43.org/api/v1/catalog/search?lang=<lang>&stage=prod&limit=100` (every page, until an empty one or the `X-Total-Count` the server announces: it may cap a page below the limit) and counts only the subjects
  * `TSV Translation Notes` and `TSV Translation Questions` (the tc-ready ones). Writes `{ "lang": "hi", "tn": [books], "tq": [books] }`, the books in
  * the order of the canon, to `--out`, or to stdout without it. Exit 0 when written, 1 when the catalog cannot be read, 2 for bad arguments.
  */
@@ -12,6 +12,7 @@ import { BOOKS } from '@bt-synergy/language-pack-v3'
 
 const BASE = 'https://git.door43.org'
 const LIMIT = 100
+const MAX_PAGES = 200
 const SUBJECTS: Record<string, 'tn' | 'tq'> = { 'TSV Translation Notes': 'tn', 'TSV Translation Questions': 'tq' }
 export const USAGE = 'Usage: door43-books --lang <code> [--out <file.json>]'
 
@@ -23,7 +24,9 @@ type Entry = { subject?: string; ingredients?: { identifier?: string }[] }
 /** The books of the notes and the questions of the production catalog of `lang`. Throws `Error` when the catalog cannot be read. */
 export async function door43Books(lang: string, fetcher: typeof fetch = fetch, base = BASE): Promise<Door43Books> {
   const sets = { tn: new Set<string>(), tq: new Set<string>() }
+  let seen = 0
   for (let page = 1; ; page++) {
+    if (page > MAX_PAGES) throw new Error(`${base}: the catalog has more than ${MAX_PAGES} pages; the server may be ignoring page`)
     const url = `${base}/api/v1/catalog/search?lang=${encodeURIComponent(lang)}&stage=prod&limit=${LIMIT}&page=${page}`
     const response = await fetcher(url)
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
@@ -34,7 +37,11 @@ export async function door43Books(lang: string, fetcher: typeof fetch = fetch, b
       if (kind === undefined) continue
       for (const ingredient of entry.ingredients ?? []) if (typeof ingredient.identifier === 'string' && BOOKS.includes(ingredient.identifier)) sets[kind].add(ingredient.identifier)
     }
-    if (body.data.length < LIMIT) break
+    // The server may cap a page below `limit` (it does at 50), so only an empty page, or the total it announced, ends the list.
+    if (body.data.length === 0) break
+    seen += body.data.length
+    const total = Number(response.headers.get('X-Total-Count'))
+    if (Number.isFinite(total) && total > 0 && seen >= total) break
   }
   const order = (set: Set<string>): string[] => [...set].sort((a, b) => BOOKS.indexOf(a) - BOOKS.indexOf(b))
   return { lang, tn: order(sets.tn), tq: order(sets.tq) }

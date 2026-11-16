@@ -370,6 +370,9 @@ function* articles(items: AquiferArticle[], book: string, res: string, issues: s
   }
 }
 
+/** What `aquiferNotes` counts when given one: the links in the text left as plain text, and the associated Manual articles with no `ta:` id (no concept for the row). */
+export type NoteCounts = { inlineLinks: number; conceptArticles: number }
+
 /**
  * The notes of a book from the articles of an Aquifer tN resource (`NN.content.json`). `res` is the key of the resource (`aquifer/hi/tn`);
  * `taMap` is {@link buildTaMap}'s map. `cols.quote` is the original-language quote when the note begins with one, `cols.note` the rest as
@@ -377,13 +380,14 @@ function* articles(items: AquiferArticle[], book: string, res: string, issues: s
  * `issues`); `concept` is the first link that maps, in the text and then in `associations.resource` (by `content_id`, whatever the code it carries). A link to another resource stays
  * its label, with a line in `issues`.
  */
-export function aquiferNotes(items: AquiferArticle[], book: string, res: string, taMap: ReadonlyMap<string, string>, issues: string[] = []): HelpTable {
+export function aquiferNotes(items: AquiferArticle[], book: string, res: string, taMap: ReadonlyMap<string, string>, issues: string[] = [], counts?: NoteCounts): HelpTable {
   const rows: HelpRow[] = []
   for (const { article, row, nodes, report } of articles(items, book, res, issues)) {
     const inText: string[] = []
     const link: LinkResolver = ({ code, contentId, label }) => {
       const id = code === MANUAL_CODE ? taMap.get(contentId) : undefined
       if (id === undefined) {
+        if (counts !== undefined) counts.inlineLinks++
         report(code === MANUAL_CODE ? `the link to the Manual article ${contentId} (${JSON.stringify(label)}) has no ta: id; it stays as text` : `the link to ${code || 'a resource'} ${contentId} (${JSON.stringify(label)}) is not a Manual link; it stays as text`)
         return label
       }
@@ -407,6 +411,7 @@ export function aquiferNotes(items: AquiferArticle[], book: string, res: string,
           break
         }
         if (linked.resource_code !== MANUAL_CODE && linked.resource_code !== 'UWTranslationNotes') continue
+        if (counts !== undefined) counts.conceptArticles++
         report(`the associated Manual article ${linked.content_id} (${JSON.stringify(linked.label ?? '')}) has no ta: id`)
       }
     }

@@ -10,15 +10,17 @@
  *   `manifest.json`); `--ta`, `--ta-eng`: the same for UWTranslationManual in the language and in English (every `json/*.content.json` is read).
  * - `--en-ta-titles`: what `fetch-en-ta-titles.ts` wrote. `--base-books`: `{ "tn": [books], "tq": [books] }`, the books Door43 production already
  *   has (`door43-books.ts` writes it). A table of a book goes in only if Door43 lacks it; a book with neither table is not built.
- * - `--common`: a folder with `catalog-common.seg` and `segments/` of the published common catalog: the patch requires it (name, revision and id) and
- *   each book takes its `orig` from the `orig:{book}` segment.
+ * - `--common`: a folder with `catalog-common.seg` and `segments/` of the published common catalog, or the base URL of a packs Worker (`https://...`; its
+ *   `/v3/packs/common/catalog` and the `orig` segments it names are downloaded to a temporary folder, removed after the read). The patch requires the
+ *   catalog (name, revision and id) and each book takes its `orig` from the `orig:{book}` segment.
  *
  * Writes in `--out`: `catalog-{lang}-x-{source}.seg`, `segments/<id>.seg` and `report.txt` (books built per table, row counts, links to Manual articles
  * left as text, sizes, what the converter worked around). With `--sign-key` the catalog is signed as `build-v3` does. The last line on stdout is
  * one JSON line. Exit code 0 when written, 1 for a usage error, 2 for a build error.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   type AquiferArticle,
@@ -69,6 +71,8 @@ type Options = {
   publisher: string
 }
 
+const isUrl = (text: string): boolean => /^https?:\/\//.test(text)
+
 export function optionsFromArgs(argv: string[]): Options {
   const flags = new Map<string, string>()
   for (let i = 0; i < argv.length; i += 2) {
@@ -101,7 +105,7 @@ export function optionsFromArgs(argv: string[]): Options {
     if (!existsSync(need(name)) || !statSync(need(name)).isFile()) throw new UsageError(`--${name}: ${need(name)} is not a file`)
   }
   const common = need('common')
-  if (!existsSync(join(common, 'catalog-common.seg')) || !statSync(join(common, 'catalog-common.seg')).isFile()) throw new UsageError(`--common: ${join(common, 'catalog-common.seg')} is not a file`)
+  if (!isUrl(common) && (!existsSync(join(common, 'catalog-common.seg')) || !statSync(join(common, 'catalog-common.seg')).isFile())) throw new UsageError(`--common: ${join(common, 'catalog-common.seg')} is not a file`)
   const signKey = flags.get('sign-key')
   if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
   const revisionText = flags.get('revision') ?? '1'
@@ -186,6 +190,41 @@ function readManual(dir: string): AquiferTaArticle[] {
   })
 }
 
+/**
+ * Downloads the published common catalog from a packs Worker into a new temporary folder (`catalog-common.seg` and `segments/`): `{base}/v3/packs/common/catalog`,
+ * then the `orig` segments it names, `{base}/v3/packs/seg/{id}` (the patch reads only those; the map and topics segments are not needed). `base` may end
+ * in `/v3/packs/common` or `/v3/packs`. Each segment is checked against its id by `readCommon`'s reader. Returns the folder; the caller removes it.
+ */
+export async function downloadCommon(base: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const root = base.replace(/\/+$/, '').replace(/\/v3\/packs(?:\/common)?$/, '')
+  const get = async (url: string): Promise<Uint8Array> => {
+    const response = await fetcher(url)
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
+    return new Uint8Array(await response.arrayBuffer())
+  }
+  const dir = await mkdtemp(join(tmpdir(), 'patch-common-'))
+  try {
+    const bytes = await get(`${root}/v3/packs/common/catalog`)
+    await writeFile(join(dir, 'catalog-common.seg'), bytes)
+    const { seg } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
+    const model = catalogView(seg)
+    await mkdir(join(dir, 'segments'))
+    for (const unit of model.units) {
+      if (!unit.id.startsWith('orig:')) continue
+      for (const index of unit.segments) {
+        const id = hex(model.segments[index].id)
+        const segment = await get(`${root}/v3/packs/seg/${id}`)
+        await readSegment(segment, { known: KNOWN.orig, expectedId: id, expectedClass: 'orig' })
+        await writeFile(join(dir, 'segments', `${id}.seg`), segment)
+      }
+    }
+    return dir
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true })
+    throw error
+  }
+}
+
 /** The published common catalog in `dir`: its revision, its id and the `[key, stamp]` of each `orig:{book}` segment. */
 export async function readCommon(dir: string): Promise<{ revision: number; id: string; origs: Map<string, [string, string]> }> {
   const file = join(dir, 'catalog-common.seg')
@@ -222,7 +261,15 @@ async function build(o: Options, io: Io): Promise<void> {
   const tq = readFetched(o.tq, 'UWTranslationQuestions', o.books)
   const titles = readJson<EnTaTitles>(o.enTaTitles, 'the TA titles')
   const { map: taMap, unmatched } = buildTaMap(readManual(o.ta), readManual(o.taEng), titles)
-  const common = await readCommon(o.common)
+  let commonDir = o.common
+  let temporary: string | undefined
+  if (isUrl(o.common)) commonDir = temporary = await downloadCommon(o.common)
+  let common: Awaited<ReturnType<typeof readCommon>>
+  try {
+    common = await readCommon(commonDir)
+  } finally {
+    if (temporary !== undefined) await rm(temporary, { recursive: true, force: true })
+  }
 
   const patch = await buildPatch({
     lang: o.lang,
@@ -246,6 +293,8 @@ async function build(o: Options, io: Io): Promise<void> {
   }
 
   const name = `${o.lang}-x-${o.source}`
+  // Empty segments/ first, as build-v3 does, so a withdrawn book does not linger.
+  await rm(join(o.out, 'segments'), { recursive: true, force: true })
   await mkdir(join(o.out, 'segments'), { recursive: true })
   for (const segment of patch.segments) await writeFile(join(o.out, 'segments', `${segment.id}.seg`), segment.bytes)
   await writeFile(join(o.out, `catalog-${name}.seg`), catalogBytes)
@@ -261,7 +310,7 @@ async function build(o: Options, io: Io): Promise<void> {
     `tq: ${patch.built.tq.length} books, ${patch.rows.tq} rows: ${patch.built.tq.join(',') || '-'}`,
     ...patch.resources.map((r) => `resource ${r.key}: ${r.release}, review ${r.review}, license ${r.license}`),
     `ta map: ${taMap.size} articles matched, ${unmatched.length} Manual articles without a ta: id`,
-    `unmatched ta links: ${patch.unmatchedTaLinks} (left as text)`,
+    `ta links left as text: ${patch.taLinks.inlineLinks} inline links; ${patch.taLinks.conceptArticles} associated concept articles with no ta: id`,
     `sizes: ${patch.segments.length} book segments ${kb(segmentBytes)}, catalog ${kb(catalogBytes.length)}`,
     ...patch.segments.map((s) => `  book ${s.seg.h.book} ${kb(s.bytes.length)} ${s.id.slice(0, 12)}`),
     ...unmatched.map((u) => `ta article ${u.contentId} ${JSON.stringify(u.title)}: ${u.reason}`),
@@ -276,7 +325,7 @@ async function build(o: Options, io: Io): Promise<void> {
       signed: keyId !== undefined,
       books: patch.built,
       rows: patch.rows,
-      unmatchedTaLinks: patch.unmatchedTaLinks,
+      taLinks: patch.taLinks,
       segments: patch.segments.length,
       bytes: { segments: segmentBytes, catalog: catalogBytes.length },
     }),
@@ -289,9 +338,8 @@ export async function main(argv: string[], io: Io = { log: console.log, error: c
   try {
     options = optionsFromArgs(argv)
   } catch (error) {
-    if (!(error instanceof UsageError)) throw error
-    io.error(error.message)
-    io.error(USAGE)
+    io.error(error instanceof Error ? error.message : String(error))
+    if (error instanceof UsageError) io.error(USAGE)
     return 1
   }
   try {

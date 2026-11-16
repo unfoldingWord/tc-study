@@ -152,7 +152,7 @@ describe('build-patch-v3', () => {
     expect(report).toContain('tn: 1 books')
     expect(report).toContain('tq: 2 books')
     expect(report).toContain('book phm: tn left out, Door43 has it')
-    expect(report).toContain('unmatched ta links:')
+    expect(report).toContain('ta links left as text:')
   })
 
   test('the resources carry provenance, source and review', async () => {
@@ -237,6 +237,61 @@ describe('build-patch-v3', () => {
     expect(r.err.join('\n')).toContain('only CC-BY-SA-4.0')
   })
 
+  test('--common can be a packs Worker: the catalog and the orig segments are downloaded', async () => {
+    const { args, root } = await inputs()
+    const dir = join(root, 'common')
+    const paths: string[] = []
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const path = new URL(request.url).pathname
+        paths.push(path)
+        if (path === '/v3/packs/common/catalog') return new Response(readFileSync(join(dir, 'catalog-common.seg')))
+        const m = /^\/v3\/packs\/seg\/([0-9a-f]{64})$/.exec(path)
+        if (m !== null) return new Response(readFileSync(join(dir, 'segments', `${m[1]}.seg`)))
+        return new Response('no', { status: 404 })
+      },
+    })
+    try {
+      const [viaDir, viaUrl] = [temp(), temp()]
+      expect((await run(args(viaDir))).code).toBe(0)
+      const withUrl = args(viaUrl)
+      withUrl[withUrl.indexOf('--common') + 1] = `http://127.0.0.1:${server.port}`
+      const r = await run(withUrl)
+      expect(r.err).toEqual([])
+      expect(r.code).toBe(0)
+      expect(paths[0]).toBe('/v3/packs/common/catalog')
+      expect(paths.length).toBe(3)
+      expect(read(join(viaUrl, 'catalog-hi-x-aquifer.seg'))).toEqual(read(join(viaDir, 'catalog-hi-x-aquifer.seg')))
+      // a server that fails is a build error
+      withUrl[withUrl.indexOf('--common') + 1] = `http://127.0.0.1:${server.port}/nothing`
+      server.stop(true)
+      expect((await run(withUrl)).code).toBe(2)
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('a rebuild empties segments/, so a withdrawn book does not linger', async () => {
+    const { args, root } = await inputs()
+    const out = temp()
+    expect((await run(args(out))).code).toBe(0)
+    expect(readdirSync(join(out, 'segments')).length).toBe(2)
+    write(join(root, 'base.json'), { tn: ['phm', 'tit'], tq: ['tit'] })
+    expect((await run(args(out))).code).toBe(0)
+    expect(readdirSync(join(out, 'segments')).length).toBe(1)
+  })
+
+  test('the counts of links left as text come from the converter', async () => {
+    const { args } = await inputs()
+    const out = temp()
+    const r = await run(args(out))
+    const summary = JSON.parse(r.out[r.out.length - 1])
+    expect(typeof summary.taLinks.inlineLinks).toBe('number')
+    expect(typeof summary.taLinks.conceptArticles).toBe('number')
+    expect(readFileSync(join(out, 'report.txt'), 'utf8')).toContain(`ta links left as text: ${summary.taLinks.inlineLinks} inline links; ${summary.taLinks.conceptArticles} associated concept articles`)
+  })
+
   test('the common catalog gives each orig', async () => {
     const { root } = await inputs()
     const common = await readCommon(join(root, 'common'))
@@ -259,20 +314,35 @@ describe('build-patch-v3', () => {
 describe('door43-books', () => {
   const entry = (subject: string, ids: string[]) => ({ subject, ingredients: ids.map((identifier) => ({ identifier })) })
   const answer = (data: unknown[]) => new Response(JSON.stringify({ ok: true, data }))
+  /** A server with one page of entries: the later pages are empty. */
+  const onePage = (data: unknown[]) => (async (url: string) => answer(new URL(url).searchParams.get('page') === '1' ? data : [])) as unknown as typeof fetch
 
   test('counts only the notes and the questions, books in canon order', async () => {
     const urls: string[] = []
+    const page = onePage([entry('TSV Translation Notes', ['act']), entry('TSV Translation Questions', ['rut', 'gen']), entry('TSV Translation Words Links', ['tit']), entry('OBS Translation Notes', ['obs'])])
     const fetcher = (async (url: string) => {
       urls.push(url)
-      return answer([entry('TSV Translation Notes', ['act']), entry('TSV Translation Questions', ['rut', 'gen']), entry('TSV Translation Words Links', ['tit']), entry('OBS Translation Notes', ['obs'])])
+      return page(url)
     }) as unknown as typeof fetch
     expect(await door43Books('hi', fetcher, 'http://x')).toEqual({ lang: 'hi', tn: ['act'], tq: ['gen', 'rut'] })
-    expect(urls).toEqual(['http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=1'])
+    expect(urls).toEqual(['http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=1', 'http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=2'])
+  })
+
+  test('follows the pages until an empty one, when the server caps a page at 50', async () => {
+    const all = Array.from({ length: 120 }, (_, i) => (i === 110 ? entry('TSV Translation Questions', ['rut']) : i === 60 ? entry('TSV Translation Notes', ['act']) : entry('Bible', ['gen'])))
+    const pages: number[] = []
+    const fetcher = (async (url: string) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      pages.push(page)
+      return answer(all.slice((page - 1) * 50, page * 50))
+    }) as unknown as typeof fetch
+    expect(await door43Books('hi', fetcher, 'http://x')).toEqual({ lang: 'hi', tn: ['act'], tq: ['rut'] })
+    expect(pages).toEqual([1, 2, 3, 4])
   })
 
   test('writes the file, and exits 1 when the catalog cannot be read', async () => {
     const out = join(temp(), 'b.json')
-    const ok = (async () => answer([entry('TSV Translation Notes', ['act'])])) as unknown as typeof fetch
+    const ok = onePage([entry('TSV Translation Notes', ['act'])])
     expect(await door43Main(['--lang', 'hi', '--out', out], { log: () => {}, error: () => {} }, ok)).toBe(0)
     expect(JSON.parse(readFileSync(out, 'utf8'))).toEqual({ lang: 'hi', tn: ['act'], tq: [] })
     const bad = (async () => new Response('no', { status: 500 })) as unknown as typeof fetch
