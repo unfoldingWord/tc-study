@@ -1,7 +1,8 @@
 /**
  * Runs the chain (`decide`) over the tune sets with the staging readers and the committed complements, and prints, per language
- * and margin: calls correct, accepted, correct among accepted, and how many questions each step decided. Only the `-tune` sets:
- * the `-test` sets are held out. Node and Bun only. `LP3_STAGING=1 bun eval/tune.ts [--margins 0,0.1,...] [--misses <file>]`.
+ * and margin: calls correct, accepted, correct among accepted, and how many questions each step decided. From C2.1 the C2 `-test`
+ * sets are tune data too (`--sets tune,test`); the `-test2` sets are held out and this script refuses them. Node and Bun only.
+ * `LP3_STAGING=1 bun eval/tune.ts [--sets tune,test] [--margins 0,0.1,...] [--words 1,2,...] [--misses <file>]`.
  * es and pt use the `es-419` reader (pt has no pack of its own yet); one reader is open at a time.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -84,14 +85,20 @@ if (process.argv[1]?.endsWith('tune.ts')) {
   // R37 f: `--words 1,2,3,4` sweeps the description N at the first margin.
   const wordsList = arg('--words')?.split(',').map(Number)
   const missFile = arg('--misses')
+  const kinds = (arg('--sets') ?? 'tune').split(',')
+  if (kinds.some((k) => k !== 'tune' && k !== 'test')) throw new Error('--sets takes tune and test only: the test2 sets are held out')
   const misses: string[] = []
   let reader: PackReader | undefined
   let readerLang = ''
   for (const { set, reader: lang, tag } of SETS) {
-    const items = readFileSync(join(ROOT, 'eval/questions', `${set}-tune.jsonl`), 'utf8')
-      .split('\n')
-      .filter((l) => l.trim() !== '')
-      .map((l) => JSON.parse(l) as Item)
+    const bySet = kinds.map((k) => ({
+      k,
+      items: readFileSync(join(ROOT, 'eval/questions', `${set}-${k}.jsonl`), 'utf8')
+        .split('\n')
+        .filter((l) => l.trim() !== '')
+        .map((l) => JSON.parse(l) as Item),
+    }))
+    const items = bySet.flatMap((b) => b.items)
     if (readerLang !== lang) {
       reader = undefined
       reader = await loadPacks(lang)
@@ -100,6 +107,7 @@ if (process.argv[1]?.endsWith('tune.ts')) {
     const ctx = await contextFor(reader!, tag, items)
     for (const w of wordsList ?? []) console.log(`${set} words ${w}: ` + line(set, margins[0]!, tally(items, { ...ctx, margin: margins[0]!, descriptionWords: w })))
     for (const m of margins) {
+      for (const b of bySet.length > 1 ? bySet : []) console.log(line(`${set}-${b.k}`, m, tally(b.items, { ...ctx, margin: m })))
       const sink: string[] = []
       console.log(line(set, m, tally(items, { ...ctx, margin: m }, sink)))
       if (m === margins[0]) misses.push(...sink.map((x) => `${set}\t${x}`))

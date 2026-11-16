@@ -161,8 +161,12 @@ export async function checkCall(reader: PackReader, call: Call): Promise<IdCheck
       if (a.book !== undefined && !isBook(a.book)) return fail(`not a book: ${String(a.book)}`)
       return ok
     case 'books': {
+      // R32: the client's books query also takes a Strong key as `{ strong }`.
+      const given = [a.article, a.concept, a.strong].filter((x) => x !== undefined)
+      if (given.length !== 1) return fail('books needs exactly one of article, concept and strong')
+      if (a.strong !== undefined) return typeof a.strong === 'string' && /^[GH]\d{1,5}[a-z]?$/.test(a.strong) ? ok : fail('not a Strong number')
       const id = a.article ?? a.concept
-      if ((a.article === undefined) === (a.concept === undefined) || typeof id !== 'string') return fail('books needs exactly one of article and concept')
+      if (typeof id !== 'string') return fail('books needs exactly one of article, concept and strong')
       if (a.concept !== undefined && /^[GH]\d{1,5}[a-z]?$/.test(id)) return ok
       return (await checkIds(reader, [`concept:${id}`])).map((c) => ({ ...c, id: label }))
     }
