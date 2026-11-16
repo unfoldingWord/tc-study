@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { catalogView, hex, keyId, KNOWN, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
+import { BOOKS, catalogView, hex, keyId, KNOWN, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { createHash } from 'node:crypto'
 import { main, optionsFromArgs, readRoleHints, USAGE } from './build-v3'
 import type { TopicSource } from './fetch-topic-sources'
@@ -745,5 +745,44 @@ describe('build-v3 --sign-key', () => {
     expect(r.code).toBe(2)
     expect(r.err.join('\n')).not.toContain('c2VjcmV0LXRleHQ=')
     expect((await run(sample(temp(), ['--sign-key', join(dir, 'missing.pem')]))).code).toBe(1)
+  })
+})
+
+describe('build-v3: the book names list', () => {
+  const EN_LIST = join(DATA, 'en', 'list.json')
+  const NAMES = join(import.meta.dir, '..', 'data', 'book-names', 'es-419.json')
+
+  /** The names of the es-419 map core of a fixture build, by book code, with their source. */
+  async function mapNames(extra: string[]): Promise<Record<string, [string, string, string, string]>> {
+    const out = temp()
+    expect((await run(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST, ...extra]))).code).toBe(0)
+    for (const name of readdirSync(join(out, 'segments'))) {
+      const output = (await readerOutput(read(join(out, 'segments', name)))) as { h?: { class?: string; part?: string }; books?: [string, string, string, string][] }
+      if (output.h?.class === 'map' && output.h.part === 'core') return Object.fromEntries(BOOKS.map((code, i) => [code, output.books![i]]))
+    }
+    throw new Error('no map core')
+  }
+
+  test('the es-419 list file names the 66 books, three strings each', () => {
+    const list = JSON.parse(readFileSync(NAMES, 'utf8')) as Record<string, string[]>
+    expect(Object.keys(list)).toEqual([...BOOKS])
+    for (const entry of Object.values(list)) {
+      expect(entry).toHaveLength(3)
+      for (const part of entry) expect(part.trim()).not.toBe('')
+    }
+  })
+
+  test('with the list a book with no text has source list and a book with text keeps source text', async () => {
+    const names = await mapNames(['--book-names', NAMES])
+    expect(names.gen?.[3]).toBe('list')
+    expect(names.gen?.[0]).toBe('El libro del Génesis')
+    expect(names.tit).toEqual(['La carta de Pablo a Tito', 'Tito', 'Tit', 'text'])
+    expect(Object.values(names).filter((n) => n[3] === 'none')).toHaveLength(0)
+  })
+
+  test('without the list a book with no text is none', async () => {
+    const names = await mapNames([])
+    expect(names.gen?.[3]).toBe('none')
+    expect(names.tit?.[3]).toBe('text')
   })
 })

@@ -400,6 +400,10 @@ jobs:
             exit 1
           fi
           args+=(--ta-config "$RUNNER_TEMP/ta-config")
+          # A language with a list of its book names in the repo (data/book-names/<tag>.json) gets them in its map, for the books
+          # whose text has no \toc lines.
+          names="packages/resource-pipeline/data/book-names/${LANGUAGE,,}.json"
+          if [ -f "$names" ]; then args+=(--book-names "$names"); fi
           if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
           status=0
