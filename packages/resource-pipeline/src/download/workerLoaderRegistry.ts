@@ -39,6 +39,7 @@ type LoaderConfig = {
   door43Client: unknown
   debug: boolean
   enableMemoryCache?: boolean
+  zip?: boolean
 }
 
 type LoaderCtor = (deps: WorkerLoaderDeps) => ResourceLoader
@@ -64,7 +65,7 @@ const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
   academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),
   notes: (deps) => new (deps.markdownObsHelps ? withMarkdownObsHelps(TranslationNotesLoader, 'tn') : TranslationNotesLoader)(toLoaderConfig(deps)),
   questions: (deps) => new (deps.markdownObsHelps ? withMarkdownObsHelps(TranslationQuestionsLoader, 'tq') : TranslationQuestionsLoader)(toLoaderConfig(deps)),
-  obs: (deps) => new ObsLoader(toLoaderConfig(deps)),
+  obs: (deps) => new ObsLoader({ ...toLoaderConfig(deps), zip: deps.markdownObsHelps === true }),
 }
 
 /**

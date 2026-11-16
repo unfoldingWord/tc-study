@@ -50,6 +50,7 @@ function setup(files: Record<string, string>, metadata = meta()) {
     cacheAdapter: { get: async (k: string) => store.get(k), set: async (k: string, v: unknown) => void store.set(k, v) },
     catalogAdapter: { get: async () => metadata },
     door43Client: door43,
+    zip: true,
   })
   return { loader, store, calls }
 }
@@ -151,5 +152,43 @@ describe('ObsLoader reads the zip', () => {
     const { loader } = setup(files, meta({ contentMetadata: { ingredients: [{ identifier: '01', path: './content/./x/../01.md' }] } }))
     const story = await loader.loadContent(key, '01')
     expect(story.frames[1].resolvedSrc).toBe('https://git.door43.org/unfoldingWord/en_obs/raw/tag/v9/content/img/obs-en-01-02.jpg')
+  })
+})
+
+describe('ObsLoader outside the packs build (the app)', () => {
+  test('asks findRepository for prod, fetches each story, and warns per failed story', async () => {
+    const store = new Map<string, any>()
+    const found: string[] = []
+    const fetched: string[] = []
+    const warns: unknown[][] = []
+    const orig = console.warn
+    console.warn = (...a: unknown[]) => void warns.push(a)
+    try {
+      const loader = new ObsLoader({
+        cacheAdapter: { get: async (k: string) => store.get(k), set: async (k: string, v: unknown) => void store.set(k, v) },
+        // A cached catalog row without release data: the ref must come from findRepository, not from the row.
+        catalogAdapter: { get: async () => meta({ release: undefined }) },
+        door43Client: {
+          config: { baseUrl: 'https://git.door43.org' },
+          async findRepository(o: string, r: string, stage: string) { found.push(`${o}/${r}/${stage}`); return { default_branch: 'main' } },
+          async fetchTextContent(_o: string, _r: string, path: string, ref: string) {
+            fetched.push(`${path}@${ref}`)
+            if (path.endsWith('02.md')) throw new Error('404')
+            return STORY1
+          },
+          async downloadZipball() { throw new Error('downloadZipball called') },
+        },
+        debug: true,
+      })
+      await loader.downloadResource(key)
+    } finally {
+      console.warn = orig
+    }
+    expect(found.length).toBe(2)
+    expect(found.every((f) => f === 'unfoldingWord/en_obs/prod')).toBe(true)
+    expect(fetched).toEqual(['./content/01.md@main', './content/02.md@main'])
+    expect(store.has(`obs:${key}:01`)).toBe(true)
+    expect(warns.length).toBe(1)
+    expect(String(warns[0][0])).toContain('02')
   })
 })
