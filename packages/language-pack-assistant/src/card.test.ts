@@ -212,3 +212,27 @@ test('OBS in a books card: the obs cell is a book:obs piece by its count, cited 
   expect(cell.link).toBe('pieza:book:obs')
   expect(cell.cite.res).toBe(obs.links!.res)
 })
+
+test('OBS frame refs: an answer that gives 1:1 is cited and shown as 01:01', async () => {
+  const obs = (await reader.obs())!
+  const tw = obs.links!.rows[0]!.concept!
+  // The same sample reader, with a concept answer whose frames are not padded.
+  const loose = new Proxy(reader, {
+    get(target, key, receiver) {
+      if (key !== 'concept') return Reflect.get(target, key, receiver)
+      return async (id: string) => {
+        const a = await target.concept(id)
+        const d = a.data as { obs?: { stories: { frames?: string[] }[] } }
+        for (const s of d.obs?.stories ?? []) if (s.frames !== undefined) s.frames = s.frames.map((f) => f.split(':').map(Number).join(':'))
+        return a
+      }
+    },
+  }) as PackReader
+  const raw = (await loose.concept(tw)).data as { obs: { stories: { frames: string[] }[] } }
+  expect(raw.obs.stories[0]!.frames).toEqual(['1:1'])
+  const { pieces } = await piecesOf(loose, { query: 'concept', args: { id: tw } }, 50)
+  const frame = pieces.find((p) => p.kind === 'frame')!
+  expect(frame.id).toBe('frame:obs 01:01')
+  expect(frame.cite.ref).toBe('obs 01:01')
+  expect(frame.link).toBe('obs:01:01')
+})

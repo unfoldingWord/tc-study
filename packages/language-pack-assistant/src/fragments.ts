@@ -43,7 +43,7 @@ export function canonStrong(key: string): string {
 
 const pad2 = (n: string | number): string => String(Number(n)).padStart(2, '0')
 /** `1:2` → `01:02`: an OBS frame as the `obs` unit writes it. */
-const frameAt = (ref: string): string => ref.split(':').map(pad2).join(':')
+export const frameAt = (ref: string): string => ref.split(':').map(pad2).join(':')
 
 /**
  * A fragment id in the form ids compare in (R29): `verse:` with the last part of the resource key, `rendering:` with a canonical key and a

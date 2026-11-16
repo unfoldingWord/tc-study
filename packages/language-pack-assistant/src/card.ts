@@ -5,7 +5,7 @@
 import { type Answer, languageTn, type PackReader } from '@bt-synergy/language-pack-client'
 import { UGNT, UHB } from '@bt-synergy/language-pack-v3'
 import type { Call, Decision } from './decision'
-import { type Fragment, fragmentsOf, type VerseAnswers } from './fragments'
+import { type Fragment, fragmentsOf, frameAt, type VerseAnswers } from './fragments'
 
 export type Card = {
   question: string
@@ -66,7 +66,7 @@ async function citeMaps(reader: PackReader, call: Call, a: Answer<unknown>): Pro
           })()
     if (from === undefined) return
     for (const s of stories) {
-      if (s.frames !== undefined && s.frames.length > 0) for (const f of s.frames) push(from[0], from[1], id, `obs ${f}`)
+      if (s.frames !== undefined && s.frames.length > 0) for (const f of s.frames) push(from[0], from[1], id, `obs ${frameAt(f)}`)
       else push(from[0], from[1], id, `obs ${pad2(s.n)}`)
     }
     return

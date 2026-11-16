@@ -82,7 +82,8 @@ digits each): `frame:obs NN:FF`, `obsnote:NN:FF/<rowid>`, `obsquestion:NN:FF/<ro
 of `books`.
 
 - passage and context: the verse of the main text (`glt`) first, then notes (non-introduction first), then one question.
-- concept: `section:<id>#<default section>` first, then `concept:<id>`. article: the default section.
+- concept: `section:<id>#<default section>` first, then the article's other sections in order, then `concept:<id>`, then where it is
+  used (books, then OBS frames or stories). article: the default section.
 - renderings: the most frequent form of each key. books: the 3 books with the highest count. topics: for a book, the person, place and event
   topics of the most verses; for a category, the first ids.
 - search: the top hits of the reader's search (the generic book introduction note was dropped from the top when other hits exist).
