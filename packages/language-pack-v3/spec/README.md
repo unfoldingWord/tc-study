@@ -77,6 +77,7 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | --- | --- |
 | The transfer file's extension (`.tcpack` is a proposal) and the format's name | Abel decides before the builder publishes |
 | Part B of phase 2: topics, people, places, events and relations (TIPNR, Theographic, OBS) in the common map | Done in phase 2 part B. Measured on the real sources: the common map (core and parts) plus the es-419 map and topics weigh 1 474 320 bytes compressed, within the 2 MB limit |
+| Patch catalogs (`{lang}-x-{source}`) and the optional `source` and `review` of a resource (`catalog.md`) | Done for the Hindi Aquifer pilot: both readers, the builder (`patch`) and the case `catalogo-parche` |
 | Verse equivalences between a text's numbering and the original's (`map`, `numbering`) | A later version |
 | MACULA and the lexicon in columns | A later version of their tables |
 | `needs: "map"` in the units of a catalog was dangling until phase 2 built the `map` unit: done in phase 2 part A. A phase 1 catalog still cannot activate a book on a device that enforces it, so phase 1 catalogs are not published | Done |

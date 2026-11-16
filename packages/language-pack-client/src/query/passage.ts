@@ -2,15 +2,18 @@
 import { type BookModel, type Event, type HelpRow, parseRef, type Piece, verseId } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
-import { type Answer, type CellState, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
+import { type Answer, type CellState, type PatchMark, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
+
+/** A row of the notes, questions or links; `patch` is set on a row that came from a patch catalog (`patch.ts`). */
+export type PassageRow = HelpRow & { patch?: PatchMark }
 
 export type PassageData = {
   book: string
   ref: string
   texts: { res: string; text: string }[]
-  notes: HelpRow[]
-  questions: HelpRow[]
-  links: HelpRow[]
+  notes: PassageRow[]
+  questions: PassageRow[]
+  links: PassageRow[]
 }
 
 /** `tit 1:1-2` -> book `tit` and the range of verse ids; `E_ARG` for anything else. */

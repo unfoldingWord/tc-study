@@ -39,6 +39,8 @@ A **unit** is what a device installs or replaces at once:
 Each unit lists the units it needs (`needs`). A unit may carry `optional: true`: a device installs it only when asked. Every `aligned:{part}` unit must carry it (with the value `true`) and no other unit may; no unit lists an optional unit in `needs`, and an optional unit lists no `needs` (rules of the builder; a reader does not check them). The part of an `aligned:{part}` id must be a group (`cddl/aligned.cddl`), or the catalog is `E_BODY`. A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
 notes and links point to that the catalog builds (the others are reported and not listed). The lexicon is not needed to read; an app downloads it when asked.
 
+A patch book is the exception: see "Patch catalogs".
+
 A bridged book names the original's stamp, so its unit needs `orig:<book>` like any book. The local catalog of the bridge lists the
 `orig:<book>` of each book it builds, and a need is resolved in the book's own catalog first, then in a catalog it requires: the
 bridged book finds its original there and activates with no common catalog. Only a book the `originals` source lacks waits for an
@@ -136,6 +138,36 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
    without keys.
 - **Going back.** A reader MUST NOT replace an installed catalog with a lower revision of the same publisher and
   catalog, unless the person confirms it. An old SD card must not undo an update without asking.
+
+## Patch catalogs
+
+A patch catalog fills the gaps of a language from a second source (for Hindi, the notes and questions Aquifer publishes
+where Door43 has none). It is a language catalog like any other, marked by its name, and the base always wins.
+
+- **Name.** `{lang}-x-{source}`, for example `hi-x-aquifer`: a BCP 47 tag with a private-use subtag, so it passes the
+  same tag check as any language and is served, listed and read as one (`serving.md`). `{source}` is 1 to 8 characters of
+  `[a-z0-9]`, so the tag stays within the Worker's pattern `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. `{lang}` is any language tag
+  (`pt-br`, `es-419`), so a patch name matches `^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*-x-[a-z0-9]{1,8}$`. **The base language is the tag
+  with its `-x-{source}` suffix removed.** `about.catalog`, the header `lang`
+  and the `lang` of its segments are that tag.
+- **Units.** Its units are `book:<book>` segments with `texts: []` (`book.cddl` already allows a language with notes and
+  no text of a book) that carry only `notes` and/or `questions`. A book unit needs **only `orig:<book>`**: no `art:` group (its `ta:` concepts resolve
+  in the base language, which the app opens beside the patch) and no `map` (the patch has no map unit and common has only
+  `xmap`, so the need could never be met; the reader takes the map from the base language). It `requires` the
+  published common catalog like any language catalog. A patch has a book only where the base lacks that table.
+- **Provenance.** It lives on the `resources` entries, the only provenance slot of format 3 (the `res` of a segment
+  header points to it). A resource entry may carry two optional fields, which a Door43 resource does not:
+  - `source`: the aggregator the data came from (`"aquifer"`);
+  - `review`: the review level of the source's articles, one of `"none"`, `"community"`, `"professional"` or `"mixed"`
+    (when the articles differ). A reader refuses any other value (`E_BODY`, like a bad `about.direction`).
+  An app takes its notice from `review` and its credit from `attribution`, `rights` and `license`.
+- **Merging.** A reader that merges a patch does it per book and per table (`notes`, `questions`, `links`): the base's
+  table wins whenever the base has that table for that book installed, and the patch fills only a missing table.
+- **Provenance of rows.** Every row shown from a patch carries its provenance: the `source`, `review`, `license`,
+  `rights`, `attribution` and `release` of its resource entry.
+- **Article ids.** The `ta:` ids of patch rows resolve in the base language.
+- **Signed** like every published catalog (above), with the same publisher key. `about.publisher` is the one who
+  publishes the pack; the source and the original publisher are on the resource entry.
 
 ## Complements
 

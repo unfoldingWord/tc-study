@@ -12,7 +12,8 @@ import { CLASS_NAMES, hex, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
 import { isGroup } from './aligned'
-import type { About, CatalogModel, CatalogResource, Complement, SegmentEntry, Unit } from '../model'
+import { REVIEW_LEVELS } from '../model'
+import type { About, CatalogModel, CatalogResource, Complement, ReviewLevel, SegmentEntry, Unit } from '../model'
 
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the catalog is malformed: ${what}`)
@@ -90,6 +91,13 @@ function readResource(value: unknown, i: number): CatalogResource {
   if (rights !== undefined) resource.rights = rights
   const attribution = optionalText(fields, 'attribution', what)
   if (attribution !== undefined) resource.attribution = attribution
+  const source = optionalText(fields, 'source', what)
+  if (source !== undefined) resource.source = source
+  if (hasOwn(fields, 'review')) {
+    const review = fields.review
+    if (!(REVIEW_LEVELS as readonly unknown[]).includes(review)) bad(`${what}.review is ${JSON.stringify(review)}, not "none", "community", "professional" or "mixed"`)
+    resource.review = review as ReviewLevel
+  }
   return resource
 }
 

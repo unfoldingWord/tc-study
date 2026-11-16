@@ -3,11 +3,22 @@
  * answer read (a book of revision 9 under a map of revision 12 says both), the coverage of what was asked, and the units that
  * would have been needed but are not installed, with their size. No Node module here.
  */
-import type { State } from '@bt-synergy/language-pack-v3'
+import type { ReviewLevel, State } from '@bt-synergy/language-pack-v3'
 import type { PackReader } from '../reader'
 
-/** `res` is the resource key; `release` its stamp from the segment's `res`. */
-export type Cite = { res: string; release: string; id?: string; ref?: string; section?: string }
+/** Where a row or a cite from a patch catalog comes from (`patch.ts`): the patch and the provenance of its resource entry. */
+export type PatchMark = {
+  patch: string
+  source?: string
+  review?: ReviewLevel
+  license: string
+  rights?: string
+  attribution?: string
+  release: string
+}
+
+/** `res` is the resource key; `release` its stamp from the segment's `res`. `patch` is set only on a cite from a patch catalog. */
+export type Cite = { res: string; release: string; id?: string; ref?: string; section?: string; patch?: PatchMark }
 
 /** The state of a cell of the map: `State` of language-pack-v3 (`Coverage` there is the map's own type). */
 export type CellState = State

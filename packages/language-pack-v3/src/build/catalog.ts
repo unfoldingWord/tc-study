@@ -25,6 +25,7 @@ import { CLASS_NAMES, hex, readHeader, type Segment, writeSegment } from '../cod
 import { sha256 } from '../codec/sha256'
 import { hexToBytes, isUint as isCount } from '../codec/values'
 import { bookNumber } from '../ids'
+import { REVIEW_LEVELS } from '../model'
 import type { About, BookModel, CatalogModel, CatalogResource, Complement, Unit } from '../model'
 
 /**
@@ -161,8 +162,13 @@ const ARTICLE_CONCEPT = /^(tw|ta):([^/:]+)\//
  * With `groups` (the units `art:...` the catalog builds) a need on another article group is left out: a unit activates only when
  * every unit it needs is complete (`catalog.md`), and a group no segment of this catalog supplies would keep the book from ever
  * activating. Without it every group is listed.
+ *
+ * With `patch: true` (the book of a patch catalog, `catalog.md`, "Patch catalogs") only `orig:<book>` is needed: no article group (its `ta:` and `tw:`
+ * concepts resolve in the base language) and no `map` (a patch has no map unit and common has only `xmap`; the patch reader takes the
+ * map from the base language).
  */
-export function needsOfBook(book: BookModel, groups?: ReadonlySet<string>): string[] {
+export function needsOfBook(book: BookModel, groups?: ReadonlySet<string>, o: { patch?: boolean } = {}): string[] {
+  if (o.patch === true) return [`orig:${book.book}`]
   const needs = new Set<string>([`orig:${book.book}`, 'map'])
   for (const table of [book.notes, book.links]) {
     for (const row of table?.rows ?? []) {
@@ -257,7 +263,11 @@ function encodeResources(resources: CatalogResource[]): CborValue[] {
       if (typeof resource[field] !== 'string') throw new Error(`${where}: ${field} is not text`)
       out[field] = resource[field]
     }
-    optionalTexts(out, resource, ['rights', 'attribution'], where)
+    optionalTexts(out, resource, ['rights', 'attribution', 'source'], where)
+    if (resource.review !== undefined) {
+      if (!(REVIEW_LEVELS as readonly unknown[]).includes(resource.review)) throw new Error(`${where}: review is not one of ${REVIEW_LEVELS.join(', ')}`)
+      out.review = resource.review
+    }
     return out
   })
 }
@@ -299,6 +309,7 @@ function catalogInputs(ids: string[]): string {
  * - `segments` are the built segments of the catalog, ordered as the top of this file says; `size` is the length of the file and
  *   `ulen` the one of its header. A catalog is not listed in a catalog.
  * - `needs(segment)` gives the units a segment needs (`unitsOf`, `needsOfBook`); without it no unit has `needs`.
+ * - `patch: true` builds a patch catalog (`catalog.md`, "Patch catalogs"): a `needs` that lists an `art:` unit throws.
  * - `requires` is `[catalog, revision, id]` with the id in hex (the common catalog a language catalog was built against).
  * - The same inputs give the same catalog and id, `about.built` included: the caller passes the date.
  * - The catalog's own `inputs` is the sha256, in hex, of the ids of its segments, of the `requires` and of its complements (as 64
@@ -314,7 +325,9 @@ export async function buildCatalog(o: {
   requires?: [string, number, string][]
   complements?: Complement[]
   needs?: (s: BuiltSegment) => string[]
+  patch?: boolean
 }): Promise<BuiltSegment> {
+  if (o.patch === true && !/^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*-x-[a-z0-9]{1,8}$/.test(o.about.catalog)) throw new Error(`The catalog ${JSON.stringify(o.about.catalog)} is not a patch catalog name: {lang}-x-{source} ({lang} any language tag), the source of 1 to 8 characters of a-z and 0-9`)
   const about = encodeAbout(o.about)
   const resources = encodeResources(o.resources)
 
@@ -324,7 +337,18 @@ export async function buildCatalog(o: {
     if (ids.has(built.id)) throw new Error(`The segment ${built.id} is listed twice`)
     ids.add(built.id)
   }
-  const units = unitsOf(ordered, o.needs ?? (() => []))
+  const needsOf = o.needs ?? (() => [])
+  const units = unitsOf(
+    ordered,
+    o.patch === true
+      ? (s) => {
+          const wanted = needsOf(s)
+          const art = Array.isArray(wanted) ? wanted.find((id) => typeof id === 'string' && id.startsWith('art:')) : undefined
+          if (art !== undefined) throw new Error(`The segment ${s.id} needs ${art}, and a patch catalog has no article groups: its concepts resolve in the base language`)
+          return wanted
+        }
+      : needsOf,
+  )
   const segments = ordered.map(encodeSegmentEntry)
 
   const requires = (o.requires ?? [])

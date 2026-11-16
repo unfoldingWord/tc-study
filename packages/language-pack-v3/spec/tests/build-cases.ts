@@ -22,7 +22,7 @@ import { deflateRaw } from 'pako'
 import { bridgeZip } from '../../src/bridge/fromV2'
 import { articleResources, artSegment, extractArticles } from '../../src/build/art'
 import { bookSegment } from '../../src/build/book'
-import { type BuiltSegment, buildCatalog, builtSegment } from '../../src/build/catalog'
+import { type BuiltSegment, buildCatalog, builtSegment, needsOfBook } from '../../src/build/catalog'
 import { BUILDER, buildCommon, buildLanguage, type LanguageBuild } from '../../src/build/language'
 import { extractObs, obsSegment } from '../../src/build/obs'
 import { buildMap } from '../../src/build/map/build'
@@ -35,7 +35,7 @@ import { topicsSegment } from '../../src/build/topics/segment'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, readHeader, readSegment, type Segment, writeSegment } from '../../src/codec/container'
-import { verseId } from '../../src/ids'
+import { bookSet, verseId } from '../../src/ids'
 import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel, TopicName } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
@@ -260,6 +260,30 @@ async function partialLanguage(): Promise<Uint8Array> {
   const titus = await titVerses()
   const { core } = buildMap({ lang: ES, refs: await esRefs(books), books: models.map((model) => ({ model, verses: model.book === 'tit' ? titus : [] })), articles: [], obs: null })
   return bytesOfMap(core)
+}
+
+// Case 22: a patch catalog
+
+/**
+ * Case 22: the catalog `hi-x-aquifer` (`catalog.md`, "Patch catalogs"): one book unit of Titus with no text and one note, the resource of
+ * the notes with `source: "aquifer"` and `review: "none"`, and the needs of the book without any `art:` group.
+ */
+async function patchCatalog(): Promise<Uint8Array> {
+  const key = 'aquifer/hi/tn'
+  const note: HelpRow = { id: '12345', ref: '1:1', from: 56_001_001, to: 56_001_001, concept: 'ta:translate/figs-metaphor', cols: { quote: 'Παῦλος', note: 'A note' } }
+  const model: BookModel = { lang: 'hi-x-aquifer', book: 'tit', orig: ['unfoldingWord/el-x-koine/ugnt', 'g987ab2025a'], res: [[key, 'UWTranslationNotes@0123456']], texts: [], notes: { res: key, rows: [note] } }
+  const book = await builtSegment(bookSegment(model), '5'.repeat(64))
+  const catalog = await buildCatalog({
+    about: { ...ABOUT, catalog: 'hi-x-aquifer', revision: 1 },
+    resources: [
+      { key, title: 'Translation Notes', subject: 'TSV Translation Notes', release: 'UWTranslationNotes@0123456', license: 'CC-BY-SA-4.0', rights: '(c) 2022 unfoldingWord; adapted by Mission Mutual', attribution: 'Adapted from unfoldingWord Translation Notes by Mission Mutual', source: 'aquifer', review: 'none', books: bookSet(['tit']) },
+    ],
+    segments: [book],
+    requires: [['common', 1, '6'.repeat(64)]],
+    patch: true,
+    needs: () => needsOfBook(model, undefined, { patch: true }),
+  })
+  return catalog.bytes
 }
 
 // Cases 7 and 8: articles
@@ -571,6 +595,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('seccion-insertada/build2.seg', build2)
   out.set('articulo-mal-titulado/art.seg', await badlyTitled())
   out.set('articulos-relacionados/art.seg', await relatedArticles())
+  out.set('catalogo-parche/catalog.seg', await patchCatalog())
   out.set('tabla-desconocida/future-x.seg', await withTable('future-x', false))
   out.set('tabla-desconocida/future-y.seg', await withTable('future-y', true))
   out.set('topics-local-clave-extra/core.seg', await localWithExtraKey())

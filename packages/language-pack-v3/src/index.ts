@@ -33,6 +33,8 @@ export { zipSource, type ZipSource } from './source/zipSource'
 // Builders
 export { extractOrig, OrigIndex, origSegment } from './build/orig'
 export { bookSegment } from './build/book'
+export { type AquiferArticle, buildTaMap, type EnTaTitles, type TaArticle as AquiferTaArticle } from './build/aquiferHelps'
+export { buildPatch, licenseOf, plainNotice, reviewOf, type BaseBooks, type PatchBuild, type PatchInput, type PatchKind, type PatchSource } from './build/patch'
 export { extractBook } from './build/bookHelps'
 export { artSegment, extractArticles } from './build/art'
 export { linkedIds, parseTaConfig, relatedArticles, type TaArticle, type TaConfigs } from './build/related'

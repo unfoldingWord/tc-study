@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import type { Sample } from './sample'
 
 export type Content = Sample | { bucketDir: string }
+/** Language catalogs besides the sample's `es-419` (a patch catalog, `hi-x-aquifer`), by name. */
+export type WithCatalogs = Sample & { catalogs?: Record<string, Uint8Array> }
 /** 429 answers with `Retry-After: 7`; 500 and 503 with a JSON error body, as the Worker does (`serving.md`). */
 export type FailSegment = (id: string, n: number) => 'ok' | 404 | 429 | 500 | 503 | 'drop' | 'corrupt'
 export type FakeServer = { url: string; hits: string[]; set(content: Content): void; stop(): void }
@@ -46,7 +48,7 @@ function lookup(content: Content, kind: 'catalog' | 'seg', key: string): Uint8Ar
   }
   if (kind === 'seg') return content.segments.get(key)
   if (key === 'common') return content.commonCatalog
-  return key === SAMPLE_LANG ? content.langCatalog : undefined
+  return key === SAMPLE_LANG ? content.langCatalog : (content as WithCatalogs).catalogs?.[key]
 }
 
 export function startFakeServer(initial: Content, o: { failSegment?: FailSegment; noCommon?: boolean } = {}): FakeServer {

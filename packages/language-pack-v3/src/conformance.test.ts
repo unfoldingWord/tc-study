@@ -46,6 +46,7 @@ describe('the case files', () => {
       'articulo-mal-titulado/art.seg',
       'articulos-relacionados/art.seg',
       'catalog-bad-sig/catalog.seg',
+      'catalogo-parche/catalog.seg',
       'catalog-signed/catalog.seg',
       'catalog-unknown-key/catalog.seg',
       'catalog-unsigned-published/catalog.seg',
@@ -309,6 +310,16 @@ describe('case 8: articulo-mal-titulado', () => {
     expect(sections[0].level).toBe(0)
     expect(sections[0].title).toBeUndefined()
     for (const s of sections) expect(typeof s.md).toBe('string')
+  })
+})
+
+describe('case 22: catalogo-parche', () => {
+  test('the resource has source and review, and the book needs no art group', async () => {
+    const out = await outputOf('catalogo-parche/catalog.seg')
+    expect(out.h).toMatchObject({ class: 'catalog', lang: 'hi-x-aquifer' })
+    expect(out.resources).toHaveLength(1)
+    expect(out.resources[0]).toMatchObject({ key: 'aquifer/hi/tn', source: 'aquifer', review: 'none', license: 'CC-BY-SA-4.0' })
+    expect(out.units).toEqual([{ id: 'book:tit', segments: [0], needs: ['orig:tit'] }])
   })
 })
 
