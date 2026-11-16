@@ -172,7 +172,9 @@ function concept(b: Build, d: ConceptData): Fragment[] {
 }
 
 function books(b: Build, d: BooksData, about: string | undefined): Fragment[] {
-  const cite = b.cites.find((c) => c.id === about && c.section === undefined)
+  // A Strong key is cited as the key that answered (padded, or with a suffix), which may differ from the one asked.
+  const strong = about !== undefined && /^[GH]\d+[a-z]?$/i.test(about)
+  const cite = b.cites.find((c) => c.section === undefined && (strong ? c.id !== undefined && /^[GH]\d+[a-z]?$/i.test(c.id) : c.id === about))
   if (cite === undefined) return []
   const cells = Object.entries(d.books).filter(([, c]) => c.state !== 'none' && c.state !== 'zero')
   cells.sort(([, x], [, y]) => (y.count ?? 0) - (x.count ?? 0))

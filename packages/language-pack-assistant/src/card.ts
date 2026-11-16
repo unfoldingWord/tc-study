@@ -45,7 +45,7 @@ async function citeMaps(reader: PackReader, call: Call, a: Answer<unknown>): Pro
     if (typeof call.args.strong === 'string') {
       // The counts of a Strong key come from the original text of the book: the Greek or the Hebrew source of the xmap.
       const orig = call.args.strong.startsWith('H') ? UHB : UGNT
-      push(orig, release(m.xmap?.core.res, orig), call.args.strong)
+      push(orig, release(m.xmap?.core.res, orig), answeredKey.get(a) ?? normalizeStrong(call.args.strong))
       return
     }
     const id = (call.args.article ?? call.args.concept) as string | undefined
@@ -89,6 +89,9 @@ export async function renderingsOf(reader: PackReader, key: string): Promise<Ren
   return first
 }
 
+/** The Strong key (padded, with its letter suffix) that actually answered a `books` call, by answer: the card cites that key. */
+const answeredKey = new WeakMap<object, string>()
+
 type BooksAnswer = Answer<{ books: Record<string, { state: string }> }>
 const hasBooks = (a: BooksAnswer): boolean => a.data !== null && Object.values(a.data.books ?? {}).some((b) => b.state !== 'none')
 
@@ -96,10 +99,14 @@ const hasBooks = (a: BooksAnswer): boolean => a.data !== null && Object.values(a
 export async function booksOf(reader: PackReader, key: string): Promise<BooksAnswer> {
   const k = normalizeStrong(key)
   const first = (await reader.books({ strong: k })) as BooksAnswer
+  answeredKey.set(first, k)
   if (hasBooks(first) || !/\d$/.test(k)) return first
   for (const s of ['a', 'b', 'c']) {
     const next = (await reader.books({ strong: k + s })) as BooksAnswer
-    if (hasBooks(next)) return next
+    if (hasBooks(next)) {
+      answeredKey.set(next, k + s)
+      return next
+    }
   }
   return first
 }

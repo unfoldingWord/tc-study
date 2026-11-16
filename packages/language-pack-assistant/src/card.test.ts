@@ -101,6 +101,19 @@ test('books by a Strong key pad and try the suffixes like renderings', async () 
   expect(asked).toEqual(['H2617', 'H2617a'])
 })
 
+test('the books card cites the Strong key that answered (padded, or with a suffix)', async () => {
+  const stub = {
+    books: async ({ strong }: { strong: string }) => answerOf('books', { books: { tit: { state: strong === 'H2617a' ? 'count' : 'none' } } }),
+    maps: async () => ({ xmap: { core: { res: [['unfoldingWord/hbo/uhb', '1']] } } }),
+  } as unknown as PackReader
+  const r = await piecesOf(stub, { query: 'books', args: { strong: 'H2617' } }, 8)
+  const ids = r.pieces.map((p) => p.cite?.id).filter((x) => x !== undefined)
+  expect(ids).toContain('H2617a')
+  expect(ids).not.toContain('H2617')
+  const g = await piecesOf(stub, { query: 'books', args: { strong: 'g26' } }, 8)
+  expect(g.pieces.map((p) => p.cite?.id).filter((x) => x !== undefined)).not.toContain('g26')
+})
+
 test('R33: search sends the content words; with no hits, each word alone and the hits merge by score', async () => {
   const sent: string[] = []
   const hit = (id: string, score: number) => ({ kind: 'note', res: 'r', book: 'tit', ref: '1:1', id, snippet: 's', score })
