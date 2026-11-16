@@ -76,7 +76,7 @@ All are methods of `PackReader`; each returns an `Answer<T>`:
 
 ```ts
 type Answer<T> = {
-  query: 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy'
+  query: 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy' | 'sections'
   data: T | null                                   // null when the unit that answers is not installed
   cites: { res; release; id?; ref?; section? }[]   // where each datum comes from
   revision: { lang?; common?; units: Record<unit, number> } // a book of revision 1 under a map of revision 2 says both
@@ -95,7 +95,18 @@ type Answer<T> = {
 | `books({ article } or { concept })` | which books use it | one cell per book: `state`, `count`, `verses`, `installed`, `bytes` |
 | `renderings({ strong } or { book, word })` | a Strong's number or a word | how the language renders it, with counts and references |
 | `academy(book)` | `'rut'` | the tA articles the notes of the book cite: `book`, `covered` (false when the language has no tN that covers the book: then `articles` is `[]` for lack of a source, not because nothing is cited), `articles` (`id`, `title`, `count`, `partial`, most cited first); `data: null` when the `map` is not installed |
+| `sections(book)` | `'tit'` | the sections of the book in the English ULT, from the `chunks` of the `xtopics` core: `book`, `sections` (`from`, `to`, `first`, `last`, in order), `source`; `data: null` when `xtopics` is not installed; `sections: []` with coverage `none` when the common unit has no entry for the book |
 | `search(text, filters?)` | full text | hits over the installed books, from the client's index or one built in memory |
+
+### Sections of a book
+
+`sections(book)` gives the section map of the English ULT (the `	s\*` chunks), the same for every language. `from` and `to` are references of the book (`1:1`, or `1:15` / `2:3` when a section crosses a chapter); `first` and `last` are verse ids. The client has no "next section" helper: the app finds it by verse id.
+
+```ts
+const { data } = await reader.sections('tit')
+// data.sections[0] -> { from: '1:1', to: '1:3', first: 56001001, last: 56001003 }
+const next = data?.sections.find((s) => s.first > current) // current: the verse id being read
+```
 
 A `lookup` query with no words (only punctuation) returns `matches: []`; empty or non-string text is `E_ARG`.
 

@@ -33,6 +33,7 @@ import { type LookupData, lookupQuery } from './query/lookup'
 import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/maps'
 import { type PassageData, passageQuery } from './query/passage'
 import { type StoryData, type StoryRef, storiesQuery, storyQuery } from './query/stories'
+import { type SectionsData, sectionsQuery } from './query/sections'
 import { searchQuery } from './query/search'
 import { memoryIndex } from './search/memory'
 import type { Hit, SearchFilters, SearchIndex } from './search/types'
@@ -126,6 +127,8 @@ export interface PackReader {
   stories(ref?: string): Promise<Answer<{ ref?: string; stories: StoryRef[] }>>
   /** One story (1 to 50): title and ranges from the maps; frames and helps when the `obs` unit is installed. */
   story(n: number): Promise<Answer<StoryData>>
+  /** The sections of a book in the English ULT, from the `chunks` of the `xtopics` core, in order (`data: null` when `xtopics` is not installed; `sections: []` and coverage `none` when it has no entry for the book). */
+  sections(book: string): Promise<Answer<SectionsData | null>>
 }
 
 export type ReaderInput = {
@@ -394,6 +397,7 @@ export function makeReader(o: ReaderInput): PackReader {
     academy: (book) => academyQuery(reader, book),
     stories: (ref) => storiesQuery(reader, ref),
     story: (n) => storyQuery(reader, n),
+    sections: (book) => sectionsQuery(reader, book),
   }
   return reader
 }
