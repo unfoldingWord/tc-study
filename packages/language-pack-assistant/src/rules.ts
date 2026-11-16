@@ -6,6 +6,7 @@ import type { Call, Decision, QueryName } from './decision'
 import { type Entity, FILLERS, type Lexicon } from './lexicon'
 import { fold } from './fold'
 import { matchPhrases, type PhraseKind, type Phrases } from './phrases'
+import { contentWords } from './words'
 
 export type RuleCtx = {
   phrases: Phrases
@@ -15,6 +16,8 @@ export type RuleCtx = {
   lastVerse: (code: string, chapter: number) => number | undefined
   /** The ranked Strong keys of a concept (`src/strongs.ts`). */
   strongsOf: (conceptId: string) => string[]
+  /** The question's language tag: with it the rules see its content words (stop, frame and phrase words removed); without, they do not. */
+  tag?: string
 }
 
 /** What a rule or the classifier gives before `via` and `interpretation` are added. */
@@ -67,7 +70,7 @@ export type View = {
   books: Book[]
   strongs: Extract<Entity, { kind: 'strong' }>[]
   ta: Concept[]
-  /** Concepts other than tA, by preference: tW names, tW terms, then topics. */
+  /** Concepts other than tA, in the order of the question (C2.1: position, not kind, says which was asked first). */
   named: Concept[]
   categories: Extract<Entity, { kind: 'category' }>[]
   all: Entity[]
@@ -85,7 +88,7 @@ export function view(entities: Entity[]): View {
     strongs: entities.filter((e): e is View['strongs'][number] => e.kind === 'strong'),
     ta: concepts.filter((c) => c.cls === 'ta'),
     // A category word asks for a list, so a name that is also a book's name is read as the book there ("characters in Ruth").
-    named: concepts.filter((c) => c.cls !== 'ta' && !(categories.length > 0 && onBook(c))).sort((a, b) => order[a.cls] - order[b.cls] || a.start - b.start),
+    named: concepts.filter((c) => c.cls !== 'ta' && !(categories.length > 0 && onBook(c))).sort((a, b) => a.start - b.start || order[a.cls] - order[b.cls]),
     categories,
     all: entities,
   }
@@ -98,6 +101,20 @@ function renderingsOfConcept(c: Concept, question: string, strongsOf: RuleCtx['s
   if (keys.length === 1) return { kind: 'call', call: call('renderings', { strong: keys[0] }) }
   if (keys.length > 1) return { kind: 'choose', options: keys.slice(0, MAX_OPTIONS).map((k) => call('renderings', { strong: k })) }
   return { kind: 'choose', options: [call('concept', { id }), call('search', { text: question })] }
+}
+
+/**
+ * Several concepts in one question (C2.1, rules 3 and 7): one gives its call or the choice of its ids; more than one give a choice of
+ * up to 3 calls over their ids, in the order of the question. A topic-only concept is the weakest reading (often an alignment alias
+ * of a common word: "there", "about"), so when a tA, tW or name concept is present the topic-only ones are not offered (R37 e's
+ * preference for articles, across concepts).
+ */
+function overConcepts(all: Concept[], prefer: (ids: string[]) => string[], make: (id: string) => Call): Outcome | undefined {
+  const strong = all.filter((c) => c.cls !== 'topic')
+  const cs = strong.length > 0 ? strong : all
+  if (cs.length <= 1) return cs[0] === undefined ? undefined : overIds(prefer(cs[0].ids), make)
+  const ids = [...new Set(cs.flatMap((c) => preferTw(prefer(c.ids))))]
+  return ids.length === 1 ? { kind: 'call', call: make(ids[0]!) } : { kind: 'choose', options: ids.slice(0, MAX_OPTIONS).map(make) }
 }
 
 /** `books` takes an article id (`tw:*`, `ta:*`) or a concept (a Strong key or a topic id). */
@@ -114,10 +131,8 @@ export function outcomeFor(query: QueryName, question: string, v: View, ctx: Rul
       const r = v.refs[0]
       return r === undefined ? undefined : { kind: 'call', call: call(query, { ref: refArg(r, ctx.lastVerse) }) }
     }
-    case 'concept': {
-      const c = v.named[0]
-      return c === undefined ? undefined : overIds(preferArticles(c.ids), (id) => call('concept', { id }))
-    }
+    case 'concept':
+      return overConcepts(v.named, preferArticles, (id) => call('concept', { id }))
     case 'article': {
       const c = v.ta[0]
       return c === undefined ? undefined : overIds(c.ids, (id) => call('article', { id }))
@@ -132,8 +147,7 @@ export function outcomeFor(query: QueryName, question: string, v: View, ctx: Rul
     case 'books': {
       const s = v.strongs[0]
       if (s !== undefined) return { kind: 'call', call: call('books', { strong: s.value }) }
-      const c = v.ta[0] ?? v.named[0]
-      return c === undefined ? undefined : overIds(c.ids, booksCall)
+      return overConcepts([...v.ta, ...v.named].sort((a, b) => a.start - b.start), (ids) => ids, booksCall)
     }
     case 'topics': {
       const b = v.books[0]
@@ -147,17 +161,29 @@ export function outcomeFor(query: QueryName, question: string, v: View, ctx: Rul
 }
 
 /** A book name alone that is also a person's name ("Juan"): the book's introduction when the catalogs list it, and each person (R5, R14, R17). */
-function ambiguousBook(v: View, ctx: RuleCtx): Outcome | undefined {
+function ambiguousBook(question: string, tokens: string[], v: View, ctx: RuleCtx): Outcome | undefined {
   for (const b of v.books) {
     const same = v.all.filter((e) => e.kind === 'concept' && e.start === b.start && e.end === b.end) as Concept[]
     const people = preferTw(same.flatMap((c) => c.ids.filter(isPerson)))
     if (people.length === 0) continue
     const others = v.all.filter((e) => e !== b && !same.includes(e as Concept))
     if (others.length > 0) continue
+    // C2.1: alone means no other content word either ("la planta de Jonás" names Jonah inside a description).
+    if (leftoverWords(question, tokens, [b], ctx).length > 0) continue
     const options = [...(ctx.listed(b.book) ? [call('passage', { ref: `${b.book} front:intro` })] : []), ...people.map((id) => call('concept', { id }))]
     return options.length === 1 ? { kind: 'call', call: options[0]! } : { kind: 'choose', options }
   }
   return undefined
+}
+
+/**
+ * The content words of the question outside the given entities. Without a tag the rules cannot tell content words from stop words,
+ * so they see none and keep the C2 behavior.
+ */
+function leftoverWords(question: string, tokens: string[], entities: Entity[], ctx: RuleCtx): string[] {
+  if (ctx.tag === undefined) return []
+  const inside = new Set(entities.flatMap((e) => tokens.slice(e.start, e.end)))
+  return contentWords(question, ctx.tag).filter((w) => !inside.has(w))
 }
 
 /** A question read for the rules: its folded tokens, the phrase kinds it holds, and its entities. */
@@ -171,6 +197,10 @@ export function readQuestion(question: string, lexicon: Lexicon, phrases: Phrase
   return { tokens, entities: lexicon.entities(question, { phraseTokens }).entities, kinds: new Set(matches.map((m) => m.kind)) }
 }
 
+/** An hour and minutes followed by a time word (es, pt, en), on the question without marks and in lower case. */
+const TIME_OF_DAY =
+  /\b\d{1,2}\s*:\s*\d{2}\s*(?:(?:de la|de|da|in the|of the|at)\s+)?(?:manana|tarde|noche|madrugada|manha|noite|morning|afternoon|evening|night|[ap]\.?\s?m\b\.?|hs?\b|hrs\b|horas\b|hours\b|o'?clock)/g
+
 const FILLER_WORDS = new Set(Object.values(FILLERS).flatMap((f) => [...f]))
 const isDigits = (t: string | undefined): boolean => t !== undefined && /^\d+(-\d+)?$/.test(t)
 
@@ -179,6 +209,13 @@ const isDigits = (t: string | undefined): boolean => t !== undefined && /^\d+(-\
  * second number after at most filler words. With no reference entity the book is one this language's map does not name (R24, R26).
  */
 export function looksLikeRef(question: string, tokens: string[]): boolean {
+  // C2.1: a time of day is no chapter and verse ("10:30 de la mañana", "9:00 pm"): it is taken out first.
+  const plain = question.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  const noTime = plain.replace(TIME_OF_DAY, ' ')
+  if (noTime !== plain) {
+    question = noTime
+    tokens = fold(noTime).split(' ').filter((w) => w !== '')
+  }
   if (/\d+\s*:\s*\d+/.test(question)) return true
   for (let i = 1; i < tokens.length; i++) {
     if (isDigits(tokens[i - 1]) || !isDigits(tokens[i])) continue
@@ -202,7 +239,7 @@ export function ruleOutcome(question: string, reading: Reading, ctx: RuleCtx): O
   if (looksLikeRef(question, reading.tokens)) return outcomeFor('search', question, v, ctx)
   // 2. A book name alone that is also a person's name.
   if (!booksPhrase && !renderingsPhrase) {
-    const amb = ambiguousBook(v, ctx)
+    const amb = ambiguousBook(question, reading.tokens, v, ctx)
     if (amb !== undefined) return amb
   }
   // 3. Where something appears: a Strong key, an Academy article or a concept.
@@ -217,9 +254,16 @@ export function ruleOutcome(question: string, reading: Reading, ctx: RuleCtx): O
   }
   // 5. An Academy article.
   if (v.ta.length > 0 && v.strongs.length === 0) return outcomeFor('article', question, v, ctx)
-  // 6. A list: a category alone, or a book with a list word (by book, never both: the reader takes one).
+  // 6. A list: a category alone, or a book with a list word (by book, never both: the reader takes one). C2.1: with no book, content
+  // words that are no entity may ask for something narrower than a list: a choice of the list and a search. Two categories give a choice
+  // of both lists.
   const onlyBookNames = v.named.every((c) => v.books.some((b) => b.start === c.start && b.end === c.end))
   if (v.strongs.length === 0 && onlyBookNames && (v.categories.length > 0 || (v.books.length > 0 && has('topics')))) {
+    if (v.books.length === 0) {
+      const lists = [...new Set(v.categories.map((c) => c.value))].slice(0, MAX_OPTIONS).map((category) => call('topics', { category }))
+      if (leftoverWords(question, reading.tokens, v.all, ctx).length > 0) return { kind: 'choose', options: [...lists.slice(0, MAX_OPTIONS - 1), call('search', { text: question })] }
+      if (lists.length > 1) return { kind: 'choose', options: lists }
+    }
     return outcomeFor('topics', question, v, ctx)
   }
   // 7. What a concept is.

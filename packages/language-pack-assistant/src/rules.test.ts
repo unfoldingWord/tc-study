@@ -6,7 +6,8 @@ import type { Decision } from './decision'
 import { buildLexicon } from './lexicon'
 import { phrasesFor } from './phrases'
 import { EN, ES, fixtureMaps } from './rules.fixture'
-import { applyRules, readQuestion, type RuleCtx } from './rules'
+import { fold } from './fold'
+import { applyRules, looksLikeRef, readQuestion, type RuleCtx } from './rules'
 
 const numbers = (lang: string): NumbersComplement => {
   const r = loadComplement(new Uint8Array(readFileSync(join(import.meta.dir, `../complements/${lang}.numbers.json`))))
@@ -22,6 +23,7 @@ function rig(tag: 'es-419' | 'en' | 'pt-BR', listed: string[] = ['jhn', 'rut', '
     listed: (c) => listed.includes(c),
     lastVerse: (c, ch) => (c === 'exo' && ch === 7 ? 25 : c === 'tit' && ch === 3 ? 15 : undefined),
     strongsOf: (id) => KEYS[id] ?? [],
+    tag,
   }
   return (q: string): Decision | undefined => {
     const r = applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)
@@ -210,4 +212,80 @@ test('R37 e: a tW name that is part of a title gives way to the tW article whose
   const only = buildLexicon(fixtureMaps('es-419', {}, { 'tw:names/philiptheapostle': ['Felipe, el apóstol'] }, {}), 'es-419', numbers('es'))
   expect(applyRules('el apóstol', readQuestion('el apóstol', only, ctx.phrases), ctx)).toEqual({ undecided: true })
   expect(only.entities('el apóstol').entities).toEqual([{ kind: 'concept', ids: ['tw:names/philiptheapostle'], cls: 'name', start: 1, end: 2 }])
+})
+
+describe('C2.1: an ambiguous name with more words (Review Focus 1)', () => {
+  test('a book name that is also a person, with other content words, is not decided by the ambiguous-name rule', () => {
+    for (const q of ['la planta de Juan', 'Rut y la cosecha de cebada', 'el perro grande de Juan']) expect(es(q)).toBeUndefined()
+    expect(en('the plant of John')).toBeUndefined()
+  })
+  test('the name alone, or with phrase and stop words only, still is', () => {
+    expect(es('Juan')?.kind).toBe('choose')
+    expect(es('¿quién era Juan?')?.kind).toBe('choose')
+    expect(callOf(rig('es-419', [])('háblame de Rut'))).toEqual({ query: 'concept', args: { id: 'tw:names/ruth' } })
+  })
+})
+
+describe('C2.1: several named concepts follow their position (rules 7 and 3)', () => {
+  test('a concept phrase with several concepts offers each, in the order of the question', () => {
+    const c = (id: string) => ({ query: 'concept', args: { id } })
+    expect(es('¿qué es el pecado de Moisés?')).toEqual(choose(c('tw:kt/sin'), c('tw:names/moses')))
+    expect(es('¿qué es Moisés y el pecado?')).toEqual(choose(c('tw:names/moses'), c('tw:kt/sin')))
+    expect(es('¿qué es el pacto, la gracia, la fe y el pecado?')).toEqual(choose(c('tw:kt/covenant'), c('tw:kt/grace'), c('tw:kt/faith')))
+  })
+  test('a topic-only concept gives way to a tW, tA or name concept in the same question', () => {
+    const lexicon = buildLexicon(fixtureMaps('en', {}, { 'ta:translate/figs-metaphor': ['metaphors'] }, { 'lug:egypt': 'there', 'lug:gilead': 'there' }), 'en', numbers('en'))
+    const ctx: RuleCtx = { phrases: phrasesFor('en'), listed: () => false, lastVerse: () => undefined, strongsOf: () => [], tag: 'en' }
+    const q = 'In which books are there metaphors?'
+    expect(applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)).toEqual({ decided: ruled({ query: 'books', args: { article: 'ta:translate/figs-metaphor' } }) })
+  })
+  test('a books phrase with several concepts offers books for each, in order', () => {
+    expect(es('¿dónde se menciona el pacto y Moisés?')).toEqual(
+      choose({ query: 'books', args: { article: 'tw:kt/covenant' } }, { query: 'books', args: { article: 'tw:names/moses' } }),
+    )
+  })
+})
+
+describe('C2.1: rule 6 decides a list only when it is one', () => {
+  test('two categories give a choice of both lists', () => {
+    expect(es('lista de personas y lugares')).toEqual(
+      choose({ query: 'topics', args: { category: 'person' } }, { query: 'topics', args: { category: 'place' } }),
+    )
+  })
+  test('a category with content words that are no entity gives a choice of the list and a search', () => {
+    const q = 'lista de lugares con agua dulce'
+    expect(es(q)).toEqual(choose({ query: 'topics', args: { category: 'place' } }, { query: 'search', args: { text: q } }))
+  })
+})
+
+describe('C2.1: a time of day is no reference', () => {
+  const t = (q: string) => looksLikeRef(q, fold(q).split(' ').filter((w) => w !== ''))
+  test.each(['a las 10:30 de la mañana', 'nos vemos 7:15 de la tarde', 'meet at 10:30 am', 'at 6:45 in the evening', 'às 10:30 da manhã', '9:00 pm'])('%s', (q) => {
+    expect(t(q)).toBe(false)
+  })
+  test('a chapter and verse still is', () => {
+    expect(t('Mateo 8:28')).toBe(true)
+    expect(t('Lucas 10:30 de nuevo')).toBe(true)
+  })
+})
+
+describe('Review Focus 3: book names once the map carries them', () => {
+  const maps = fixtureMaps(
+    'es-419',
+    { jhn: ['El evangelio de Juan', 'Juan', 'Jn'], '1jn': ['Primera carta de Juan', '1 Juan', '1 Jn'], gen: ['Génesis', 'Génesis', 'Gn'] },
+    { 'tw:names/johntheapostle': ['Juan'] },
+    {},
+  )
+  const lexicon = buildLexicon(maps, 'es-419', numbers('es'))
+  const ctx: RuleCtx = { phrases: phrasesFor('es-419'), listed: () => false, lastVerse: () => undefined, strongsOf: () => [], tag: 'es-419' }
+  const ask = (q: string) => {
+    const r = applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)
+    return 'decided' in r && r.decided.kind === 'call' ? r.decided.call : undefined
+  }
+  test('«Juan 3:16», «Jn 1:1», «1 Juan 3» and «Génesis 1» are passages, even with no book installed', () => {
+    expect(ask('Juan 3:16')).toEqual({ query: 'passage', args: { ref: 'jhn 3:16' } })
+    expect(ask('Jn 1:1')).toEqual({ query: 'passage', args: { ref: 'jhn 1:1' } })
+    expect(ask('1 Juan 3')).toEqual({ query: 'passage', args: { ref: '1jn 3:1-999' } })
+    expect(ask('Génesis 1')).toEqual({ query: 'passage', args: { ref: 'gen 1:1-999' } })
+  })
 })

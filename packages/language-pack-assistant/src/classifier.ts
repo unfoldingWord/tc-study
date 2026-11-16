@@ -9,10 +9,17 @@ import type { Entity } from './lexicon'
 
 const slotOf = (e: Entity): string => (e.kind === 'concept' ? e.cls : e.kind === 'category' ? 'cat' : e.kind)
 
-/** The question's tokens with each entity replaced by its slot word. */
+/**
+ * The question's tokens with each entity replaced by its slot word. Overlapping spans are not both replaced (that would splice the
+ * wrong tokens): by start, then longest first, an entity that overlaps one already kept is dropped.
+ */
 export function mask(tokens: string[], entities: Entity[]): string {
+  const kept: Entity[] = []
+  for (const e of [...entities].sort((a, b) => a.start - b.start || b.end - a.end)) {
+    if (kept.every((k) => e.start >= k.end || e.end <= k.start)) kept.push(e)
+  }
   const out = [...tokens]
-  for (const e of [...entities].sort((a, b) => b.start - a.start)) {
+  for (const e of kept.sort((a, b) => b.start - a.start)) {
     out.splice(e.start, e.end - e.start, slotOf(e))
   }
   return out.join(' ')
@@ -59,9 +66,20 @@ export function train(examples: [string, QueryName][], meta: { lang: string; ver
   }
 }
 
+/** The feature-to-column map of a model, built once per model object. */
+const indexes = new WeakMap<ClassifierComplement, Map<string, number>>()
+function indexOf(model: ClassifierComplement): Map<string, number> {
+  let index = indexes.get(model)
+  if (index === undefined) {
+    index = new Map(model.vocab.map((x, i) => [x, i] as const))
+    indexes.set(model, index)
+  }
+  return index
+}
+
 /** Probabilities of each query for a masked question: they sum to 1, best first, ties by label. */
 export function predict(model: ClassifierComplement, text: string): [QueryName, number][] {
-  const index = new Map(model.vocab.map((x, i) => [x, i] as const))
+  const index = indexOf(model)
   const f = features(text)
   const n = model.docs.reduce((a, b) => a + b, 0)
   const v = model.vocab.length

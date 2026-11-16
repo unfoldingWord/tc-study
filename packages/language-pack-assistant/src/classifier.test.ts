@@ -48,4 +48,16 @@ describe('classifier', () => {
     expect(mask(tokens, [{ kind: 'ref', book: 'tit', chapter: 2, verse: 11, start: 0, end: 2 }])).toBe('ref que dice')
     expect(mask(['que', 'es', 'x', 'y'], [{ kind: 'concept', ids: ['a'], cls: 'name', start: 2, end: 4 }])).toBe('que es name')
   })
+  test('mask keeps the first, longest of overlapping spans and drops the others', () => {
+    const a = { kind: 'concept', ids: ['a'], cls: 'name', start: 0, end: 2 } as const
+    const b = { kind: 'concept', ids: ['b'], cls: 'tw', start: 1, end: 3 } as const
+    const c = { kind: 'concept', ids: ['c'], cls: 'tw', start: 0, end: 1 } as const
+    expect(mask(['x', 'y', 'z', 'w'], [b, a])).toBe('name z w')
+    expect(mask(['x', 'y', 'z', 'w'], [c, a, b])).toBe('name z w')
+  })
+  test('predict gives the same answer on repeated calls', () => {
+    const m = train([['a b', 'concept'], ['c d', 'search']], { lang: 'es', version: 't' })
+    expect(predict(m, 'a b')).toEqual(predict(m, 'a b'))
+    expect(predict(m, 'a b')[0]![0]).toBe('concept')
+  })
 })

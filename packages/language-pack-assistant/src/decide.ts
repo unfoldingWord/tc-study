@@ -23,21 +23,21 @@ import { contentWords } from './words'
 export const DEFAULT_MARGIN = 0.3
 
 /**
- * R37 f: a question with a name and more than this many other content words, and no concept, books or renderings phrase, describes
- * something to find ("Jonah and the big fish"): it goes to search, not to the classifier. Tune sets (`eval/tune.ts --words`,
- * 2026-11-15): flat for N = 1..4 and equal to no rule (es 76/100, pt 49/100, en 55/60), so the smallest N is kept.
+ * R37 f, general form (C2.1): a question with a concept other than a tA article (a name, a tW term or a topic) and at least N other
+ * content words, and no concept, books or renderings phrase, describes something to find ("Jonah and the big fish", "the prodigal
+ * son"): it goes to search, not to the classifier. N is set on the tune data (`eval/tune.ts --sets tune,test --words 1,2,3`,
+ * 2026-11-16, margin 0.3, tune+C2 test sets): calls correct es 185/178/178 of 250, pt 128/128/124 of 250, en 171/167/165 of 210 for
+ * N = 1/2/3, and correct among accepted is highest at N = 1 in all three (es 84.0 %, pt 66.9 %, en 89.7 %), so N = 1.
  */
 export const DEFAULT_DESCRIPTION_WORDS = 1
 
-const NAME = /^(tw:names\/|per:|lug:)/
-
-/** Whether a question undecided by the rules is a free description around a name (R37 f). */
+/** Whether a question undecided by the rules is a free description around a concept (R37 f). */
 export function describesWithName(question: string, reading: Reading, tag: string, n: number): boolean {
   if (reading.kinds.has('concept') || reading.kinds.has('books') || reading.kinds.has('renderings')) return false
-  const names = reading.entities.filter((e) => e.kind === 'concept' && e.ids.some((id) => NAME.test(id)))
-  if (names.length === 0) return false
-  const inName = new Set(names.flatMap((e) => reading.tokens.slice(e.start, e.end)))
-  return contentWords(question, tag).filter((w) => !inName.has(w)).length > n
+  const named = reading.entities.filter((e) => e.kind === 'concept' && e.cls !== 'ta')
+  if (named.length === 0) return false
+  const inName = new Set(named.flatMap((e) => reading.tokens.slice(e.start, e.end)))
+  return contentWords(question, tag).filter((w) => !inName.has(w)).length >= n
 }
 
 export type DecideCtx = {
@@ -71,7 +71,8 @@ export function decideStep(question: string, ctx: DecideCtx): { decision: Decisi
   const search: Decision = { kind: 'call', call: { query: 'search', args: { text: question } }, via: 'search', interpretation: '' }
   const r = ruleOutcome(question, reading, ctx)
   if (r !== undefined) return { decision: asDecision(r, 'rule'), step: 'rule' }
-  if (describesWithName(question, reading, ctx.tag ?? '', ctx.descriptionWords ?? DEFAULT_DESCRIPTION_WORDS)) return { decision: search, step: 'search' }
+  // Without a tag the chain cannot tell content words from stop words, so fix (f) does not apply (as in the rules).
+  if (ctx.tag !== undefined && describesWithName(question, reading, ctx.tag, ctx.descriptionWords ?? DEFAULT_DESCRIPTION_WORDS)) return { decision: search, step: 'search' }
   const model = ctx.classifier?.for === QUERIES_VERSION ? ctx.classifier : undefined
   if (model === undefined) return { decision: search, step: 'search' }
 

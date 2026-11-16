@@ -91,9 +91,12 @@ test('R37 f: a name inside a free description goes to search, not to the classif
   const ctx: DecideCtx = { ...base, classifier: raw, tag: 'es-419', descriptionWords: 2 }
   // A name and three other content words, no concept phrase: search.
   expect(decideStep('Moisés y la zarza ardiente grande', ctx)).toMatchObject({ step: 'search', decision: { call: { query: 'search' } } })
-  // Two other content words is not more than N = 2: the chain goes on as before.
-  expect(decideStep('Moisés zarza ardiente', ctx).step).not.toBe('search')
-  expect(decideStep('Moisés zarza ardiente', { ...ctx, descriptionWords: 1 }).step).toBe('search')
+  // C2.1: N is reached with `>=`: two other content words with N = 2 are a description, one is not.
+  expect(decideStep('Moisés zarza ardiente', ctx).step).toBe('search')
+  expect(decideStep('Moisés zarza', ctx).step).not.toBe('search')
+  expect(decideStep('Moisés zarza ardiente', { ...ctx, descriptionWords: 3 }).step).not.toBe('search')
+  // C2.1: every concept but a tA one counts, not only names.
+  expect(decideStep('el pacto con los ancianos fieles', ctx).step).toBe('search')
   // A concept phrase keeps the rule: "quién fue" asks what the name is.
   expect(decideStep('quién fue Moisés el que vio la zarza ardiente', ctx)).toMatchObject({ step: 'rule', decision: { call: { query: 'concept' } } })
   // No name: unchanged.
