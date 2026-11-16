@@ -71,13 +71,13 @@
   },
   "search": {
     "label": { "es": "Búsqueda: texto en los recursos instalados", "pt": "Busca: texto nos recursos instalados", "en": "Search: text in the installed resources" },
-    "description": "A full-text search over the installed resources.",
+    "description": "A full-text search over the installed resources. Section rows (articles) have book '' and no reference, so a books filter leaves them out.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "text": { "type": "string", "description": "The words to look for." },
-        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes), or 'obs' for the Open Bible Stories." },
+        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes), or 'obs' for the Open Bible Stories. Section rows have book '', so a books filter leaves them out." },
         "kinds": { "type": "array", "items": { "enum": ["text", "note", "question", "link", "title", "section"] }, "description": "Only these kinds of result." },
         "limit": { "type": "integer", "minimum": 1, "description": "The most results to return (20 when absent)." }
       },
@@ -101,8 +101,8 @@
     }
   },
   "books": {
-    "label": { "es": "Libros: dónde se usa un artículo o concepto, y si el libro está instalado", "pt": "Livros: onde se usa um artigo ou conceito, e se o livro está instalado", "en": "Books: where an article or concept is used, and whether the book is installed" },
-    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, state none with installed false when the obs unit is not installed (not looked at, the unit is not installed; it is then listed in notInstalled).",
+    "label": { "es": "Libros: dónde se usa un artículo, concepto o clave Strong, y si el libro está instalado", "pt": "Livros: onde se usa um artigo, conceito ou chave Strong, e se o livro está instalado", "en": "Books: where an article, concept or Strong key is used, and whether the book is installed" },
+    "description": "For each book, how often an article, a concept or a Strong key is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, state none with installed false when the obs unit is not installed (not looked at, the unit is not installed; it is then listed in notInstalled).",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

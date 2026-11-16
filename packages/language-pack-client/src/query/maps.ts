@@ -158,7 +158,10 @@ async function strongBooks(reader: PackReader, key: unknown): Promise<Answer<Boo
     out.data = { installed: false, books: {} }
     return out
   }
-  const cells = (answer(m, { kind: 'strong', key: strongKey(key) }) as { books: Record<string, Cell> }).books
+  // `G26` and `g3972` are the keys `G0026` and `G3972` of the table: upper-case the letter and pad the digits to four before the lookup.
+  const parts = /^([GH])(\d{1,4})([a-z]?)$/i.exec(key.trim())
+  const padded = parts === null ? key : `${parts[1]!.toUpperCase()}${parts[2]!.padStart(4, '0')}${parts[3]!.toLowerCase()}`
+  const cells = (answer(m, { kind: 'strong', key: strongKey(padded) }) as { books: Record<string, Cell> }).books
   const books: Record<string, BookCell> = {}
   for (const book of BOOKS) {
     const c = cells[book] ?? { state: 'none' as const }
