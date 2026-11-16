@@ -52,6 +52,8 @@ describe('sections', () => {
     for (let i = 1; i < d.sections.length; i++) expect(d.sections[i]!.first).toBeGreaterThan(d.sections[i - 1]!.last)
     expect(a.coverage).toEqual({ 'unfoldingWord/en/ult': 'count' })
     expect(a.cites[0]!.res).toBe('unfoldingWord/en/ult')
+    expect(typeof a.cites[0]!.release).toBe('string')
+    expect(a.cites[0]!.release.length).toBeGreaterThan(0)
     expect(a.revision.units.xtopics).toBeGreaterThan(0)
     expect(a.notInstalled).toEqual([])
   })

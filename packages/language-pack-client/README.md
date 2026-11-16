@@ -100,7 +100,7 @@ type Answer<T> = {
 
 ### Sections of a book
 
-`sections(book)` gives the section map of the English ULT (the `	s\*` chunks), the same for every language. `from` and `to` are references of the book (`1:1`, or `1:15` / `2:3` when a section crosses a chapter); `first` and `last` are verse ids. The client has no "next section" helper: the app finds it by verse id.
+`sections(book)` gives the section map of the English ULT (the `\ts\*` chunks), the same for every language. `from` and `to` are references of the book (`1:1`, or `1:15` / `2:3` when a section crosses a chapter); `first` and `last` are verse ids. The client has no "next section" helper: the app finds it by verse id.
 
 ```ts
 const { data } = await reader.sections('tit')
