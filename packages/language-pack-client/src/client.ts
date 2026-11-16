@@ -1,7 +1,7 @@
 /**
  * The client: refresh the catalogs, install by unit, status, prune and verify. Calls on one client run one after the other.
  */
-import { bookView, FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
+import { bookView, FormatError, KNOWN, obsView, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { patchedReader } from './patch'
 import { ClientError } from './errors'
 import { catalogsOf, checkConcurrency, localCatalogIds, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
@@ -325,9 +325,16 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const out = new Map<string, string>()
     for (const [k, u] of Object.entries(state.units)) {
       const slash = k.indexOf('/')
-      if (!k.slice(slash + 1).startsWith('book:')) continue
+      const unit = k.slice(slash + 1)
+      if (!unit.startsWith('book:') && unit !== 'obs') continue
       for (const id of u.segments) out.set(id, k.slice(0, slash))
     }
+    return out
+  }
+  /** The segments of the active `obs` unit (they are read as `obsView`, the others as `bookView`). */
+  const activeObs = (state: InstalledState): Set<string> => {
+    const out = new Set<string>()
+    for (const [k, u] of Object.entries(state.units)) if (k.slice(k.indexOf('/') + 1) === 'obs') for (const id of u.segments) out.add(id)
     return out
   }
   /** Runs `call`, then brings the index in line with the state. Index errors are recorded, never thrown. */
@@ -348,7 +355,9 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   }
   async function syncIndex(index: SearchIndex, before?: Map<string, string>): Promise<void> {
     try {
-      const after = activeBooks(await loadState(store))
+      const state = await loadState(store)
+      const after = activeBooks(state)
+      const obsIds = activeObs(state)
       await (indexReady ??= index.init())
       for (const id of before?.keys() ?? []) if (!after.has(id)) await index.removeSegment(id)
       for (const [id, name] of after) {
@@ -356,8 +365,13 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
         try {
           const bytes = await st(() => store.get(id))
           if (bytes === undefined) continue
-          const { seg } = await readSegment(bytes, { known: KNOWN.book, expectedId: id })
-          await index.addBook(name, bookView(seg), id)
+          if (obsIds.has(id)) {
+            const { seg } = await readSegment(bytes, { known: KNOWN.obs, expectedId: id })
+            await index.addObs(name, obsView(seg), id)
+          } else {
+            const { seg } = await readSegment(bytes, { known: KNOWN.book, expectedId: id })
+            await index.addBook(name, bookView(seg), id)
+          }
         } catch (e) {
           indexProblems.push({ segment: id, message: e instanceof Error ? e.message : String(e) })
         }

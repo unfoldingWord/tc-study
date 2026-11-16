@@ -14,6 +14,7 @@ import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/res
 import { TranslationNotesLoader } from '@bt-synergy/translation-notes-loader'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
+import { withMarkdownObsHelps } from '../obs/markdownObsHelps'
 
 /** obsTranslationNotesResourceType without its viewer; tc-study adds the viewer. */
 export const obsTranslationNotesResourceTypeBase: ResourceTypeDefinition = defineResourceType({
@@ -33,7 +34,8 @@ export const obsTranslationNotesResourceTypeBase: ResourceTypeDefinition = defin
   aliases: ['obs-tn', 'obs-notes'],
 
   // ===== DATA LAYER =====
-  loader: TranslationNotesLoader,
+  // Old repos (`hi_obs-tn`) are markdown, not TSV: for those the loader converts `content/NN/FF.md` to the same rows.
+  loader: withMarkdownObsHelps(TranslationNotesLoader, 'tn'),
   loaderConfig: {
     enableMemoryCache: true,
     memoryCacheSize: 50,

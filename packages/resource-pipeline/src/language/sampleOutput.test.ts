@@ -276,6 +276,9 @@ const PRODUCER: Record<string, string> = {
   [fixture.TA]: 'ta',
   [fixture.UHL]: 'lexicon',
   [fixture.OBS]: 'obs',
+  [fixture.OBS_TN]: 'obs-tn',
+  [fixture.OBS_TQ]: 'obs-tq',
+  [fixture.OBS_TWL]: 'obs-twl',
   ...Object.fromEntries(MACULA_KEYS.map((k) => [k, 'macula'])),
 }
 
@@ -308,6 +311,11 @@ const COVERS: Record<string, string> = {
   'macula sot': 'MACULA_ROWS_VERSION (cli/companions.ts)',
   'obs sot': 'OBS_ROWS_VERSION (loaders/ObsLoader.ts)',
   'obs prepared': 'OBS_PREPARE_VERSION (obsPreparer.ts), or MARKDOWN_HAST_VERSION if markdownToHast changed',
+  'obs-tn sot': 'NOTES_TSV_PARSER_VERSION (resource-parsers notes-parser.ts), or the markdown helps converter (obs/markdownObsHelps.ts) for old notes',
+  'obs-tn prepared': 'NOTES_PREPARE_VERSION (notesPreparer.ts), or MARKDOWN_HAST_VERSION if markdownToHast changed',
+  'obs-tq sot': 'QUESTIONS_TSV_PARSER_VERSION (resource-parsers questions-parser.ts), or the markdown helps converter (obs/markdownObsHelps.ts) for old questions',
+  'obs-tq prepared': 'QUESTIONS_PREPARE_VERSION (questionsPreparer.ts), or MARKDOWN_HAST_VERSION if markdownToHast changed',
+  'obs-twl sot': 'WORDS_LINKS_TSV_PARSER_VERSION (resource-parsers words-links-parser.ts)',
   ruth: 'HELPS_QUOTE_VERSION, HELPS_ALIGN_VERSION or SCRIPTURE_PREPARE_SCHEMA (the Ruth 4:5 qere sample)',
   rules: 'PARTS_FORMAT_VERSION (language-pack types.ts) for slots, bucket counts and input rules; FINGERPRINT_VERSION for the fingerprint',
   'part bytes': 'PARTS_FORMAT_VERSION (language-pack types.ts): the part file format',
@@ -329,7 +337,6 @@ async function fixtureParts() {
       door43Client: fixture.fakeDoor43() as never,
       discover: fixture.discover,
       obs: true,
-      obsTestOnly: true,
     })
     if (failures.length) throw new Error(`the parts fixture did not build: ${JSON.stringify(failures)}`)
     const rows = new Map<string, PartRow[]>()

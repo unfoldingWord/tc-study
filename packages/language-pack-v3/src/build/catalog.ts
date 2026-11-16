@@ -26,7 +26,7 @@ import { sha256 } from '../codec/sha256'
 import { hexToBytes, isUint as isCount } from '../codec/values'
 import { bookNumber } from '../ids'
 import { REVIEW_LEVELS } from '../model'
-import type { About, BookModel, CatalogResource, Complement, Unit } from '../model'
+import type { About, BookModel, CatalogModel, CatalogResource, Complement, Unit } from '../model'
 
 /**
  * A segment as a builder leaves it: the segment, its file, its id (lowercase hex) and its `inputs`, the fingerprint of what it
@@ -197,6 +197,13 @@ function sortKey(built: BuiltSegment): [number, number, number, string, string] 
 export function compareSegments(a: BuiltSegment, b: BuiltSegment): number {
   const [ka, kb] = [sortKey(a), sortKey(b)]
   return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2] || compareCodePoints(ka[3], kb[3]) || compareCodePoints(ka[4], kb[4])
+}
+
+/** The bytes a device downloads for each unit of `catalog`: the sum of the compressed `size` of its segments, by unit id. */
+export function unitBytes(catalog: Pick<CatalogModel, 'segments' | 'units'>): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const unit of catalog.units) out[unit.id] = unit.segments.reduce((sum, index) => sum + catalog.segments[index].size, 0)
+  return out
 }
 
 function encodeSegmentEntry(built: BuiltSegment): CborValue {

@@ -90,7 +90,9 @@ describe('discoverLanguage', () => {
     const obsSubjects = door43.calls.filter((c) => c.subject && !c.owner).map((c) => c.subject)
     expect(obsSubjects.length).toBeGreaterThan(0)
     expect(door43.calls.filter((c) => c.subject && !c.owner).every((c) => c.topic === undefined)).toBe(true)
-    expect(obsSubjects.every((s) => /\bOBS\b/.test(String(s)))).toBe(true)
+    // The OBS stories search (subject Open Bible Stories, no topic) is the one non-"OBS" subject, for the owner pick.
+    expect(obsSubjects).toContain('Open Bible Stories')
+    expect(obsSubjects.every((s) => /\bOBS\b/.test(String(s)) || s === 'Open Bible Stories')).toBe(true)
   })
 
   test('obsOwnHelpsSubjects keeps only OBS subjects', () => {
@@ -126,5 +128,36 @@ describe('discoverLanguage', () => {
     const keys = found.resources.map((r) => r.resourceKey)
     expect(keys).not.toContain('es-419_obt/es-419/tw')
     expect(keys).not.toContain('es-419_obt/es-419/ta')
+  })
+
+  test('only the picked OBS rows reach the result; Bible rows are unchanged', async () => {
+    const door43 = fakeDoor43((p) => {
+      if (p.topic === 'tc-ready' && p.language === 'es-419') {
+        return [hit('es-419_gl', 'es-419', 'es-419_glt', 'Aligned Bible'), hit('BSA', 'es-419', 'es-419_obs', 'Open Bible Stories')]
+      }
+      if (!p.topic && p.subject === 'Open Bible Stories') {
+        return [hit('BSA', 'es-419', 'es-419_obs', 'Open Bible Stories', 'v9'), hit('es-419_gl', 'es-419', 'es-419_obs', 'Open Bible Stories')]
+      }
+      if (!p.topic && p.subject === 'TSV OBS Translation Notes') {
+        return [hit('BSA', 'es-419', 'es-419_obs-tn', 'TSV OBS Translation Notes'), hit('es-419_gl', 'es-419', 'es-419_obs-tn', 'TSV OBS Translation Notes')]
+      }
+      return []
+    })
+    const catalogManager = new CatalogManager({
+      catalogAdapter: memoryStore() as never,
+      cacheAdapter: memoryStore() as never,
+      door43Client: door43 as never,
+    } as never)
+    const found = await discoverLanguage({
+      language: 'es-419',
+      door43Client: door43 as never,
+      catalogManager,
+      resourceTypeRegistry: createHeadlessResourceTypeRegistry(catalogManager),
+    })
+    const keys = found.resources.map((r) => r.resourceKey).sort()
+    expect(keys.filter((k) => k.includes('obs'))).toEqual(['es-419_gl/es-419/obs', 'es-419_gl/es-419/obs-tn'])
+    expect(keys).toContain('es-419_gl/es-419/glt')
+    expect(found.obs.lines[0]).toBe('es-419_gl/es-419_obs@v1')
+    expect(found.obs.lines[2]).toBe('none in the catalog')
   })
 })

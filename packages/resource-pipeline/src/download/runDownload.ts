@@ -51,6 +51,8 @@ export async function runDownload(args: {
   runId: number
   post: (message: DownloadThreadMessage) => void
   isCurrentRun: () => boolean
+  /** Notes and questions loaders that also read old markdown OBS helps (the OBS unit of a parts build). */
+  markdownObsHelps?: boolean
 } & DownloadStores): Promise<void> {
   const { resourceKeys, skipExisting, books, totalIngredients: providedTotal, runId, post, isCurrentRun } =
     args
@@ -74,6 +76,7 @@ export async function runDownload(args: {
     catalogAdapter,
     door43Client,
     debug: false,
+    markdownObsHelps: args.markdownObsHelps,
   })
   const downloadManager = new BackgroundDownloadManager(
     loaderRegistry,

@@ -28,7 +28,6 @@ describe('publish-language refuses the combinations that would do something othe
     ['--previous with no folder', ['--parts', '--no-upload', '--previous'], {}, 'Falta la carpeta de --previous'],
     ['--parts with R2 half set', ['--parts', '--no-upload'], { R2_ENDPOINT: R2.R2_ENDPOINT, R2_BUCKET: R2.R2_BUCKET }, 'Faltan R2_ENDPOINT'],
     ['a parts publish without R2', ['--parts'], {}, 'Faltan R2_ENDPOINT'],
-    ['--parts with --obs (its loader reads each story from Door43)', ['--parts', '--no-upload', '--obs'], {}, 'OBS parts wait for the OBS loader to read the hashed zip'],
     ['--dry-run with --no-upload (as before)', ['--generator', 'g', '--dry-run', '--no-upload'], {}, '--dry-run y --no-upload no van juntos'],
     ['a whole publish without --generator (as before)', [], R2, 'Faltan --generator'],
     ['a short --macula-commit', ['--parts', '--no-upload', '--macula-commit', '3b8aa38', '--macula-date', '2026-10-15T02:19:35Z'], {}, '--macula-commit no es un commit'],
@@ -51,6 +50,7 @@ describe('publish-language refuses the combinations that would do something othe
     ['--parts --no-upload reading the previous lists from R2', ['--parts', '--no-upload'], R2],
     ['--parts --no-upload --previous', ['--parts', '--no-upload', '--previous', '/x'], {}],
     ['a whole --no-upload --force (as before)', ['--generator', 'g', '--no-upload', '--force'], {}],
+    ['--parts with --obs', ['--parts', '--no-upload', '--obs'], {}],
     ['a whole --no-upload with --obs (as before)', ['--generator', 'g', '--no-upload', '--obs'], {}],
   ]
   for (const [what, args, r2] of accepted) {

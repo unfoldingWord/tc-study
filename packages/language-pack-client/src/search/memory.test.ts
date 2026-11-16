@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { BookModel } from '@bt-synergy/language-pack-v3'
+import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
 import { memoryIndex } from './memory'
 
 const book = (name: string, text: string): BookModel => ({
@@ -31,5 +31,41 @@ describe('memoryIndex', () => {
     await ix.removeSegment('s1')
     expect(await ix.has('s1')).toBe(false)
     expect(await ix.search('xx', 'noemi')).toEqual([])
+  })
+})
+
+const obs: ObsModel = {
+  lang: 'xx',
+  res: [['r/obs', 'v1']],
+  stories: [
+    { res: 'r/obs', n: 1, title: 'La creación', frames: [{ n: 1, text: 'Dios creó el mundo.' }] },
+    { res: 'r/obs', n: 2, title: '', frames: [{ n: 1, text: 'La serpiente engañó.' }] },
+  ],
+  notes: { res: 'r/obs-tn', rows: [{ id: 'n1', ref: '1:1', frame: 101, cols: { quote: 'creó', note: 'Una metáfora' } }] },
+  questions: { res: 'r/obs-tq', rows: [{ id: 'q1', ref: '1:1', frame: 101, cols: { question: '¿Quién creó?', response: 'Dios' } }] },
+}
+
+describe('memoryIndex with OBS', () => {
+  test('rows of obs: title, frame, note and question, book obs; an empty title has no row', async () => {
+    const ix = memoryIndex()
+    await ix.addObs('xx', obs, 'o1')
+    const t = await ix.search('xx', 'creación', { kinds: ['title'] })
+    expect(t.map((h) => [h.kind, h.book, h.ref, h.res])).toEqual([['title', 'obs', '01:0', 'r/obs']])
+    expect((await ix.search('xx', 'creó', { kinds: ['text'] })).map((h) => [h.book, h.ref])).toEqual([['obs', '01:01']])
+    const n = await ix.search('xx', 'metáfora')
+    expect(n.map((h) => [h.kind, h.id, h.ref, h.res])).toEqual([['note', 'n1', '01:01', 'r/obs-tn']])
+    expect((await ix.search('xx', 'creó', { kinds: ['note'] })).length).toBe(1)
+    expect((await ix.search('xx', 'dios', { kinds: ['question'] })).map((h) => h.id)).toEqual(['q1'])
+    expect(await ix.search('xx', 'story', { kinds: ['title'] })).toEqual([])
+    expect((await ix.search('xx', 'serpiente')).map((h) => h.kind)).toEqual(['text'])
+    expect((await ix.search('xx', 'serpiente', { kinds: ['title'] })).length).toBe(0)
+  })
+  test('removing the obs segment removes its rows', async () => {
+    const ix = memoryIndex()
+    await ix.addObs('xx', obs, 'o1')
+    expect(await ix.has('o1')).toBe(true)
+    await ix.removeSegment('o1')
+    expect(await ix.has('o1')).toBe(false)
+    expect(await ix.search('xx', 'creación')).toEqual([])
   })
 })

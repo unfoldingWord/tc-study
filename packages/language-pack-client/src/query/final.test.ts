@@ -145,6 +145,23 @@ describe('final review, reading and queries', () => {
     expect(a.cites).toEqual([])
   })
 
+  test('6b: search keeps an obs hit only when the obs unit is installed in this reader', async () => {
+    const lang = await verifyCatalogFile(sample.langCatalog, {}, { from: 'store' })
+    const index = {
+      init: async () => {},
+      addBook: async () => {},
+      addObs: async () => {},
+      removeSegment: async () => {},
+      has: async () => true,
+      search: async () => [{ kind: 'title', book: 'obs', ref: '01:0', res: 'x', snippet: '«Creación»', score: 1 }],
+    } as unknown as SearchIndex
+    const reader = makeReader({ lang: 'es-419', catalogs: [lang], get: async () => undefined, active: {}, index })
+    const a = await reader.search('Creación')
+    expect(a.data).toEqual([])
+    expect(a.cites).toEqual([])
+    expect(a.notInstalled.map((n) => n.unit)).toContain('obs')
+  })
+
   test('7: the topics schema refuses a category and a book together', () => {
     expect((schemas as unknown as { topics: { input: { not?: unknown } } }).topics.input.not).toEqual({ required: ['category', 'book'] })
   })

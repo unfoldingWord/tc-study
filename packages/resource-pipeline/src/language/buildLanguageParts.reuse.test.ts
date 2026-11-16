@@ -77,8 +77,6 @@ async function build(f: Fixture = {}, previous?: PreviousParts): Promise<Built> 
     door43Client: fakeDoor43({ repos: f.repos, lexicon: f.lexicon, catalog: f.catalog }) as never,
     discover: discoverWith(f.catalog),
     obs: f.obs ?? false,
-    // OBS parts are refused outside tests (its loader reads Door43): the fixture's stories are what the test checks.
-    obsTestOnly: f.obs ?? false,
     log: (line) => lines.push(line),
     ...(previous ? { previous } : {}),
   })
@@ -350,13 +348,24 @@ describe('a build with the previous lists', () => {
     expect(reuse.texts).toEqual(baseline.texts)
   }, 120_000)
 
-  test('with OBS, the shared unit is always built (its stories are not read from the zip hashed), the books carried', async () => {
+  test('OBS on, unchanged inputs: --previous carries every unit, obs included', async () => {
     const withObs = await build({ obs: true })
     expect(withObs.failures).toEqual([])
+    expect(withObs.list.units!.map((u) => u.id)).toContain('obs')
     const again = await build({ obs: true }, previousOf(withObs))
-    expect(builtUnits(again)).toEqual(['shared'])
-    expect(again.lines).toContainEqual(expect.stringContaining('shared: se construye (OBS stories are read one by one from Door43'))
+    expect(builtUnits(again)).toEqual([])
+    expect(again.carried).toContain('obs')
+    expect(again.carried).toContain('shared')
     expect(again.texts).toEqual(withObs.texts)
+    expect(again.units.find((u) => u.unit === 'obs')?.outcome).toBe('carried')
+  }, 120_000)
+
+  test('OBS on, an OBS file changed: only the obs unit is built', async () => {
+    const withObs = await build({ obs: true })
+    const repos = reposCopy()
+    repos['test_gl/es-419_obs-tq']['tq_OBS.tsv'] += '2:1	ob99				¿Quién pecó?	Adán.\n'
+    const again = await build({ obs: true, repos }, previousOf(withObs))
+    expect(builtUnits(again)).toEqual(['obs'])
   }, 120_000)
 
   test("a book its release has no file for is carried on the same tag, and built again when only the tag moves", async () => {

@@ -24,6 +24,14 @@ describe('language-packs.yml format 3 steps', () => {
     expect(inputs.v3.default).toBe('true')
   })
 
+  test('the obs input is a boolean off by default, and --obs is passed only when it is true', () => {
+    expect(inputs.obs.type).toBe('boolean')
+    expect(inputs.obs.default).toBe(false)
+    expect(text).toContain('OBS: ${{ inputs.obs }}')
+    expect(text).toContain('if [ "$OBS" = true ]; then args+=(--obs); fi')
+    expect(text.split('args+=(--obs)').length).toBe(2)
+  })
+
   test('the steps come after Build and publish and before Status result, in order', () => {
     const build = names.indexOf('Build and publish')
     const topics = names.indexOf('Topic sources (format 3)')
@@ -137,7 +145,13 @@ describe('language-packs.yml format 3 steps', () => {
     }
     // And only whole blocks were added: every 2.0 step is the same object.
     const before = (Bun.YAML.parse(old.stdout) as typeof doc).jobs.packs.steps
-    const kept = steps.filter((s) => before.some((b) => b.name === s.name))
+    // The one 2.0 line added since: the obs flag, passed only when the input is true.
+    const withoutObs = (s: Step): Step => {
+      if (typeof s.run !== 'string') return s
+      const drop = 'if [ "$OBS" = true ]; then args+=(--obs); fi'
+      return { ...s, run: s.run.split(String.fromCharCode(10)).filter((l) => l.trim() !== drop).join(String.fromCharCode(10)) }
+    }
+    const kept = steps.filter((s) => before.some((b) => b.name === s.name)).map(withoutObs)
     expect(kept).toEqual(before)
   })
 })

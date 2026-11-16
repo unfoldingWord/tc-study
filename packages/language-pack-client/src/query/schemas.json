@@ -12,7 +12,7 @@
   },
   "concept": {
     "label": { "es": "Concepto: qué es, sus nombres, sus relaciones y los libros donde aparece" },
-    "description": "A concept of the translation helps with its names and relations, and the installed books that use it.",
+    "description": "A concept of the translation helps with its names and relations, and the installed books that use it. With the obs unit installed, a tW or tA article also lists the Open Bible Stories that use it (obs.stories, with frames or a count of notes); a person, place or event lists the stories that overlap its verses, from the topics alone.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -66,8 +66,8 @@
       "type": "object",
       "properties": {
         "text": { "type": "string", "description": "The words to look for." },
-        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes)." },
-        "kinds": { "type": "array", "items": { "enum": ["text", "note", "question", "link"] }, "description": "Only these kinds of result." },
+        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes), or 'obs' for the Open Bible Stories." },
+        "kinds": { "type": "array", "items": { "enum": ["text", "note", "question", "link", "title"] }, "description": "Only these kinds of result." },
         "limit": { "type": "integer", "minimum": 1, "description": "The most results to return (20 when absent)." }
       },
       "required": ["text"],
@@ -91,7 +91,7 @@
   },
   "books": {
     "label": { "es": "Libros: dónde se usa un artículo o concepto, y si el libro está instalado" },
-    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed.",
+    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, state none with installed false when the obs unit is not installed (not looked at, the unit is not installed; it is then listed in notInstalled).",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -137,6 +137,28 @@
       "type": "object",
       "properties": { "book": { "type": "string", "description": "A book code, such as \"rut\"." } },
       "required": ["book"],
+      "additionalProperties": false
+    }
+  },
+  "stories": {
+    "label": { "es": "Historias: las historias bíblicas (OBS) de un pasaje, o todas" },
+    "description": "The Open Bible Stories whose ranges meet a passage or a whole chapter, or all of them in order.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "ref": { "type": "string", "description": "A book code and a chapter or a range, such as \"gen 1\" or \"gen 1:1-2:3\". Absent: every story." } },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "story": {
+    "label": { "es": "Historia: una historia bíblica (OBS) con sus cuadros, notas, preguntas y enlaces" },
+    "description": "One Open Bible Story with its frames and, per frame, the notes, questions and word links, when the stories are installed.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "n": { "type": "integer", "minimum": 1, "maximum": 50, "description": "The number of the story, 1 to 50." } },
+      "required": ["n"],
       "additionalProperties": false
     }
   }

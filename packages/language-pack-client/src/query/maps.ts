@@ -1,14 +1,18 @@
 /** `concept`, `topics` and `books`: answers from the maps (`answer` of language-pack-v3), in the envelope of the queries. No Node module here. */
-import { answer, BOOKS, type Cell, type MapSet, TN, TWL } from '@bt-synergy/language-pack-v3'
+import { answer, BOOKS, type Cell, type MapSet, type ObsModel, TN, TWL } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
+import { refOf, type StoryRef, storyIndex } from './stories'
 import { type Answer, type CellState, missingUnit, newAnswer, usedUnit } from './envelope'
 
 export const TOPIC_CATEGORIES = ['person', 'place', 'event', 'topic', 'story', 'section'] as const
 
 export type BookCell = { state: CellState; count?: number; verses?: number; installed: boolean; bytes?: number }
 /** `installed: false` (and no states) when the map that answers is not on the device: `xtopics` for a topic, `xmap` for `tw:`, `map` for `ta:`. */
-export type BooksData = { installed?: false; books: Record<string, BookCell> }
+export type BooksData = { installed?: false; books: Record<string, BookCell>; obs?: BookCell }
+
+/** The Open Bible Stories that use a concept: `frames` (`"NN:FF"`) for a tW article, `count` of notes for a tA article, neither for a topic. */
+export type ObsUse = { stories: (StoryRef & { frames?: string[]; count?: number })[] }
 
 /**
  * Whether the map unit a query needs (`xmap` for `tw:` and the Strong table, `map` for `ta:`) was read. When it was not (not
@@ -69,6 +73,39 @@ function cellsOf(m: MapSet, concept: string): Record<string, Cell> {
 
 const counted = (c: Cell | undefined): boolean => c !== undefined && (c.state === 'count' || c.state === 'partial')
 
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+
+/** The stories (with the frames or the count of notes) the OBS helps of the `obs` unit link to an article. `undefined`: the segment has no such table. */
+function obsOfArticle(model: ObsModel, m: MapSet, id: string): ObsUse | undefined {
+  const tw = id.startsWith('tw:')
+  const table = tw ? model.links : model.notes
+  if (table === undefined) return undefined
+  const index = storyIndex(m)
+  const per = new Map<number, string[]>()
+  for (const r of table.rows) {
+    if (r.concept !== id) continue
+    const n = Math.floor(r.frame / 100)
+    const frames = per.get(n) ?? []
+    frames.push(`${pad2(n)}:${pad2(r.frame % 100)}`)
+    per.set(n, frames)
+  }
+  const stories = [...per].sort((a, b) => a[0] - b[0]).map(([n, rows]) => {
+    const ref = refOf(n, index?.get(n), model.stories.find((s) => s.n === n))
+    return tw ? { ...ref, frames: [...new Set(rows)] } : { ...ref, count: rows.length }
+  })
+  return { stories }
+}
+
+/** Counts over the OBS rows of an article, in the cell of `books`: `none` when the segment has no table of that help. */
+function obsCell(model: ObsModel, id: string): BookCell {
+  const tw = id.startsWith('tw:')
+  const table = tw ? model.links : model.notes
+  if (table === undefined) return { state: 'none', installed: true }
+  const rows = table.rows.filter((r) => r.concept === id)
+  const count = tw ? new Set(rows.map((r) => r.frame)).size : rows.length
+  return { state: count > 0 ? 'count' : 'zero', count, installed: true }
+}
+
 export async function conceptQuery(reader: PackReader, id: string): Promise<Answer<unknown>> {
   if (typeof id !== 'string' || id === '') throw new ClientError('E_ARG', 'concept needs an id')
   const out = newAnswer<unknown>(reader, 'concept')
@@ -86,7 +123,30 @@ export async function conceptQuery(reader: PackReader, id: string): Promise<Answ
       if (counted(c) && reader.listed(unit) && !reader.installed(unit)) missingUnit(out, { book, unit, bytes: reader.size(unit), what: found.id })
     }
   }
+  if (found.found || !article) await addObs(out, reader, m, id, article)
   return out
+}
+
+/** The `obs` field of a concept: stories from the `obs` unit for an article, from the topics for a person, place or event. */
+async function addObs(out: Answer<unknown>, reader: PackReader, m: MapSet, id: string, article: boolean): Promise<void> {
+  const data = out.data as { obs?: ObsUse | { installed: false } }
+  if (!article) {
+    // A person, place or event is a topic of `xtopics`; the concept answer of the maps does not know it, the topic answer does.
+    const t = answer(m, { kind: 'topic', id }) as { stories?: string[] }
+    if (t.stories === undefined || t.stories.length === 0) return
+    const index = storyIndex(m)
+    data.obs = { stories: t.stories.map((s) => refOf(Number(s.slice(4)), index?.get(Number(s.slice(4))))) }
+    return
+  }
+  const model = reader.installed('obs') ? await reader.obs() : undefined
+  if (model === undefined) {
+    if (reader.listed('obs')) missingUnit(out, { unit: 'obs', bytes: reader.size('obs') })
+    data.obs = { installed: false }
+    return
+  }
+  usedUnit(out, reader, 'obs')
+  const use = obsOfArticle(model, m, id)
+  if (use !== undefined) data.obs = use
 }
 
 export async function booksQuery(reader: PackReader, q: { article: string } | { concept: string }): Promise<Answer<BooksData>> {
@@ -120,6 +180,20 @@ export async function booksQuery(reader: PackReader, q: { article: string } | { 
     books[book] = cell
   }
   out.data = { books }
+  if (id.startsWith('ta:') || id.startsWith('tw:')) {
+    if (!reader.installed('obs')) {
+      if (reader.listed('obs')) {
+        out.data.obs = { state: 'none', installed: false, bytes: reader.size('obs') }
+        missingUnit(out, { unit: 'obs', bytes: reader.size('obs') })
+      }
+    } else {
+      const model = await reader.obs()
+      if (model !== undefined) {
+        usedUnit(out, reader, 'obs')
+        out.data.obs = obsCell(model, id)
+      }
+    }
+  }
   return out
 }
 

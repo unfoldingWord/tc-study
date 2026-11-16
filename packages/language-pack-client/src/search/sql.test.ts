@@ -55,6 +55,9 @@ function setup(content: Sample, index?: SearchIndex, store = memoryStore()): Lan
   return createClient({ store, source: httpSource({ base: server.url }), trust, ...(index ? { index } : {}) })
 }
 
+/** The default units before OBS joined them: for tests that need obs absent. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+
 const key = (hits: { kind: string; ref: string; book: string }[]) => hits.map((h) => `${h.kind}|${h.book}|${h.ref}`).sort()
 
 describe('sqlIndex through the client', () => {
@@ -166,15 +169,96 @@ describe('sqlIndex through the client', () => {
 
   test('notInstalled lists the books not installed, with bytes', async () => {
     const client = setup(sample, sqlIndex(bunDriver()))
-    await client.install('es-419', { books: ['tit'] })
+    await client.install('es-419', { books: ['tit'], defaults: false, units: NO_OBS })
     const a = await (await client.open('es-419')).search('Pablo')
-    // The sample lists Titus only, and Titus is installed: nothing is missing.
+    // Titus is installed; the sample also lists the obs unit, which is not.
     expect(a.data!.length).toBeGreaterThan(0)
-    expect(a.notInstalled).toEqual([])
+    expect(a.notInstalled.map((n) => n.unit)).toEqual(['obs'])
     const none = setup(sample)
     await none.refresh('es-419')
     const b = await (await none.open('es-419')).search('Pablo')
     expect(b.data).toEqual([])
     expect(b.notInstalled.map((n) => n.unit)).toContain('book:tit')
+  })
+})
+
+describe('OBS in the search index', () => {
+  async function readerWith(index: SearchIndex | undefined, want: { units?: string[]; books: string[] }, content: Sample = sample) {
+    const client = setup(content, index)
+    await client.install('es-419', want as never)
+    return client.open('es-419')
+  }
+  test('a search for the title of story 1 finds it', async () => {
+    const r = await readerWith(sqlIndex(bunDriver()), { units: ['obs'], books: [] })
+    const a = await r.search('creación', { kinds: ['title'] })
+    expect(a.data!.map((h) => [h.kind, h.book, h.ref])).toEqual([['title', 'obs', '01:0']])
+    expect(a.cites.map((c) => c.ref)).toEqual(['obs 01:0'])
+    expect(a.revision.units.obs).toBeDefined()
+    expect(a.notInstalled.map((n) => n.unit)).not.toContain('obs')
+  })
+  test('frame text, an OBS note and an OBS question are found with book obs', async () => {
+    const r = await readerWith(sqlIndex(bunDriver()), { units: ['obs'], books: [] })
+    expect((await r.search('mundo', { kinds: ['text'] })).data!.map((h) => [h.book, h.ref])).toEqual([['obs', '01:01']])
+    const n = (await r.search('metáfora')).data!
+    expect(n.map((h) => [h.kind, h.book, h.ref])).toEqual([['note', 'obs', '01:02']])
+    expect(n[0]!.id).toBe('n001')
+    const q = (await r.search('Dios', { kinds: ['question'] })).data!
+    expect(q.map((h) => [h.kind, h.book, h.ref, h.id])).toEqual([['question', 'obs', '01:01', 'q001']])
+  })
+  test('kinds: ["title"] filters', async () => {
+    const r = await readerWith(sqlIndex(bunDriver()), { units: ['obs'], books: [] })
+    expect((await r.search('pecado', { kinds: ['title'] })).data!.map((h) => h.ref)).toEqual(['02:0'])
+    expect((await r.search('serpiente', { kinds: ['title'] })).data).toEqual([])
+    expect((await r.search('serpiente')).data!.length).toBeGreaterThan(0)
+  })
+  test('obs not installed: no OBS hits and notInstalled obs', async () => {
+    const r = await readerWith(sqlIndex(bunDriver()), { units: NO_OBS, defaults: false, books: ['tit'] })
+    const a = await r.search('creación')
+    expect(a.data).toEqual([])
+    expect(a.notInstalled.map((n) => n.unit)).toEqual(['obs'])
+    expect(a.notInstalled[0]!.bytes).toBe(r.size('obs'))
+    expect((await r.search('Pablo', { books: ['tit'] })).notInstalled).toEqual([])
+  })
+  test('the same hits from the SQL index, the memory index and no index', async () => {
+    const out: string[][] = []
+    for (const ix of [sqlIndex(bunDriver()), memoryIndex(), undefined]) {
+      const r = await readerWith(ix, { units: ['obs'], books: ['tit'] })
+      const all: string[] = []
+      for (const q of ['creación', 'mundo', 'metáfora', 'creó', 'Dios', 'Pablo']) all.push(...key((await r.search(q, { limit: 1000 })).data!), '--')
+      out.push(all)
+    }
+    expect(out[1]).toEqual(out[0]!)
+    expect(out[2]).toEqual(out[0]!)
+    expect(out[0]!.some((k) => k.startsWith('title|obs'))).toBe(true)
+  })
+  test('an empty title has no title row, in either index', async () => {
+    const empty = await buildSample({
+      revision: 2,
+      tweak: {
+        row: (row) => {
+          if (!row.key.startsWith('obs:es-419_gl/es-419/obs:02')) return row
+          const value = JSON.parse(JSON.stringify(row.value))
+          value.content.title = ''
+          return { ...row, value }
+        },
+      },
+    })
+    for (const ix of [sqlIndex(bunDriver()), memoryIndex(), undefined]) {
+      const r = await readerWith(ix, { units: ['obs'], books: [] }, empty)
+      expect((await r.search('pecado', { kinds: ['title'] })).data).toEqual([])
+      expect((await r.search('Story', { kinds: ['title'] })).data).toEqual([])
+      expect((await r.search('creación', { kinds: ['title'] })).data!.length).toBe(1)
+      expect((await r.search('serpiente')).data!.length).toBe(1)
+    }
+  })
+  test('removing the obs segment removes its rows (SQL)', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addObs('xx', { lang: 'xx', res: [['r/obs', 'v1']], stories: [{ res: 'r/obs', n: 1, title: 'La creación', frames: [{ n: 1, text: 'Dios' }] }] }, 'o1')
+    expect(await ix.has('o1')).toBe(true)
+    expect((await ix.search('xx', 'creación')).length).toBe(1)
+    await ix.removeSegment('o1')
+    expect(await ix.has('o1')).toBe(false)
+    expect(await ix.search('xx', 'creación')).toEqual([])
   })
 })
