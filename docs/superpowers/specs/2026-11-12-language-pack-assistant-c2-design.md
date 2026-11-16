@@ -72,15 +72,22 @@ Measured per language on a held-out question set:
 - **The index gains one row kind:** `section`, one row per section of an installed tW or tA article. It carries the
   article id, the section id and its role.
 - **OBS frames wait** (decided while planning). C1's reader has no OBS accessor and staging has no OBS for es-419, so
-  a `frame` kind comes with an OBS reader.
+  a `frame` kind comes with an OBS reader. (C2.1: the OBS reader is on master; the card shows OBS pieces, below.)
 - **When they are indexed:** articles are indexed when their units are installed or imported, the same way books are.
   The `search` filters and its schema list the new kind.
 - **The `Fragment` type** (in the assistant) is the one shape of a piece in a card:
   `{ id, kind, title, ref?, concepts[], length, cite, license, link }`.
   - It is built from a query answer or a search hit. It is never stored.
-  - Its `id` is stable: `note:<book>/<rowid>`, `question:…`, `section:tw:kt/grace#<sid>`, `verse:<res> tit 2:11`,
-    (`frame:obs 4:2` once OBS frames exist).
-  - `link` is a typed link the app can open: `ref:`, `concepto:`, `articulo:<id>#<role>`, `pieza:<id>`.
+  - Its `id` is stable: `note:<book>/<rowid>`, `question:…`, `section:tw:kt/grace#<sid>`, `verse:<res> tit 2:11`.
+  - OBS pieces (C2.1), with `NN` the story and `FF` the frame, two digits each as the `obs` unit writes them:
+    - `frame:obs NN:FF`, a frame: from a search `text` hit, or a frame the `concept` answer's `obs` field lists (tW);
+    - `obsnote:NN:FF/<rowid>` and `obsquestion:NN:FF/<rowid>`, a row of the OBS notes or questions: from a search hit;
+    - `story:obs NN`, a whole story: from a search `title` hit, or a story of the `obs` field that lists no frames (tA,
+      topics);
+    - `book:obs`, the OBS cell of a `books` answer, like the cell of a book.
+  - `link` is a typed link the app can open: `ref:`, `concepto:`, `articulo:<id>#<role>`, `pieza:<id>`, and for OBS
+    `obs:NN:FF` (a frame: `frame:`, `obsnote:` and `obsquestion:` pieces) or `obs:NN` (a story: `story:` pieces).
+    `book:obs` keeps `pieza:book:obs`.
 
 ### 3. The lexicon (assistant)
 
