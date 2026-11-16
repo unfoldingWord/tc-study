@@ -19,13 +19,13 @@ of its list file is not what the originals have).
 All picks match the plan's design table (en all `unfoldingWord`; es-419 all `es-419_gl`; id all `bahtraku`; hi stories, notes and
 questions from `Door43-Catalog` at the versions Task 3 checked, no TWL in the catalog; ar stories only).
 
-| Language | Picks | Stories | Notes | Questions | TWL links | obs unit (units.json bytes) | obs unit step | vs 3 MB |
+| Language | Picks | Stories | Notes | Questions | TWL links | obs unit (units.json bytes) | obs unit step (time; peak memory of the whole process, not of the obs step) | vs 3 MB |
 |---|---|--:|--:|--:|--:|--:|---|---|
-| en | unfoldingWord obs v9, tn v13, tq v10, twl v3 | 50 | 2267 | 672 | 2381 | 223,292 (218 KB) | 27 s, 890 MB peak | 7% |
-| es-419 | es-419_gl obs, tn, tq, twl (all v2) | 50 | 2267 | 672 | 2542 | 246,459 (241 KB) | 27 s, 1086 MB peak | 8% |
-| hi | Door43-Catalog obs v8.3, tn v11.2, tq v8.2; no twl | 50 | 2325 (markdown) | 672 (markdown) | 0 (none in catalog) | 287,929 (281 KB) | 20 s, 1046 MB peak | 9% |
-| ar | OBS-Aquifer ar_obs v1; no tn, tq, twl | 50 | none | none | none | 61,192 (60 KB) | 4.5 s, 1124 MB peak | 2% |
-| id | bahtraku obs v6, tn v2.7, tq v2.3, twl v2.1 | 50 | 2266 | 670 | 2381 | 232,320 (227 KB) | 29 s, 1108 MB peak | 7% |
+| en | unfoldingWord obs v9, tn v13, tq v10, twl v3 | 50 | 2267 | 672 | 2381 | 223,292 (218 KB) | 27 s, 890 MB peak of the process | 7% |
+| es-419 | es-419_gl obs, tn, tq, twl (all v2) | 50 | 2267 | 672 | 2542 | 246,459 (241 KB) | 27 s, 1086 MB peak of the process | 8% |
+| hi | Door43-Catalog obs v8.3, tn v11.2, tq v8.2; no twl | 50 | 2325 (markdown) | 672 (markdown) | 0 (none in catalog) | 287,929 (281 KB) | 20 s, 1046 MB peak of the process | 9% |
+| ar | OBS-Aquifer ar_obs v1; no tn, tq, twl | 50 | none | none | none | 61,192 (60 KB) | 4.5 s, 1124 MB peak of the process | 2% |
+| id | bahtraku obs v6, tn v2.7, tq v2.3, twl v2.1 | 50 | 2266 | 670 | 2381 | 232,320 (227 KB) | 29 s, 1108 MB peak of the process | 7% |
 
 - The threshold is 3 MB per language (ruling R2, text + TN + TQ, no images). Every language is far under it: the largest is hi at 281 KB.
   Sizes are the bytes `units.json` records for the `obs` unit (the compressed segment).
@@ -56,7 +56,7 @@ what `publish-v3` puts under the bucket's `v3/` prefix), unsigned. Serve as a st
 
 | Query | Answer |
 |---|---|
-| `stories('gen 1')` | 2 stories: 1 "1. The Creation" (gen 1:1-2:25) and 48 "48. Jesus Is the Promised Messiah" (gen 1:1-3:24, 6, 14, 22, heb …) |
+| `stories('gen 1')` | 2 stories (the design's "Done when" expected stories 1 and 2; story 2 is Genesis 3, so the expectation changed to 1 and 48): 1 "1. The Creation" (gen 1:1-2:25) and 48 "48. Jesus Is the Promised Messiah" (gen 1:1-3:24, 6, 14, 22, heb …) |
 | `story(1)` | title "1. The Creation", 16 frames, 90 notes, 22 questions, 35 links |
 | `search('1. The Creation')` | 4 hits: a `title` hit in `obs` 01:0, and 3 TN notes of Genesis |
 | `concept('tw:kt/god')` | `obs.stories` has 45 stories (story 1 frames 01:01-01:16 …) |
@@ -70,3 +70,16 @@ Time of the en run with gen: 1441 s (gen 925 s).
 - Size to Abel: by the R2 threshold (3 MB) `obs` fits for all five languages (largest 281 KB), so adding `obs` to the default units is
   within the rule; the decision stays with the supervisor and Abel.
 - Not measured here: whole-language time and memory with OBS on; the workflow run does that.
+
+## Evidence limits
+
+- One book per language (`rut`; `gen` and `rut` for en), through an uncommitted temporary book filter.
+- The OBS-off compare is one book (`tit`) of es-419; fingerprints differ on every part, as the Task 4 ruling expects.
+- The data is unsigned.
+- Whole-language time and memory were not measured.
+- The page check ran a modified copy of the page (`trust: {}`, no stylesheet) against the en folder only.
+
+## Staging note
+
+The OBS code-version constant moves every unit's fingerprint, so the first publish after the merge rebuilds all units (about 6 h
+per language here). Plan the staging timing for that.
