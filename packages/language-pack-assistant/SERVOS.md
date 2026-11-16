@@ -25,6 +25,8 @@ What an app that embeds `@bt-synergy/language-pack-assistant` should know, from 
   es 83 %, en 75 %, pt 59 %; no accuracy target is met (see `eval/RESULTS.md`, C2.1).
 - **Cards.** A concept or article card shows every section of the article, not only the default one. OBS (Bible stories) fragments
   and ids exist in the card (frame references are padded on both sides); the staging packs hold no OBS yet.
+  A card holds 8 pieces by default, and a concept or article card can fill them all with sections: pass a larger `limit` to
+  `ask` or `run` to also show where it is used (books, OBS).
 - **Faster renderings.** The client builds an index of aligned words once per book and text, so the `renderings` tail measured in C2 is gone.
   Test2, desktop, warm, SQL index: p50 1.0 to 3.7 ms; p95 33 ms (es), 105 ms (en), 220 ms (pt). The earlier `en` p95 of 1228 ms no longer applies.
 - **Book names.** `es-419` revision 7 names all 66 books.

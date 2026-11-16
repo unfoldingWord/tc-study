@@ -115,8 +115,6 @@ if (process.argv[1]?.endsWith('run.ts')) {
   }
   const summary = summarize(lang, set, out)
   mkdirSync(join(ROOT, 'eval/results'), { recursive: true })
-  const out2 = arg('--out')
-  if (out2 !== undefined && !/^[a-z0-9]+$/.test(out2)) throw new Error('--out must be letters and digits')
-  writeFileSync(join(ROOT, 'eval/results', `${lang}-${set}${out2 !== undefined ? `-${out2}` : ''}.json`), JSON.stringify({ summary, questions: out }, null, 1) + '\n')
+  writeFileSync(target, JSON.stringify({ summary, questions: out }, null, 1) + '\n')
   console.log(JSON.stringify(summary))
 }
