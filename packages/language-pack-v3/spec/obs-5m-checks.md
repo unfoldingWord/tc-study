@@ -40,13 +40,17 @@ discourse references use the OBS numbering (21-13, 21-14, 21-15) and need no cor
 the label `21-14` stand "raise the Messiah from the dead" and "to make the New Covenant", which are the words of OBS
 21-14.
 
-Frame lists are read with commas or spaces as separators. Story 8 writes `08-10 08-11` without a comma.
+Frame lists are read with commas or spaces as separators, and with one-digit frames (`14-1`). Story 8 writes
+`08-10 08-11` without a comma; stories 14 and 30 write one-digit frames. A reference the build corrected or wrote
+differently keeps the published label in `refText` (for example `43-03, 44-04, …` on `44/m2/2`).
 
 ## Checks
 
 Fail the build (an error):
-1. A story's frame headers, after the correspondence, are not the frames of the `obs` story, in the same order.
-2. A question, term or discourse reference names a frame that the `obs` story does not have.
+1. A story's frame headers, after the correspondence, are not the frames of the `obs` story, in the same order. The
+   exception is the approved fallback: a story or a frame that the `obs` resource lacks entirely goes in `tf-frames`
+   with its origin, and is not a mismatch. A frame that `obs` has under another number is a mismatch, never a fallback.
+2. A question, term or discourse reference names a frame that is neither in the `obs` story nor in `tf-frames`.
 3. A transclusion names a file or heading that does not exist.
 4. A heading that starts a part is unknown.
 
@@ -55,10 +59,12 @@ Warn (the build goes on and the report lists each one):
    per frame. v4 against v9: 62 frames with this normalization. The 07-10 typo «again., so» is one of them.
 6. **Titles and references.** Compare the same way. v4: story 32 has «and» where OBS has «&», story 34 has
    «13:18-21;18:9-14» and story 36 has «Luke9:28-36».
-7. **A missing part.** v4: story 33 has no drafting transclusion and no Personal Reflection (m3). Story 14 has an m3
-   heading but no Journal Reflection.
-8. **A term not found in its frame** (after normalizing). It is a hint only, not proof. v4: 11 terms, all paraphrases or
-   ellipses («the older son...the younger son»). None comes from a wrong frame.
+7. **A missing part or list.** v4: story 33 has no drafting transclusion and no Personal Reflection (m3). Story 14 has
+   an m3 heading but no Journal Reflection.
+8. **A term not found in its frame** (after normalizing). It is a hint only, not proof. v4: 11 terms. Each one matches
+   its own frame better than any other, so none comes from a wrong frame. Most are ellipses or paraphrases («the older
+   son...the younger son»); some are transcription slips worth reporting upstream: `38:8/4` repeats «all the sheep», and
+   `48:9/1` runs two clauses together.
 9. **Versions.** The catalog lists both releases (`obs` v9, `obs-tf` v4). Warn when the `obs` release is newer than the
    `obs` version that OBS-TF's manifest gives as its source (`source: obs en 9`). Note that the manifest of the v4
    release says `version: '3'`.
@@ -66,5 +72,6 @@ Warn (the build goes on and the report lists each one):
 ## Results on v4
 
 - 50 stories, 796 part rows, 2044 questions (1505 observation, 187 discourse, 157 theology, 195 journal), 1565 terms, and
-  55 shared blocks (5 used by every story, 50 devotional sections).
+  55 shared blocks: checking, M4, M5 and the conclusion in all 50 stories, drafting in 49 (not story 33), and 50
+  devotional sections.
 - With the correspondence above: no errors, and the warnings listed in 5–8.

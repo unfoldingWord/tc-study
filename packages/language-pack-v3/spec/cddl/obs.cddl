@@ -64,8 +64,16 @@ obs-helps = {
 ; Source: one OBS Theological Formation resource of the segment's language (Door43 "OBS Theological Formation", en_obs-tf
 ; v4 today), listed in the header's "res" and in the catalog's "resources" with its own release, license, rights and
 ; attribution. The frames, the titles, the "A Bible story from" lines and the images are not here: they are the story's in
-; "stories". Every frame a 5M row names is story × 100 + frame of "stories" (ids.md), after the reviewed correspondence of
-; the build (spec/obs-5m-checks.md).
+; "stories". Every frame a 5M row names is story × 100 + frame (ids.md), after the reviewed correspondence of the build
+; (spec/obs-5m-checks.md), and it is a frame of "stories" or a row of tf-frames.
+;
+; The 5M tables are one set. tf-parts is its root: a reader that does not have tf-parts (absent, or a version it does not
+; know) uses none of the others. A builder writes tf-shared when a row of tf-parts has "shared", tf-frames when a frame
+; lacks from "stories", and never tf-questions, tf-terms, tf-shared, tf-frames or tf-framework without tf-parts. A reader
+; that has tf-parts and not tf-shared (a version it does not know) skips the rows of tf-parts that have "shared"; one that
+; does not have tf-frames shows no text for a frame missing from "stories"; one that does not have tf-questions or
+; tf-terms shows the heading of those lists with no rows. A "shared" or "frames" value that names a row or frame the
+; segment does not have is E_BODY.
 ;
 ; The codes are fixed and never translated. Parts, in session order:
 ;   intro, frames, community, m1, m2, drafting, m3, checking, m4, m5, conclusion
