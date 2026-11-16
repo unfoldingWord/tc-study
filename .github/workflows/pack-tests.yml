@@ -54,6 +54,7 @@ jobs:
         with:
           # workflow-v3.test.ts reads an older revision of language-packs.yml with `git show`.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -64,6 +65,10 @@ jobs:
       - name: Build pack tools
         run: bash scripts/build-pack-tools.sh
 
+      # The independent Python reader (spec/reader-py, standard library only) checks what the builders write: the
+      # conformance cases and transfer-v3 call it through LP3_PYTHON. The runner has python3 (3.12; the reader needs 3.11).
       - name: Test
         working-directory: ${{ matrix.suite.dir }}
+        env:
+          LP3_PYTHON: python3
         run: bun test --timeout 120000 ${{ matrix.suite.args }}
