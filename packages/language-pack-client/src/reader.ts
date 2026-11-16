@@ -11,6 +11,7 @@ import {
   artView,
   type BookModel,
   bookView,
+  type CatalogResource,
   FormatError,
   KNOWN,
   mapView,
@@ -100,6 +101,8 @@ export interface PackReader {
   unitOf(cls: 'book' | 'art' | 'orig', key: string): string | undefined
   /** Whether the catalogs list the unit, installed or not. */
   listed(unit: string): boolean
+  /** The resource entries of the language catalog (`source`, `review`, `license`, `rights`, `attribution`, `release`). Added with patch catalogs: a hand-made reader may lack it. */
+  resources?(): CatalogResource[]
   /** The checked segments of an installed unit, or `undefined` when it is not installed. For the queries of later tasks. */
   segments(unit: string): Promise<Segment[] | undefined>
   /** The revision of the catalog the unit was installed from (the catalog's own in `openFromSegments`), or `undefined` when it is not active. */
@@ -336,6 +339,7 @@ export function makeReader(o: ReaderInput): PackReader {
       return ids !== undefined && !ids.some((id) => missing.has(id))
     },
     listed: (unit) => listedUnits.has(unit),
+    resources: () => langCat?.catalog.resources ?? [],
     book: (book) => single(`book:${book}`, bookView),
     orig: (book) => single(`orig:${book}`, origView),
     async articles(group) {

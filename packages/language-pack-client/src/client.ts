@@ -2,6 +2,7 @@
  * The client: refresh the catalogs, install by unit, status, prune and verify. Calls on one client run one after the other.
  */
 import { bookView, FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
+import { patchedReader } from './patch'
 import { ClientError } from './errors'
 import { catalogsOf, checkConcurrency, localCatalogIds, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
@@ -33,9 +34,18 @@ export type Status = {
   missingCommon?: RefreshReport['missingCommon']
 }
 
+export type OpenOptions = {
+  /**
+   * Patch catalogs (`hi-x-aquifer`) to merge into the answers, in order of preference. The base language always wins; a patch fills only
+   * the notes, questions or links the base lacks for a book (`patch.ts`). A patch that is not installed is left out. Absent: the reader of
+   * the language alone, exactly as before.
+   */
+  patches?: string[]
+}
+
 export interface LanguagePackClient {
   /** A reader over the installed segments of a language (its units as the installed state says). */
-  open(lang: string): Promise<PackReader>
+  open(lang: string, o?: OpenOptions): Promise<PackReader>
   refresh(lang: string, o?: { confirmDowngrade?: boolean; signal?: AbortSignal }): Promise<RefreshReport>
   /** `concurrency`: how many segment requests run at once (default 4; `1` asks one after the other, in plan order). */
   install(lang: string, want?: Want, o?: InstallOptions): Promise<InstallReport>
@@ -387,7 +397,19 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   }
 
   return {
-    open: (lang) => queued(() => openNow(lang)),
+    open: (lang, opts = {}) =>
+      queued(async () => {
+        const base = await openNow(lang)
+        const patches: PackReader[] = []
+        for (const name of opts.patches ?? []) {
+          try {
+            patches.push(await openNow(name))
+          } catch (e) {
+            if (!(e instanceof ClientError && e.code === 'E_NOT_INSTALLED')) throw e
+          }
+        }
+        return patchedReader(base, patches)
+      }),
     refresh: (lang, opts = {}) =>
       queued(async () => {
         const { name: _name, ...report } = await refreshNow(lang, opts)

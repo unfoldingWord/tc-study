@@ -105,6 +105,25 @@ A `lookup` query with no words (only punctuation) returns `matches: []`; empty o
 
 Errors are `ClientError` with a `code` (`CLIENT_ERROR_CODES`): the list is `CLIENT_ERROR_CODES` (`E_DOWNGRADE`, `E_COMMON`, `E_NO_BASE`, `E_NO_PACK`, `E_NETWORK`, `E_STORE`, ...); a signature or format failure is a `FormatError` of `language-pack-v3` with its own code (`E_SIGNATURE`, `E_BODY`, ...).
 
+## Patch catalogs (e.g. Aquifer)
+
+A patch catalog (`hi-x-aquifer`: `{lang}-x-{source}`) is a language catalog that fills what Door43 lacks. Its `book:<book>` units have no text, only `notes` and/or `questions`, and each resource entry says where they came from (`source`, `review`, `license`, `rights`, `attribution`, `release`). It is refreshed and installed like any language: `client.refresh('hi-x-aquifer')`, `client.install('hi-x-aquifer', { books })`. A patch book needs only `orig:<book>` (the common catalog); its `ta:` concepts resolve through the base language, which the app opens too.
+
+```ts
+const reader = await client.open('hi', { patches: ['hi-x-aquifer'] })
+const a = await reader.passage('tit 1:1') // reader.context(...) the same
+```
+
+- **Order of preference** (the app's rule, `plan-aquifer.md`): the Door43 language first, then the patch, then English. The reader does the first two: the base always wins. For a book the base has, a table (`notes`, `questions`, `links`) the base has stays the base's, even if the patch has the book; the patch fills only a table the base lacks. For a book the base has not installed, the answer is the patch rows alone (no text; the base unit is in `notInstalled` when the catalog lists it). English is a second `open`, as before. With several patches the first has priority; a patch that is not installed is left out; without `patches` nothing changes.
+- **Marks.** Every row (`data.notes[i].patch`) and cite (`cites[i].patch`) that came from a patch carries `{ patch, source, review, license, rights, attribution, release }`, taken from the patch's resource entry. A row with no `patch` is the base's.
+- **The notice is the app's job**, by `patch.review` (texts from `plan-aquifer.md`; the app translates them):
+  - `none` (not known): "desconocida": "Traducción de Aquifer; puede haber sido hecha con ayuda de IA. No es parte del paquete oficial de este idioma."
+  - `community`: "revisión de la comunidad": "Traducción de Aquifer hecha con ayuda de IA y revisada por personas; no es parte del paquete oficial de este idioma."
+  - `professional`: "revisión editorial de Aquifer": "Notas de unfoldingWord traducidas al hindi, vía Aquifer."
+  - `mixed`: the weakest of the above that applies; when in doubt, show the "desconocida" text.
+- **Attribution.** Show `patch.attribution` and `patch.license` (CC-BY-SA-4.0) with the answer and in "About", with `patch.rights`. Reports should carry the `patch` mark of what was shown.
+- What stays the base's: articles, maps, coverage and search (`coverage` counts the base's sources, not the patch's rows).
+
 ## Tests
 
 `bun test` (needs the sibling `packages/language-pack-v3` for the spec fixtures). `src/situations.test.ts` runs the five failure situations of the plan end to end: few resources, a book with no sources, an old pack with no network, mixed revisions, a mistitled article.
