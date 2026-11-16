@@ -1,0 +1,150 @@
+{"q":"rom 8:28","expect":{"call":{"query":"passage","args":{"ref":"rom 8:28"}}},"pieces":["verse:ult rom 8:28","note:rom/u0ev","note:rom/q3ce","question:rom/adpw"]}
+{"q":"genesis 1:1-3","expect":{"call":{"query":"passage","args":{"ref":"gen 1:1-3"}}},"pieces":["verse:ult gen 1:1"]}
+{"q":"john 3 16","expect":{"call":{"query":"passage","args":{"ref":"jhn 3:16"}}},"pieces":["verse:ult jhn 3:16","note:jhn/vg6z","note:jhn/h4ht"]}
+{"q":"first corinthians 13 verses 4 to 7","expect":{"call":{"query":"passage","args":{"ref":"1co 13:4-7"}}},"pieces":["verse:ult 1co 13:4","note:1co/m671","note:1co/cr57"]}
+{"q":"2 tim 3:16","expect":{"call":{"query":"passage","args":{"ref":"2ti 3:16"}}},"pieces":["verse:ult 2ti 3:16","note:2ti/dz99","note:2ti/s274"]}
+{"q":"matt 5:3-12","expect":{"call":{"query":"passage","args":{"ref":"mat 5:3-12"}}},"pieces":["verse:ult mat 5:3","note:mat/egbs","note:mat/jhdg"]}
+{"q":"what does ruth 1:16 say","expect":{"call":{"query":"passage","args":{"ref":"rut 1:16"}}},"pieces":["verse:ult rut 1:16","note:rut/z5ug","note:rut/wspu","question:rut/s63s"]}
+{"q":"heb 11:1","expect":{"call":{"query":"passage","args":{"ref":"heb 11:1"}}},"pieces":["verse:ult heb 11:1","note:heb/g4cc","note:heb/d95i"]}
+{"q":"1 jn 4:8","expect":{"call":{"query":"passage","args":{"ref":"1jn 4:8"}}},"pieces":["verse:ult 1jn 4:8","note:1jn/j265","note:1jn/j266","question:1jn/x7ex"]}
+{"q":"show me eph 2 8-9","expect":{"call":{"query":"passage","args":{"ref":"eph 2:8-9"}}},"pieces":["verse:ult eph 2:8","note:eph/abcq","note:eph/t9pc"]}
+{"q":"phil 2:5-8","expect":{"call":{"query":"passage","args":{"ref":"php 2:5-8"}}},"pieces":["verse:ult php 2:5","note:php/pqdc","note:php/rh98"]}
+{"q":"acts 2:38 text and notes","expect":{"call":{"query":"passage","args":{"ref":"act 2:38"}}},"pieces":["verse:ult act 2:38","note:act/a180","note:act/cmb7","question:act/ql6u"]}
+{"q":"titus 2 11","expect":{"call":{"query":"passage","args":{"ref":"tit 2:11"}}},"pieces":["verse:ult tit 2:11","note:tit/tlbm","note:tit/gp2z"]}
+{"q":"jonah 2:1-2","expect":{"call":{"query":"passage","args":{"ref":"jon 2:1-2"}}},"pieces":["verse:ult jon 2:1","note:jon/alr2","note:jon/al5b"]}
+{"q":"gen 22:1-2","expect":{"call":{"query":"passage","args":{"ref":"gen 22:1-2"}}},"pieces":["verse:ult gen 22:1","note:gen/oi54","note:gen/y0sj"]}
+{"q":"rev 21:4","expect":{"call":{"query":"passage","args":{"ref":"rev 21:4"}}},"pieces":["verse:ult rev 21:4","note:rev/w39g","note:rev/r310"]}
+{"q":"third john verse 4","expect":{"call":{"query":"passage","args":{"ref":"3jn 1:4"}}},"pieces":["verse:ult 3jn 1:4","note:3jn/c375","note:3jn/w79m","question:3jn/n2vf"]}
+{"q":"second peter 1:20-21","expect":{"call":{"query":"passage","args":{"ref":"2pe 1:20-21"}}},"pieces":["verse:ult 2pe 1:20","note:2pe/wcn9","note:2pe/ctiz"]}
+{"q":"1 sam 17:45","expect":{"call":{"query":"passage","args":{"ref":"1sa 17:45"}}},"pieces":["verse:ult 1sa 17:45","note:1sa/wv78","note:1sa/haix","question:1sa/pwus"]}
+{"q":"hab 2:4","expect":{"call":{"query":"passage","args":{"ref":"hab 2:4"}}},"pieces":["verse:ult hab 2:4","note:hab/ipcz","note:hab/wjie"]}
+{"q":"james 2:17","expect":{"call":{"query":"passage","args":{"ref":"jas 2:17"}}},"pieces":["verse:ult jas 2:17","note:jas/me1d","note:jas/j138","question:jas/fpr8"]}
+{"q":"daniel 3:17","expect":{"call":{"query":"passage","args":{"ref":"dan 3:17"}}},"pieces":["verse:ult dan 3:17","note:dan/a5tq","note:dan/r9q3","question:dan/n0d5"]}
+{"q":"col 1:15-17","expect":{"call":{"query":"passage","args":{"ref":"col 1:15-17"}}},"pieces":["verse:ult col 1:15","note:col/j5u9","note:col/rgb7"]}
+{"q":"mark 4:39","expect":{"call":{"query":"passage","args":{"ref":"mrk 4:39"}}},"pieces":["verse:ult mrk 4:39","note:mrk/yym6","note:mrk/mnsa","question:mrk/vehj"]}
+{"q":"luke 15:20","expect":{"call":{"query":"passage","args":{"ref":"luk 15:20"}}},"pieces":["verse:ult luk 15:20","note:luk/m43r","note:luk/m011"]}
+{"q":"joel 2:28","expect":{"call":{"query":"passage","args":{"ref":"jol 2:28"}}},"pieces":["verse:ult jol 2:28","note:jol/j045","note:jol/s3t8"]}
+{"q":"exodus 20:1-3","expect":{"call":{"query":"passage","args":{"ref":"exo 20:1-3"}}},"pieces":["verse:ult exo 20:1","note:exo/qg71","note:exo/r9h3","question:exo/fm4s"]}
+{"q":"psalm 23","expect":{"call":{"query":"passage","args":{"ref":"psa 23:1-6"}}},"pieces":["verse:ult psa 23:1","note:psa/r1f6","note:psa/glpb"]}
+{"q":"jonah 2","expect":{"call":{"query":"passage","args":{"ref":"jon 2:1-10"}}},"pieces":["verse:ult jon 2:1","note:jon/alr2"]}
+{"q":"ruth 1","expect":{"call":{"query":"passage","args":{"ref":"rut 1:1-22"}}},"pieces":["verse:ult rut 1:1","note:rut/irf4"]}
+{"q":"who was Melchizedek","expect":{"call":{"query":"concept","args":{"id":"tw:names/melchizedek"}}},"pieces":["section:tw:names/melchizedek#definition","concept:tw:names/melchizedek"]}
+{"q":"what is propitiation","expect":{"call":{"query":"concept","args":{"id":"tw:kt/propitiation"}}},"pieces":["section:tw:kt/propitiation#definition","concept:tw:kt/propitiation"]}
+{"q":"tell me about Sennacherib","expect":{"call":{"query":"concept","args":{"id":"tw:names/sennacherib"}}},"pieces":["section:tw:names/sennacherib#definition","concept:tw:names/sennacherib"]}
+{"q":"who is gideon","expect":{"call":{"query":"concept","args":{"id":"tw:names/gideon"}}},"pieces":["section:tw:names/gideon#definition","concept:tw:names/gideon"]}
+{"q":"where was Nineveh","expect":{"call":{"query":"concept","args":{"id":"tw:names/nineveh"}}},"pieces":["section:tw:names/nineveh#definition","concept:tw:names/nineveh"]}
+{"q":"what does tabernacle mean in the bible","expect":{"call":{"query":"concept","args":{"id":"tw:kt/tabernacle"}}},"pieces":["section:tw:kt/tabernacle#definition","concept:tw:kt/tabernacle"]}
+{"q":"grace definition","expect":{"call":{"query":"concept","args":{"id":"tw:kt/grace"}}},"pieces":["section:tw:kt/grace#definition","concept:tw:kt/grace"]}
+{"q":"who is Barnabas","expect":{"call":{"query":"concept","args":{"id":"tw:names/barnabas"}}},"pieces":["section:tw:names/barnabas#definition","concept:tw:names/barnabas"]}
+{"q":"what is the sabbath","expect":{"call":{"query":"concept","args":{"id":"tw:kt/sabbath"}}},"pieces":["section:tw:kt/sabbath#definition","concept:tw:kt/sabbath"]}
+{"q":"meaning of redeem and redemption","expect":{"call":{"query":"concept","args":{"id":"tw:kt/redeem"}}},"pieces":["section:tw:kt/redeem#definition","concept:tw:kt/redeem"]}
+{"q":"what does firstborn mean","expect":{"call":{"query":"concept","args":{"id":"tw:other/firstborn"}}},"pieces":["section:tw:other/firstborn#definition","concept:tw:other/firstborn"]}
+{"q":"damascus city","expect":{"call":{"query":"concept","args":{"id":"tw:names/damascus"}}},"pieces":["section:tw:names/damascus#definition","concept:tw:names/damascus"]}
+{"q":"what was Noah's ark","expect":{"call":{"query":"concept","args":{"id":"tw:kt/ark"}}},"pieces":["section:tw:kt/ark#definition","concept:tw:kt/ark"]}
+{"q":"who was Zacchaeus","expect":{"call":{"query":"concept","args":{"id":"tw:names/zacchaeus"}}},"pieces":["section:tw:names/zacchaeus#definition","concept:tw:names/zacchaeus"]}
+{"q":"whats a steward","expect":{"call":{"query":"concept","args":{"id":"tw:other/manager"}}},"pieces":["section:tw:other/manager#definition","concept:tw:other/manager"]}
+{"q":"covenant tw","expect":{"call":{"query":"concept","args":{"id":"tw:kt/covenant"}}},"pieces":["section:tw:kt/covenant#definition","concept:tw:kt/covenant"]}
+{"q":"elder meaning","expect":{"call":{"query":"concept","args":{"id":"tw:other/elder"}}},"pieces":["section:tw:other/elder#definition","concept:tw:other/elder"]}
+{"q":"who was Naaman","expect":{"call":{"query":"concept","args":{"id":"tw:names/naaman"}}},"pieces":["section:tw:names/naaman#definition","concept:tw:names/naaman"]}
+{"q":"who was lazarus","expect":{"call":{"query":"concept","args":{"id":"tw:names/lazarus"}}},"pieces":["section:tw:names/lazarus#definition","concept:tw:names/lazarus"]}
+{"q":"atonement what is it","expect":{"call":{"query":"concept","args":{"id":"tw:kt/atonement"}}},"pieces":["section:tw:kt/atonement#definition","concept:tw:kt/atonement"]}
+{"q":"what is the Holy Spirit","expect":{"call":{"query":"concept","args":{"id":"tw:kt/holyspirit"}}},"pieces":["section:tw:kt/holyspirit#definition","concept:tw:kt/holyspirit"]}
+{"q":"jericho","expect":{"call":{"query":"concept","args":{"id":"tw:names/jericho"}}},"pieces":["section:tw:names/jericho#definition","concept:tw:names/jericho"]}
+{"q":"what is a metaphor and how do i translate it","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metaphor"}}},"pieces":["section:ta:translate/figs-metaphor#description"]}
+{"q":"how to translate metonymy","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metonymy"}}},"pieces":["section:ta:translate/figs-metonymy#description"]}
+{"q":"simile translation help","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-simile"}}},"pieces":["section:ta:translate/figs-simile#description"]}
+{"q":"hyperbole in the bible how to handle","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-hyperbole"}}},"pieces":["section:ta:translate/figs-hyperbole#description"]}
+{"q":"euphemisms","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-euphemism"}}},"pieces":["section:ta:translate/figs-euphemism#description"]}
+{"q":"how do I translate abstract nouns","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-abstractnouns"}}},"pieces":["section:ta:translate/figs-abstractnouns#description"]}
+{"q":"ellipsis what to do when words are left out","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-ellipsis"}}},"pieces":["section:ta:translate/figs-ellipsis#description"]}
+{"q":"doublet","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-doublet"}}},"pieces":["section:ta:translate/figs-doublet#description"]}
+{"q":"parallelism in psalms and proverbs","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-parallelism"}}},"pieces":["section:ta:translate/figs-parallelism#description"]}
+{"q":"personification","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-personification"}}},"pieces":["section:ta:translate/figs-personification#description"]}
+{"q":"irony how to translate","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-irony"}}},"pieces":["section:ta:translate/figs-irony#description"]}
+{"q":"how to translate names","expect":{"call":{"query":"article","args":{"id":"ta:translate/translate-names"}}},"pieces":["section:ta:translate/translate-names#description"]}
+{"q":"chapter and verse numbers in my translation","expect":{"call":{"query":"article","args":{"id":"ta:translate/translate-chapverse"}}},"pieces":["section:ta:translate/translate-chapverse#description"]}
+{"q":"exclusive and inclusive we","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-exclusive"}}},"pieces":["section:ta:translate/figs-exclusive#description"]}
+{"q":"quotations and quote margins","expect":{"call":{"query":"article","args":{"id":"ta:translate/writing-quotations"}}},"pieces":["section:ta:translate/writing-quotations#description"]}
+{"q":"G5485 how is it translated","expect":{"call":{"query":"renderings","args":{"strong":"G5485"}}},"pieces":["rendering:G5485/grace","rendering:G5485/Grace","rendering:G5485/favor"]}
+{"q":"how was G4102 rendered in the ult","expect":{"call":{"query":"renderings","args":{"strong":"G4102"}}},"pieces":["rendering:G4102/faith","rendering:G4102/By faith"]}
+{"q":"g1680 renderings","expect":{"call":{"query":"renderings","args":{"strong":"G1680"}}},"pieces":["rendering:G1680/hope"]}
+{"q":"H7965 shalom how translated","expect":{"call":{"query":"renderings","args":{"strong":"H7965"}}},"pieces":["rendering:H7965/peace","rendering:H7965/in peace"]}
+{"q":"strong G3340 repent how is it translated","expect":{"call":{"query":"renderings","args":{"strong":"G3340"}}},"pieces":["rendering:G3340/repent","rendering:G3340/Repent"]}
+{"q":"how is G1344 translated","expect":{"call":{"query":"renderings","args":{"strong":"G1344"}}},"pieces":["rendering:G1344/justified"]}
+{"q":"G4991 english renderings","expect":{"call":{"query":"renderings","args":{"strong":"G4991"}}},"pieces":["rendering:G4991/salvation","rendering:G4991/of salvation"]}
+{"q":"how was grace translated","expect":{"choose":[{"query":"renderings","args":{"strong":"H2580"}},{"query":"renderings","args":{"strong":"G54850"}},{"query":"renderings","args":{"strong":"H2587"}}]},"pieces":[]}
+{"q":"how was redeem translated","expect":{"choose":[{"query":"renderings","args":{"strong":"G00590"}},{"query":"renderings","args":{"strong":"G06290"}},{"query":"renderings","args":{"strong":"G18050"}}]},"pieces":[]}
+{"q":"how is covenant translated","expect":{"choose":[{"query":"renderings","args":{"strong":"H3772"}},{"query":"renderings","args":{"strong":"H1285"}},{"query":"renderings","args":{"strong":"G12420"}}]},"pieces":[]}
+{"q":"how was sabbath translated in the ult","expect":{"choose":[{"query":"renderings","args":{"strong":"H7676"}},{"query":"renderings","args":{"strong":"G45210"}},{"query":"renderings","args":{"strong":"H7677"}}]},"pieces":[]}
+{"q":"how is tabernacle translated","expect":{"choose":[{"query":"renderings","args":{"strong":"H0168"}},{"query":"renderings","args":{"strong":"G46330"}},{"query":"renderings","args":{"strong":"H4908"}}]},"pieces":[]}
+{"q":"which books talk about redemption","expect":{"call":{"query":"books","args":{"concept":"tw:kt/redeem"}}},"pieces":["book:lev","book:psa","book:rut"]}
+{"q":"where does the sabbath show up","expect":{"call":{"query":"books","args":{"concept":"tw:kt/sabbath"}}},"pieces":["book:lev","book:luk","book:exo"]}
+{"q":"books that mention the tabernacle","expect":{"call":{"query":"books","args":{"concept":"tw:kt/tabernacle"}}},"pieces":["book:exo","book:heb","book:psa"]}
+{"q":"atonement which books","expect":{"call":{"query":"books","args":{"concept":"tw:kt/atonement"}}},"pieces":["book:lev","book:exo","book:pro"]}
+{"q":"where is passover mentioned","expect":{"call":{"query":"books","args":{"concept":"tw:kt/passover"}}},"pieces":["book:jhn","book:luk","book:exo"]}
+{"q":"books with the ark of the covenant","expect":{"call":{"query":"books","args":{"concept":"tw:kt/arkofthecovenant"}}},"pieces":["book:1sa","book:jos","book:exo"]}
+{"q":"in which books do priests appear most","expect":{"call":{"query":"books","args":{"concept":"tw:kt/priest"}}},"pieces":["book:lev","book:2ki","book:neh"]}
+{"q":"firstborn in what books","expect":{"call":{"query":"books","args":{"concept":"tw:other/firstborn"}}},"pieces":["book:exo","book:gen","book:deu"]}
+{"q":"which books mention melchizedek","expect":{"call":{"query":"books","args":{"concept":"tw:names/melchizedek"}}},"pieces":["book:heb","book:gen","book:psa"]}
+{"q":"nineveh in which books","expect":{"call":{"query":"books","args":{"concept":"tw:names/nineveh"}}},"pieces":["book:jon","book:gen","book:nam"]}
+{"q":"where is damascus named","expect":{"call":{"query":"books","args":{"concept":"tw:names/damascus"}}},"pieces":["book:act","book:2ki","book:1ki"]}
+{"q":"books about the covenant","expect":{"call":{"query":"books","args":{"concept":"tw:kt/covenant"}}},"pieces":["book:gen","book:deu","book:psa"]}
+{"q":"which books use a lot of metaphor","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-metaphor"}}},"pieces":["book:psa","book:pro","book:job"]}
+{"q":"where do the notes explain idioms the most","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-idiom"}}},"pieces":["book:psa","book:luk","book:act"]}
+{"q":"rhetorical questions books","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-rquestion"}}},"pieces":["book:job","book:psa","book:mat"]}
+{"q":"who and what is in the book of ruth","expect":{"call":{"query":"topics","args":{"book":"rut"}}},"pieces":["topic:per:naomi","topic:per:boaz","topic:per:ruth","topic:lug:moab","topic:lug:bethlehem-gen-35-16"]}
+{"q":"people and places in jonah","expect":{"call":{"query":"topics","args":{"book":"jon"}}},"pieces":["topic:per:jonah","topic:lug:nineveh","topic:lug:tarshish","topic:lug:joppa","topic:per:amittai"]}
+{"q":"esther topics","expect":{"call":{"query":"topics","args":{"book":"est"}}},"pieces":["topic:per:mordecai-est-2-5","topic:per:esther","topic:per:haman","topic:per:ahasuerus"]}
+{"q":"who is named in philemon","expect":{"call":{"query":"topics","args":{"book":"phm"}}},"pieces":["topic:per:jesus","topic:per:paul","topic:per:onesimus","topic:per:philemon"]}
+{"q":"obadiah people places events","expect":{"call":{"query":"topics","args":{"book":"oba"}}},"pieces":["topic:ev:prophecies-of-obadiah","topic:lug:esaumount"]}
+{"q":"list of persons in the bible","expect":{"call":{"query":"topics","args":{"category":"person"}}},"pieces":["topic:per:aaron","topic:per:abagtha","topic:per:abda"]}
+{"q":"all the events","expect":{"call":{"query":"topics","args":{"category":"event"}}},"pieces":["topic:ev:2nd-rejection-at-nazareth","topic:ev:3rd-tour-of-galilee","topic:ev:7-years-of-famine"]}
+{"q":"what bible stories are there","expect":{"call":{"query":"topics","args":{"category":"story"}}},"pieces":["topic:obs:1","topic:obs:10","topic:obs:11"]}
+{"q":"context for jonah 1:1-3","expect":{"call":{"query":"context","args":{"ref":"jon 1:1-3"}}},"pieces":["verse:ult jon 1:1","note:jon/hk4p","note:jon/jdr1"]}
+{"q":"ruth 2:1-3 with the helps","expect":{"call":{"query":"context","args":{"ref":"rut 2:1-3"}}},"pieces":["verse:ult rut 2:1","note:rut/ab10","note:rut/t2sn"]}
+{"q":"romans 3:23-25 what are the key terms here","expect":{"call":{"query":"context","args":{"ref":"rom 3:23-25"}}},"pieces":["verse:ult rom 3:23","note:rom/x1hu","note:rom/akn9"]}
+{"q":"heb 9:11-12 background","expect":{"call":{"query":"context","args":{"ref":"heb 9:11-12"}}},"pieces":["verse:ult heb 9:11","note:heb/bnc6","note:heb/ez21"]}
+{"q":"gen 14:18-20 context","expect":{"call":{"query":"context","args":{"ref":"gen 14:18-20"}}},"pieces":["verse:ult gen 14:18","note:gen/x5qz","note:gen/z3jb"]}
+{"q":"acts 9:1-6 whats going on and which words to check","expect":{"call":{"query":"context","args":{"ref":"act 9:1-6"}}},"pieces":["verse:ult act 9:1","note:act/r4n5","note:act/anb6"]}
+{"q":"Mark","expect":{"choose":[{"query":"passage","args":{"ref":"mrk front:intro"}},{"query":"concept","args":{"id":"tw:names/johnmark"}}]},"pieces":[]}
+{"q":"luke","expect":{"choose":[{"query":"passage","args":{"ref":"luk front:intro"}},{"query":"concept","args":{"id":"tw:names/luke"}}]},"pieces":[]}
+{"q":"daniel","expect":{"choose":[{"query":"passage","args":{"ref":"dan front:intro"}},{"query":"concept","args":{"id":"tw:names/daniel"}}]},"pieces":[]}
+{"q":"james","expect":{"choose":[{"query":"passage","args":{"ref":"jas front:intro"}},{"query":"concept","args":{"id":"tw:names/jamesbrotherofjesus"}},{"query":"concept","args":{"id":"tw:names/jamessonofzebedee"}},{"query":"concept","args":{"id":"tw:names/jamessonofalphaeus"}}]},"pieces":[]}
+{"q":"hosea","expect":{"choose":[{"query":"passage","args":{"ref":"hos front:intro"}},{"query":"concept","args":{"id":"tw:names/hosea"}}]},"pieces":[]}
+{"q":"titus","expect":{"choose":[{"query":"passage","args":{"ref":"tit front:intro"}},{"query":"concept","args":{"id":"tw:names/titus"}}]},"pieces":[]}
+{"q":"micah","expect":{"choose":[{"query":"passage","args":{"ref":"mic front:intro"}},{"query":"concept","args":{"id":"tw:names/micah"}}]},"pieces":[]}
+{"q":"amos?","expect":{"choose":[{"query":"passage","args":{"ref":"amo front:intro"}},{"query":"concept","args":{"id":"tw:names/amos"}}]},"pieces":[]}
+{"q":"philip","expect":{"choose":[{"query":"concept","args":{"id":"tw:names/philip"}},{"query":"concept","args":{"id":"tw:names/philiptheapostle"}}]},"pieces":[]}
+{"q":"Herod","expect":{"choose":[{"query":"concept","args":{"id":"tw:names/herodantipas"}},{"query":"concept","args":{"id":"tw:names/herodthegreat"}}]},"pieces":[]}
+{"q":"Jonah and the big fish","expect":{"search":true},"pieces":["verse:bsb jon 1:17","note:mat/hzem","verse:ult mat 12:40"]}
+{"q":"the prodigal son","expect":{"search":true},"pieces":["verse:bsb luk 15:11","verse:bsb luk 15:20","note:luk/p1ba"]}
+{"q":"David and Goliath","expect":{"search":true},"pieces":["section:tw:names/goliath#definition","verse:ust 1sa 17:54","verse:ust 1sa 17:49","question:1sa/k2v7"]}
+{"q":"noah and the flood","expect":{"search":true},"pieces":["verse:bsb gen 7:17","verse:bsb gen 7:7"]}
+{"q":"the good samaritan","expect":{"search":true},"pieces":["verse:bsb luk 10:33","verse:bsb luk 10:34","section:tw:kt/parable#definition"]}
+{"q":"feeding the five thousand","expect":{"search":true},"pieces":["verse:bsb mat 14:19","verse:bsb mat 14:21"]}
+{"q":"Daniel in the lions den","expect":{"search":true},"pieces":["verse:bsb dan 6:9","verse:ult dan 6:16","verse:ult dan 6:20"]}
+{"q":"tower of babel","expect":{"search":true},"pieces":["section:tw:names/babel#definition","section:tw:names/shinar#definition","section:tw:names/babylon#definition"]}
+{"q":"burning bush Moses","expect":{"search":true},"pieces":["verse:ust exo 3:2","verse:bsb exo 3:3","note:luk/m406"]}
+{"q":"Elijah and the prophets of Baal on Mount Carmel","expect":{"search":true},"pieces":["question:1ki/hh9r","section:tw:names/carmel#definition"]}
+{"q":"Naaman healed of leprosy","expect":{"search":true},"pieces":["section:tw:names/naaman#definition","question:2ki/bz76","verse:ust 2ki 5:6"]}
+{"q":"raising of Lazarus","expect":{"search":true},"pieces":["verse:bsb jhn 11:43","verse:bsb jhn 11:44","section:tw:names/lazarus#definition"]}
+{"q":"zacchaeus the tax collector","expect":{"search":true},"pieces":["question:luk/j7em","section:tw:names/zacchaeus#definition"]}
+{"q":"joseph sold by his brothers","expect":{"search":true},"pieces":["verse:bsb gen 37:28"]}
+{"q":"crossing the red sea","expect":{"search":true},"pieces":["section:tw:names/redsea#definition","verse:bsb jos 4:23"]}
+{"q":"Esther and Haman","expect":{"search":true},"pieces":["verse:bsb est 5:5","verse:ult est 5:5","verse:bsb est 7:6"]}
+{"q":"stephen stoned","expect":{"search":true},"pieces":["question:act/u11s","question:act/fhm6","question:act/ff4n"]}
+{"q":"Ananias and Sapphira lie to the Spirit","expect":{"search":true},"pieces":["question:act/blzo","note:act/a352","note:act/pg1e"]}
+{"q":"peter denies jesus three times","expect":{"search":true},"pieces":["question:mrk/gvoq","question:luk/kor8","question:mat/meef"]}
+{"q":"transfiguration","expect":{"search":true},"pieces":["verse:bsb luk 9:29","verse:bsb mat 17:2"]}
+{"q":"abraham offering isaac","expect":{"search":true},"pieces":["question:gen/fr0x","question:gen/hi0p","question:gen/aaij"]}
+{"q":"ruth gleaning in the field of boaz","expect":{"search":true},"pieces":["verse:bsb rut 2:3","section:tw:other/glean#definition","note:rut/abc4"]}
+{"q":"parable of the sower","expect":{"search":true},"pieces":["verse:bsb mat 13:18","verse:ult mat 13:18","question:mat/lc0c"]}
+{"q":"fruit of the spirit","expect":{"search":true},"pieces":["question:gal/k16e","verse:bsb gal 5:22","verse:ult gal 5:22"]}
+{"q":"armor of God","expect":{"search":true},"pieces":["question:eph/wg7y","question:eph/za87","verse:ult eph 6:11"]}
+{"q":"beatitudes","expect":{"search":true},"pieces":["verse:bsb mat 5:2","verse:bsb luk 6:19","note:mat/awz8"]}
+{"q":"wolves in sheep's clothing","expect":{"search":true},"pieces":["verse:bsb mat 7:15","verse:ult mat 7:15","note:mat/lj5v"]}
+{"q":"eye for an eye","expect":{"search":true},"pieces":["verse:ult exo 21:24","verse:ult mat 5:38","verse:ult deu 19:21"]}
+{"q":"heap burning coals on his head","expect":{"search":true},"pieces":["verse:bsb pro 25:22","verse:bsb rom 12:20"]}
+{"q":"wages of sin is death","expect":{"search":true},"pieces":["question:rom/egef","verse:bsb rom 6:23","verse:ult rom 6:23"]}
+{"q":"gideon and the fleece","expect":{"search":true},"pieces":["question:jdg/dyim","question:jdg/a050","verse:ust jdg 6:38"]}
+{"q":"blind bartimaeus","expect":{"search":true},"pieces":["question:mrk/ece0","question:mrk/rato","verse:ult mrk 10:46"]}

@@ -93,3 +93,14 @@ Found with the reader's own queries. The id grammar:
 The test sets are frozen by the freeze commit (`eval: question sets, frozen before tuning`). After it, no question, expectation or piece of a
 `*-test.jsonl` file changes to make a rule pass: the rules are tuned on the `*-tune.jsonl` sets only. A wrong expectation found later is
 reported to the controller, fixed in a separate commit that says why, and the gate is run again on the corrected set.
+
+## C2.1: the second held-out sets (`*-test2.jsonl`)
+
+The C2 test sets (`*-test.jsonl`) were run twice in C2 (runs 1 and 2) and their failures were read. From C2.1 on they are tuning
+data, like `*-tune.jsonl`.
+
+The sets that measure C2.1 are `{es,en,pt}-test2.jsonl`, 150 questions each, written on 2026-11-16 by three fresh subagents. The
+writers could not see any rule, phrase, template, earlier question or result. An independent reviewer read every line and one fix
+pass followed. Search pieces are the rows a good answer shows (the verse that tells the story), not the engine's current hits. The
+packs hold no `obs` unit, so the planned OBS questions are ordinary story searches. The sets are frozen by the commit
+`eval: second held-out sets, frozen before C2.1`. The freeze rule above applies to them, and they run once, in C2.1's gate task.
