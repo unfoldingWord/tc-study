@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main } from '../../cli/fetch-aquifer'
@@ -13,6 +13,8 @@ const files: Record<string, string> = {
   'hin/json/001.content.json': '[{"manual":1}]',
 }
 let badSize = false
+let truncated = false
+let ignoreRange = false
 const metadata = '{"resource_metadata":{"title":"T","adaptation_notice":"x"},"scripture_burrito":{"big":"' + 'z'.repeat(40000) + '"}}'
 const seen: { url: string; auth: string | null; enc: string | null }[] = []
 let server: ReturnType<typeof Bun.serve>
@@ -30,6 +32,7 @@ beforeAll(() => {
       if (p === '/repos/BibleAquifer/R/commits/main') return Response.json({ sha: SHA })
       if (p === `/repos/BibleAquifer/R/git/trees/${SHA}`)
         return Response.json({
+          truncated,
           tree: [
             ...Object.entries(files).map(([path, c]) => ({ path, type: 'blob', size: Buffer.byteLength(c) + (badSize ? 1 : 0) })),
             { path: 'hin/metadata.json', type: 'blob', size: metadata.length },
@@ -39,6 +42,7 @@ beforeAll(() => {
       const m = p.match(new RegExp(`^/BibleAquifer/R/${SHA}/(.+)$`))
       if (m && files[m[1]]) return new Response(files[m[1]])
       if (m && m[1] === 'hin/metadata.json') {
+        if (ignoreRange) return new Response(metadata)
         if (req.headers.get('range') !== 'bytes=0-16383') return new Response('no range', { status: 400 })
         return new Response(metadata.slice(0, 16384), { status: 206 })
       }
@@ -107,6 +111,41 @@ describe('fetch-aquifer', () => {
     badSize = false
     expect(r.code).toBe(1)
     expect(r.err[0]).toContain('bytes')
+  })
+  test('a truncated tree exits 1 with a clear message', async () => {
+    truncated = true
+    const r = await run(['--repo', 'R', '--lang', 'hin', '--out', tmp()])
+    truncated = false
+    expect(r.code).toBe(1)
+    expect(r.err[0]).toContain('truncated')
+  })
+  test('a server that ignores Range: only the 16 KB head is used, and its hash is in the manifest', async () => {
+    ignoreRange = true
+    const out = tmp()
+    const r = await run(['--repo', 'R', '--lang', 'hin', '--out', out, '--books', 'tit'])
+    ignoreRange = false
+    expect(r.code).toBe(0)
+    const manifest = JSON.parse(readFileSync(join(out, 'manifest.json'), 'utf8'))
+    expect(manifest.metadata.range).toBe('bytes=0-16383')
+    expect(manifest.metadata.sha256).toBe(createHash('sha256').update(metadata.slice(0, 16384)).digest('hex'))
+  })
+  test('stale files in <out>/json are removed', async () => {
+    const out = tmp()
+    mkdirSync(join(out, 'json'))
+    writeFileSync(join(out, 'json', '99.content.json'), 'stale')
+    expect((await run(['--repo', 'R', '--lang', 'hin', '--out', out, '--books', 'tit'])).code).toBe(0)
+    expect(readdirSync(join(out, 'json'))).toEqual(['56.content.json'])
+  })
+  test('3-digit files skipped by --books are noted on stderr', async () => {
+    const r = await run(['--repo', 'R', '--lang', 'hin', '--out', tmp(), '--books', 'tit'])
+    expect(r.err.some((l) => l.includes('001.content.json'))).toBe(true)
+  })
+  test('--commit must be a full 40-hex sha; an unknown book code is refused', async () => {
+    for (const bad of ['main', 'aaaaaaa', 'A'.repeat(40)]) {
+      const r = await run(['--repo', 'R', '--lang', 'hin', '--out', tmp(), '--commit', bad])
+      expect(r.code).toBe(2)
+    }
+    expect((await run(['--repo', 'R', '--lang', 'hin', '--out', tmp(), '--books', 'gen,xyz'])).code).toBe(2)
   })
   test('bad arguments exit 2', async () => {
     expect((await run(['--repo', 'R'])).code).toBe(2)
