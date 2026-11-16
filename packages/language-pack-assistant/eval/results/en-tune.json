@@ -4,23 +4,23 @@
   "set": "tune",
   "n": 60,
   "callsCorrect": 55,
-  "accepted": 47,
-  "correctAccepted": 45,
-  "acceptedWithSearch": 48,
-  "correctAcceptedWithSearch": 45,
+  "accepted": 50,
+  "correctAccepted": 47,
+  "acceptedWithSearch": 51,
+  "correctAcceptedWithSearch": 47,
   "top3": {
    "hit": 0,
    "of": 0
   },
   "cardMs": {
-   "median": 6.9,
-   "p95": 2896,
+   "median": 5,
+   "p95": 1693.8,
    "over300": 6
   },
   "steps": {
-   "rule": 46,
-   "classifier": 1,
-   "choose": 12,
+   "rule": 48,
+   "classifier": 2,
+   "choose": 9,
    "search": 1
   }
  },
@@ -49,7 +49,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 12.2
+   "ms": 4.7
   },
   {
    "q": "Show me John 3:16",
@@ -75,7 +75,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 62.4
+   "ms": 14.8
   },
   {
    "q": "notes for Ruth 1:16",
@@ -101,7 +101,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.4
+   "ms": 4.7
   },
   {
    "q": "Psalm 23:1",
@@ -127,7 +127,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 39
+   "ms": 40.2
   },
   {
    "q": "titus two eleven",
@@ -153,7 +153,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.9
+   "ms": 2.6
   },
   {
    "q": "Gen 1:1",
@@ -179,7 +179,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 12.1
+   "ms": 11.8
   },
   {
    "q": "How do I translate Hebrews 11:1?",
@@ -205,7 +205,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 8
+   "ms": 11.6
   },
   {
    "q": "1 John 4:8",
@@ -231,7 +231,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 5
+   "ms": 4
   },
   {
    "q": "Matthew 28:19-20",
@@ -248,16 +248,16 @@
    },
    "interpretation": "Passage: Matthew 28:19-20",
    "top3": [
-    "verse:ult mat 28:19-20",
-    "note:mat/tlm4",
-    "note:mat/ejcd"
+    "verse:ult mat 28:19",
+    "verse:ult mat 28:20",
+    "note:mat/tlm4"
    ],
    "score": {
     "callCorrect": true,
     "accepted": true,
     "top3": null
    },
-   "ms": 11
+   "ms": 28.1
   },
   {
    "q": "Rom 8:28 with its notes",
@@ -283,7 +283,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 9
+   "ms": 4.7
   },
   {
    "q": "Ruth chapter 1",
@@ -300,16 +300,16 @@
    },
    "interpretation": "Passage: Ruth 1:1-22",
    "top3": [
-    "verse:ult rut 1:1-22",
-    "note:rut/f68r",
-    "note:rut/irf4"
+    "verse:ult rut 1:1",
+    "verse:ult rut 1:2",
+    "verse:ult rut 1:3"
    ],
    "score": {
     "callCorrect": true,
     "accepted": true,
     "top3": null
    },
-   "ms": 15.3
+   "ms": 9.4
   },
   {
    "q": "Titus 3",
@@ -326,16 +326,16 @@
    },
    "interpretation": "Passage: Titus 3:1-15",
    "top3": [
-    "verse:ult tit 3:1-15",
-    "note:tit/zh6x",
-    "note:tit/j2sa"
+    "verse:ult tit 3:1",
+    "verse:ult tit 3:2",
+    "verse:ult tit 3:3"
    ],
    "score": {
     "callCorrect": true,
     "accepted": true,
     "top3": null
    },
-   "ms": 6.6
+   "ms": 4.6
   },
   {
    "q": "What is grace?",
@@ -361,7 +361,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 115.8
+   "ms": 69.2
   },
   {
    "q": "What does redeem mean?",
@@ -387,7 +387,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 6.9
+   "ms": 3.7
   },
   {
    "q": "Who was Abraham?",
@@ -413,7 +413,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 63
+   "ms": 46.3
   },
   {
    "q": "Tell me about Abram",
@@ -439,7 +439,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.8
+   "ms": 6
   },
   {
    "q": "What is a covenant?",
@@ -465,42 +465,33 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3
+   "ms": 3.2
   },
   {
    "q": "What does holy mean?",
    "decision": {
-    "kind": "choose",
-    "options": [
-     {
-      "query": "concept",
-      "args": {
-       "id": "tw:kt/holy"
-      }
-     },
-     {
-      "query": "concept",
-      "args": {
-       "id": "lug:holyplace"
-      }
-     },
-     {
-      "query": "concept",
-      "args": {
-       "id": "lug:mostholyplace"
-      }
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/holy"
      }
-    ],
-    "interpretation": "Concept: holy, Concept: in the Holy Place, or Concept: the Most Holy Place?"
+    },
+    "via": "rule",
+    "interpretation": "Concept: holy"
    },
-   "interpretation": "Concept: holy, Concept: in the Holy Place, or Concept: the Most Holy Place?",
-   "top3": [],
+   "interpretation": "Concept: holy",
+   "top3": [
+    "concept:tw:kt/holy",
+    "section:tw:kt/holy#definition",
+    "book:lev"
+   ],
    "score": {
     "callCorrect": true,
-    "accepted": false,
+    "accepted": true,
     "top3": null
    },
-   "ms": 4.4
+   "ms": 5
   },
   {
    "q": "Who is Moses?",
@@ -526,7 +517,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.7
+   "ms": 3.5
   },
   {
    "q": "definition of faith",
@@ -555,7 +546,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 1
+   "ms": 19.9
   },
   {
    "q": "what is repentance",
@@ -581,7 +572,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3
+   "ms": 3.9
   },
   {
    "q": "Who was Boaz?",
@@ -607,36 +598,33 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.5
+   "ms": 2
   },
   {
    "q": "what is the meaning of forgive",
    "decision": {
-    "kind": "choose",
-    "options": [
-     {
-      "query": "concept",
-      "args": {
-       "id": "tw:kt/forgive"
-      }
-     },
-     {
-      "query": "concept",
-      "args": {
-       "id": "sec:jas/5.13-5.18"
-      }
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/forgive"
      }
-    ],
-    "interpretation": "Concept: forgive, or Concept: Prayer, forgiveness, and healing?"
+    },
+    "via": "rule",
+    "interpretation": "Concept: forgive"
    },
-   "interpretation": "Concept: forgive, or Concept: Prayer, forgiveness, and healing?",
-   "top3": [],
+   "interpretation": "Concept: forgive",
+   "top3": [
+    "concept:tw:kt/forgive",
+    "section:tw:kt/forgive#definition",
+    "book:luk"
+   ],
    "score": {
     "callCorrect": true,
-    "accepted": false,
+    "accepted": true,
     "top3": null
    },
-   "ms": 1.1
+   "ms": 2
   },
   {
    "q": "What is a metaphor?",
@@ -661,7 +649,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 75.8
+   "ms": 56.7
   },
   {
    "q": "How do I translate a rhetorical question?",
@@ -686,7 +674,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.2
+   "ms": 2.4
   },
   {
    "q": "Academy article on hyperbole",
@@ -711,7 +699,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.4
+   "ms": 1.7
   },
   {
    "q": "translation strategies for metonymy",
@@ -736,7 +724,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.6
+   "ms": 2
   },
   {
    "q": "what is a simile?",
@@ -761,7 +749,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.5
+   "ms": 1.3
   },
   {
    "q": "explain active or passive voice",
@@ -786,7 +774,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.2
+   "ms": 1.5
   },
   {
    "q": "how are proper names translated?",
@@ -812,7 +800,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 420.1
+   "ms": 315.2
   },
   {
    "q": "what is an idiom",
@@ -837,7 +825,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.8
+   "ms": 1.4
   },
   {
    "q": "How was grace translated?",
@@ -872,7 +860,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 5.9
+   "ms": 2.8
   },
   {
    "q": "How do the texts translate the word covenant?",
@@ -907,7 +895,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 3.3
+   "ms": 1.8
   },
   {
    "q": "How has G5485 been translated?",
@@ -933,7 +921,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 8495.5
+   "ms": 4481.1
   },
   {
    "q": "compare how redeem was translated in each book",
@@ -968,7 +956,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 10.7
+   "ms": 3.2
   },
   {
    "q": "translations of H2617",
@@ -994,7 +982,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 5247
+   "ms": 2270.7
   },
   {
    "q": "What words do they use for sin?",
@@ -1008,22 +996,28 @@
       }
      },
      {
-      "query": "concept",
+      "query": "renderings",
       "args": {
-       "id": "lug:sin"
+       "strong": "G40120"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G02660"
       }
      }
     ],
-    "interpretation": "Concept: sin, or Concept: Sin?"
+    "interpretation": "Concept: sin, Renderings: G4012, or Renderings: G0266?"
    },
-   "interpretation": "Concept: sin, or Concept: Sin?",
+   "interpretation": "Concept: sin, Renderings: G4012, or Renderings: G0266?",
    "top3": [],
    "score": {
     "callCorrect": false,
     "accepted": false,
     "top3": null
    },
-   "ms": 25.5
+   "ms": 9.9
   },
   {
    "q": "compare the renderings of G26",
@@ -1049,7 +1043,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2896
+   "ms": 1693.8
   },
   {
    "q": "how is lamb translated?",
@@ -1084,7 +1078,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 20.1
+   "ms": 3.1
   },
   {
    "q": "In which books are there metaphors?",
@@ -1110,7 +1104,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 35
+   "ms": 5.5
   },
   {
    "q": "How many times does Abraham appear in the Bible?",
@@ -1136,7 +1130,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 6.1
+   "ms": 10.2
   },
   {
    "q": "Where does G5485 appear?",
@@ -1162,7 +1156,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 15.2
+   "ms": 7.6
   },
   {
    "q": "In which books is the covenant mentioned?",
@@ -1188,7 +1182,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 5.4
+   "ms": 3.1
   },
   {
    "q": "how many rhetorical questions are there and where?",
@@ -1213,7 +1207,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 6.8
+   "ms": 3.3
   },
   {
    "q": "where is Moses mentioned?",
@@ -1239,7 +1233,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.8
+   "ms": 5.3
   },
   {
    "q": "How many hyperboles are there in Matthew?",
@@ -1264,7 +1258,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 7
+   "ms": 4.8
   },
   {
    "q": "books where the word grace appears",
@@ -1290,7 +1284,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.7
+   "ms": 4.6
   },
   {
    "q": "Where else does Boaz appear?",
@@ -1316,7 +1310,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.5
+   "ms": 7.6
   },
   {
    "q": "What people are in the Bible?",
@@ -1342,7 +1336,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 288.2
+   "ms": 378.8
   },
   {
    "q": "list of places",
@@ -1368,7 +1362,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 53.8
+   "ms": 49.8
   },
   {
    "q": "What important events are there?",
@@ -1394,7 +1388,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 30.4
+   "ms": 14.1
   },
   {
    "q": "What characters appear in Ruth?",
@@ -1420,7 +1414,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 17.2
+   "ms": 8.3
   },
   {
    "q": "main topics of Romans",
@@ -1446,7 +1440,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 26
+   "ms": 9.4
   },
   {
    "q": "passages about the widow who gave two coins",
@@ -1472,7 +1466,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4956.9
+   "ms": 3002.6
   },
   {
    "q": "the verse about not worrying about tomorrow",
@@ -1498,7 +1492,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 113.3
+   "ms": 101.4
   },
   {
    "q": "where does it say that love is patient?",
@@ -1524,42 +1518,33 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 337.6
+   "ms": 181.5
   },
   {
    "q": "the prodigal son",
    "decision": {
-    "kind": "choose",
-    "options": [
-     {
-      "query": "concept",
-      "args": {
-       "id": "tw:kt/sonofgod"
-      }
-     },
-     {
-      "query": "concept",
-      "args": {
-       "id": "per:israel"
-      }
-     },
-     {
-      "query": "concept",
-      "args": {
-       "id": "per:simon-jhn-6-71"
-      }
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/sonofgod"
      }
-    ],
-    "interpretation": "Concept: Son of God, Concept: Israel, or Concept: Simon?"
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Son of God"
    },
-   "interpretation": "Concept: Son of God, Concept: Israel, or Concept: Simon?",
-   "top3": [],
+   "interpretation": "Concept: Son of God",
+   "top3": [
+    "concept:tw:kt/sonofgod",
+    "section:tw:kt/sonofgod#definition",
+    "book:jhn"
+   ],
    "score": {
     "callCorrect": false,
-    "accepted": false,
+    "accepted": true,
     "top3": null
    },
-   "ms": 27.5
+   "ms": 10.8
   },
   {
    "q": "John",
@@ -1594,7 +1579,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 4.5
+   "ms": 3.1
   },
   {
    "q": "Jonah",
@@ -1623,7 +1608,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 1.1
+   "ms": 1.2
   },
   {
    "q": "tell me about Ruth",
@@ -1652,7 +1637,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 6.6
+   "ms": 1.3
   }
  ]
 }

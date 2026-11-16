@@ -4,23 +4,23 @@
   "set": "tune",
   "n": 100,
   "callsCorrect": 49,
-  "accepted": 62,
-  "correctAccepted": 38,
-  "acceptedWithSearch": 88,
-  "correctAcceptedWithSearch": 39,
+  "accepted": 63,
+  "correctAccepted": 39,
+  "acceptedWithSearch": 89,
+  "correctAcceptedWithSearch": 40,
   "top3": {
    "hit": 0,
    "of": 0
   },
   "cardMs": {
-   "median": 8.2,
-   "p95": 429.4,
-   "over300": 9
+   "median": 5.2,
+   "p95": 927.1,
+   "over300": 10
   },
   "steps": {
-   "rule": 59,
+   "rule": 60,
    "classifier": 3,
-   "choose": 12,
+   "choose": 11,
    "search": 26
   }
  },
@@ -75,7 +75,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1491.3
+   "ms": 3079.9
   },
   {
    "q": "O que dizem as notas de Rute 1:16?",
@@ -101,7 +101,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1819.6
+   "ms": 3297.9
   },
   {
    "q": "ajudas para Mateus 5:3",
@@ -127,7 +127,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 413.3
+   "ms": 918.6
   },
   {
    "q": "Salmo 23:1",
@@ -153,7 +153,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 98.7
+   "ms": 185.9
   },
   {
    "q": "tito dois onze",
@@ -179,7 +179,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.4
+   "ms": 4.7
   },
   {
    "q": "Gênesis 12, versículo 1",
@@ -205,7 +205,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 33.3
+   "ms": 79.7
   },
   {
    "q": "Quero ver Romanos 8:28 com as notas",
@@ -231,7 +231,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 20.5
+   "ms": 54.3
   },
   {
    "q": "Êx 7:14",
@@ -257,7 +257,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 250.8
+   "ms": 927.1
   },
   {
    "q": "Como traduzo Hebreus 11:1?",
@@ -283,7 +283,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 421.3
+   "ms": 941.2
   },
   {
    "q": "1 João 4:8",
@@ -309,7 +309,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 930.5
+   "ms": 1154
   },
   {
    "q": "Lucas capítulo 15 versículo 11",
@@ -335,7 +335,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 429.4
+   "ms": 443
   },
   {
    "q": "notas de Filipenses 4:13",
@@ -361,7 +361,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 19.7
+   "ms": 19.3
   },
   {
    "q": "Sl 119:105",
@@ -387,7 +387,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 71.9
+   "ms": 45.6
   },
   {
    "q": "Atos 2:38",
@@ -413,7 +413,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 606.9
+   "ms": 467.9
   },
   {
    "q": "Rute um dezesseis",
@@ -439,7 +439,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 30.7
+   "ms": 23.5
   },
   {
    "q": "O que significa João 1:1?",
@@ -465,7 +465,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 390.9
+   "ms": 276.6
   },
   {
    "q": "Mt 28:19-20",
@@ -491,7 +491,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 192.6
+   "ms": 152.8
   },
   {
    "q": "Apocalipse 21:4",
@@ -517,7 +517,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 293.8
+   "ms": 300.5
   },
   {
    "q": "Isaías 53:5",
@@ -542,7 +542,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 11.2
+   "ms": 12.9
   },
   {
    "q": "O que é a graça?",
@@ -568,7 +568,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 9.1
+   "ms": 4.5
   },
   {
    "q": "O que significa redimir?",
@@ -594,7 +594,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.4
+   "ms": 2
   },
   {
    "q": "Quem foi Abraão?",
@@ -616,7 +616,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 7.3
+   "ms": 6
   },
   {
    "q": "Fale-me sobre Abrão",
@@ -642,7 +642,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 69
+   "ms": 81.1
   },
   {
    "q": "O que é uma aliança?",
@@ -664,7 +664,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 6.2
+   "ms": 5.6
   },
   {
    "q": "definição de justificar",
@@ -693,7 +693,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.1
+   "ms": 1.7
   },
   {
    "q": "O que quer dizer santo?",
@@ -722,7 +722,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 0.9
+   "ms": 0.8
   },
   {
    "q": "explique a palavra pecado",
@@ -748,7 +748,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.4
+   "ms": 2
   },
   {
    "q": "Quem era Moisés?",
@@ -774,7 +774,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.6
+   "ms": 1.9
   },
   {
    "q": "O que era o Egito?",
@@ -796,36 +796,33 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 10.2
+   "ms": 6.1
   },
   {
    "q": "informação sobre Jerusalém",
    "decision": {
-    "kind": "choose",
-    "options": [
-     {
-      "query": "concept",
-      "args": {
-       "id": "tw:names/jerusalem"
-      }
-     },
-     {
-      "query": "concept",
-      "args": {
-       "id": "lug:jerusalem"
-      }
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/jerusalem"
      }
-    ],
-    "interpretation": "Conceito: Jerusalén, ou Conceito: de Jerusalén?"
+    },
+    "via": "rule",
+    "interpretation": "Conceito: Jerusalén"
    },
-   "interpretation": "Conceito: Jerusalén, ou Conceito: de Jerusalén?",
-   "top3": [],
+   "interpretation": "Conceito: Jerusalén",
+   "top3": [
+    "concept:tw:names/jerusalem",
+    "section:tw:names/jerusalem#facts",
+    "book:2ki"
+   ],
    "score": {
     "callCorrect": true,
-    "accepted": false,
+    "accepted": true,
     "top3": null
    },
-   "ms": 1.8
+   "ms": 2.4
   },
   {
    "q": "O que significa arrepender-se?",
@@ -847,7 +844,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 13.5
+   "ms": 4.8
   },
   {
    "q": "o que é a salvação?",
@@ -869,7 +866,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 8.2
+   "ms": 4.3
   },
   {
    "q": "Quem foi Boaz?",
@@ -895,7 +892,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.3
+   "ms": 2.5
   },
   {
    "q": "o reino de Deus, o que é?",
@@ -930,7 +927,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.3
+   "ms": 3.7
   },
   {
    "q": "O que é o templo?",
@@ -956,7 +953,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.3
+   "ms": 3.1
   },
   {
    "q": "Quem era o faraó?",
@@ -978,7 +975,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 8.5
+   "ms": 9.2
   },
   {
    "q": "significado de esperança",
@@ -1000,7 +997,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 5.7
+   "ms": 8.3
   },
   {
    "q": "O que é uma metáfora?",
@@ -1025,7 +1022,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 9.6
+   "ms": 10.6
   },
   {
    "q": "Como traduzo uma pergunta retórica?",
@@ -1051,7 +1048,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 44.8
+   "ms": 33.1
   },
   {
    "q": "artigo da Academia sobre a hipérbole",
@@ -1076,7 +1073,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.9
+   "ms": 1.5
   },
   {
    "q": "sugestões de tradução para a metonímia",
@@ -1126,7 +1123,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.6
+   "ms": 1.4
   },
   {
    "q": "explique a voz ativa ou passiva",
@@ -1150,7 +1147,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 8.3
+   "ms": 5.2
   },
   {
    "q": "como se traduzem os nomes próprios?",
@@ -1172,7 +1169,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 10.1
+   "ms": 8
   },
   {
    "q": "O que é uma expressão idiomática?",
@@ -1198,7 +1195,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 51.8
+   "ms": 42
   },
   {
    "q": "dublê, o que é?",
@@ -1220,7 +1217,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 5.5
+   "ms": 5
   },
   {
    "q": "O que são substantivos abstratos?",
@@ -1242,7 +1239,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 11.2
+   "ms": 8.5
   },
   {
    "q": "nós inclusivo e exclusivo",
@@ -1268,7 +1265,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 44
+   "ms": 48.2
   },
   {
    "q": "O que é a elipse?",
@@ -1293,7 +1290,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.6
+   "ms": 1.3
   },
   {
    "q": "Como traduzir um eufemismo?",
@@ -1318,7 +1315,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.1
+   "ms": 0.9
   },
   {
    "q": "leia o artigo sobre metáfora",
@@ -1343,7 +1340,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1
+   "ms": 1.1
   },
   {
    "q": "Como foi traduzida graça?",
@@ -1378,7 +1375,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.1
+   "ms": 2.3
   },
   {
    "q": "Como os textos traduzem a palavra aliança?",
@@ -1400,7 +1397,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 3.6
+   "ms": 4.6
   },
   {
    "q": "Como foi traduzido G5485?",
@@ -1426,7 +1423,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 182.5
+   "ms": 102.6
   },
   {
    "q": "compare como se traduziu redimir em cada livro",
@@ -1461,7 +1458,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.6
+   "ms": 1.4
   },
   {
    "q": "De que maneiras se traduziu fé?",
@@ -1487,7 +1484,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 33.4
+   "ms": 20.5
   },
   {
    "q": "traduções de H2617",
@@ -1513,7 +1510,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 26.9
+   "ms": 32.9
   },
   {
    "q": "Como traduziram santo no texto literal?",
@@ -1548,7 +1545,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.2
+   "ms": 2.3
   },
   {
    "q": "Que palavras usam para pecado?",
@@ -1583,7 +1580,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 10.2
+   "ms": 3.6
   },
   {
    "q": "usos da palavra amor nas traduções",
@@ -1618,7 +1615,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.9
+   "ms": 2.5
   },
   {
    "q": "como se traduz cordeiro?",
@@ -1640,7 +1637,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 9.7
+   "ms": 5.5
   },
   {
    "q": "Como os tradutores verteram perdoar?",
@@ -1666,7 +1663,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 51.7
+   "ms": 30.6
   },
   {
    "q": "compare as traduções de G26",
@@ -1692,7 +1689,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 14.4
+   "ms": 6.6
   },
   {
    "q": "Como se traduziu abençoar em Rute?",
@@ -1721,7 +1718,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.1
+   "ms": 0.8
   },
   {
    "q": "com que palavras se traduz espírito?",
@@ -1743,7 +1740,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 4.4
+   "ms": 2.7
   },
   {
    "q": "Em que livros há metáforas?",
@@ -1769,7 +1766,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.5
+   "ms": 2
   },
   {
    "q": "Quantas vezes aparece Abraão na Bíblia?",
@@ -1791,7 +1788,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 3.1
+   "ms": 2.9
   },
   {
    "q": "Onde aparece G5485?",
@@ -1817,7 +1814,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.1
+   "ms": 2.7
   },
   {
    "q": "Em que livros se fala da aliança?",
@@ -1839,7 +1836,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.9
+   "ms": 2.3
   },
   {
    "q": "Em que livros há perguntas retóricas e quantas?",
@@ -1865,7 +1862,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 88.7
+   "ms": 68.9
   },
   {
    "q": "onde se menciona Moisés?",
@@ -1891,7 +1888,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.9
+   "ms": 1.4
   },
   {
    "q": "Quantas hipérboles há em Mateus?",
@@ -1942,7 +1939,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2
+   "ms": 1.8
   },
   {
    "q": "Onde mais aparece Boaz?",
@@ -1968,7 +1965,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.1
+   "ms": 2.4
   },
   {
    "q": "Em que partes da Bíblia aparece o Egito?",
@@ -1990,7 +1987,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 7.1
+   "ms": 3.3
   },
   {
    "q": "em que livros se usam símiles?",
@@ -2012,7 +2009,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 2.8
+   "ms": 0.9
   },
   {
    "q": "Quantas vezes aparece redimir?",
@@ -2038,7 +2035,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.9
+   "ms": 0.8
   },
   {
    "q": "Onde aparece H2617 no Antigo Testamento?",
@@ -2060,7 +2057,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.5
+   "ms": 1
   },
   {
    "q": "que livros têm metonímias?",
@@ -2086,7 +2083,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1.3
+   "ms": 0.9
   },
   {
    "q": "Em quantos livros aparece Jerusalém?",
@@ -2115,7 +2112,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 0.9
+   "ms": 0.6
   },
   {
    "q": "Onde se usa a palavra arrepender-se?",
@@ -2137,7 +2134,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 4.3
+   "ms": 2.4
   },
   {
    "q": "Que pessoas há na Bíblia?",
@@ -2163,7 +2160,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 175.5
+   "ms": 162.3
   },
   {
    "q": "lista de lugares",
@@ -2189,7 +2186,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 31.4
+   "ms": 20.2
   },
   {
    "q": "Que eventos importantes há?",
@@ -2215,7 +2212,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 8.8
+   "ms": 10.1
   },
   {
    "q": "mostre os temas",
@@ -2237,7 +2234,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 5.5
+   "ms": 3.7
   },
   {
    "q": "Que personagens aparecem em Rute?",
@@ -2263,7 +2260,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 183.8
+   "ms": 156
   },
   {
    "q": "Que lugares são mencionados em Tito?",
@@ -2289,7 +2286,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.1
+   "ms": 4.6
   },
   {
    "q": "acontecimentos do Êxodo",
@@ -2337,7 +2334,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.8
+   "ms": 5.1
   },
   {
    "q": "passagens sobre a viúva que deu duas moedinhas",
@@ -2363,7 +2360,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 60.8
+   "ms": 60.3
   },
   {
    "q": "o versículo de não se preocupar com o amanhã",
@@ -2389,7 +2386,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 47.3
+   "ms": 58.8
   },
   {
    "q": "Onde diz que o amor é paciente?",
@@ -2413,7 +2410,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 8.4
+   "ms": 9.3
   },
   {
    "q": "algo sobre a ovelha perdida",
@@ -2439,7 +2436,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 30.2
+   "ms": 38.6
   },
   {
    "q": "o que a Bíblia diz dos estrangeiros?",
@@ -2461,7 +2458,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 4.9
+   "ms": 7.3
   },
   {
    "q": "o filho pródigo",
@@ -2485,7 +2482,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 12.1
+   "ms": 15.8
   },
   {
    "q": "versículos onde Jesus chora",
@@ -2511,7 +2508,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 1247.9
+   "ms": 1427.3
   },
   {
    "q": "João",
@@ -2535,7 +2532,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 8.5
+   "ms": 8.1
   },
   {
    "q": "Jonas",
@@ -2564,7 +2561,7 @@
     "accepted": false,
     "top3": null
    },
-   "ms": 2.4
+   "ms": 2.3
   },
   {
    "q": "fale sobre Rute",
@@ -2590,7 +2587,7 @@
     "accepted": true,
     "top3": null
    },
-   "ms": 3.3
+   "ms": 3.2
   }
  ]
 }
