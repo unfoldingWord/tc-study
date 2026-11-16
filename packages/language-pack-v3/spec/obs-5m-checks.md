@@ -27,7 +27,8 @@ Movements"). Measured against `unfoldingWord/en_obs-tf` v4 and `unfoldingWord/en
 
 ## Reviewed correspondence
 
-The build reads frame labels through this table. A label the table does not cover must name a frame of `obs`.
+The build reads frame labels through this table. A label the table does not cover must name a frame of `obs`, or a
+frame that `obs` lacks and `tf-frames` supplies (the fallback, Checks 1 and 2).
 
 | Story | Where | OBS-TF label | OBS frames | Why |
 |---|---|---|---|---|
