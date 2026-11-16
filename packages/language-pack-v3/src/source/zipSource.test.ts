@@ -74,6 +74,7 @@ describe('zipSource: MACULA', () => {
     const orig = await extractOrig(await zipSource(await withMacula()), 'tit')
     expect(orig.stamp).toBe('g987ab2025a')
     expect(orig.macula).toEqual({
+      v: 1,
       release: '3b8aa380e8#2026-10-15T02_19_35.000Z',
       trees: { sentences: [['*', ['s', 56001001]]] },
       referents: { words: [['ζωῆς', 'G2222']] },

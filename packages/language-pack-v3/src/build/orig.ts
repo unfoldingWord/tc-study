@@ -11,12 +11,12 @@
  * The reader of the segment is `read/orig.ts`. No Node module is used.
  */
 import type { CborValue } from '../codec/cbor'
-import { encodeUvarints, stringTable } from '../codec/columns'
+import { encodeDeltas, encodeUvarints, stringTable } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { hasOwn, isMap } from '../codec/values'
 import { eventCode } from '../events'
 import { verseId } from '../ids'
-import { type Event, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
+import { type Event, type MaculaReferents, type MaculaTrees, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 import { ORIGINALS, type RowSource } from '../source/rows'
 
 // Extraction
@@ -190,7 +190,7 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
   const ordered = [...chunks.entries()].sort(([a], [b]) => a - b).map(([, chunk]) => chunk)
   const model: OrigModel = { book, key: resource, stamp, ...readDocument(ordered) }
   if (macula.resource !== undefined) {
-    model.macula = { release: refOf(macula.resource).stamp }
+    model.macula = { release: refOf(macula.resource).stamp, v: 1 }
     if (macula.trees !== undefined) model.macula.trees = macula.trees
     if (macula.referents !== undefined) model.macula.referents = macula.referents
   }
@@ -228,6 +228,51 @@ function checkModel(m: OrigModel): void {
     if (!isInteger(event) || String(event) !== key || event < 0 || event >= m.events.length) {
       throw new Error(`attrs names the event ${JSON.stringify(key)}, and the model has events 0 to ${m.events.length - 1}`)
     }
+  }
+}
+
+function sameLength(what: string, lists: Record<string, { length: number }>): void {
+  const names = Object.keys(lists)
+  for (const name of names) {
+    if (lists[name].length !== lists[names[0]].length) {
+      throw new Error(`${what}: ${name} has ${lists[name].length} entries and ${names[0]} has ${lists[names[0]].length}`)
+    }
+  }
+}
+
+function maculaTreesOut(trees: MaculaTrees): CborValue {
+  sameLength('macula.trees', { lo: trees.lo, span: trees.span, nodes: trees.nodes })
+  return {
+    labels: trees.labels,
+    pieces: trees.pieces,
+    lo: encodeDeltas(trees.lo),
+    span: encodeUvarints(trees.span),
+    nodes: trees.nodes,
+  }
+}
+
+function maculaReferentsOut(r: MaculaReferents): CborValue {
+  sameLength('macula.referents', { word: r.word, kind: r.kind, piece: r.piece, ent: r.ent, ch: r.ch, vs: r.vs, ante: r.ante })
+  let last = 0
+  const word = r.word.map((position) => {
+    if (position < last) throw new Error('macula.referents: the rows are not in the order of their words')
+    const delta = position - last
+    last = position
+    return delta
+  })
+  return {
+    ents: r.ents.map(([form, strong]): CborValue => [form, strong]),
+    kinds: r.kinds,
+    pieces: r.pieces,
+    cols: {
+      word: encodeUvarints(word),
+      kind: encodeUvarints(r.kind),
+      piece: encodeUvarints(r.piece),
+      ent: encodeUvarints(r.ent),
+      ch: encodeUvarints(r.ch),
+      vs: encodeUvarints(r.vs),
+      ante: encodeUvarints(r.ante),
+    },
   }
 }
 
@@ -278,10 +323,16 @@ export function origSegment(m: OrigModel): Segment {
   const tables: Record<string, [number, boolean]> = { words: [1, true], text: [1, true] }
   const t: Record<string, CborValue> = { words, text }
   if (m.macula !== undefined) {
-    tables.macula = [1, false]
     const macula: Record<string, CborValue> = { release: m.macula.release }
-    if (m.macula.trees !== undefined) macula.trees = m.macula.trees as CborValue
-    if (m.macula.referents !== undefined) macula.referents = m.macula.referents as CborValue
+    if (m.macula.v === 2) {
+      tables.macula = [2, false]
+      if (m.macula.trees !== undefined) macula.trees = maculaTreesOut(m.macula.trees)
+      if (m.macula.referents !== undefined) macula.referents = maculaReferentsOut(m.macula.referents)
+    } else {
+      tables.macula = [1, false]
+      if (m.macula.trees !== undefined) macula.trees = m.macula.trees as CborValue
+      if (m.macula.referents !== undefined) macula.referents = m.macula.referents as CborValue
+    }
     t.macula = macula
   }
   return { h: { class: 'orig', v: 1, tables, book: m.book, orig: [m.key, m.stamp] }, t }

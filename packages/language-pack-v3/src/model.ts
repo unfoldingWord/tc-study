@@ -40,8 +40,41 @@ export type OrigModel = {
   pieces: Piece[]
   events: Event[]
   attrs?: Record<number, Record<string, string>>
-  macula?: { release: string; trees?: unknown; referents?: unknown }
+  macula?: MaculaModel
 }
+
+/**
+ * The trees of `macula` v2 (`orig.cddl`): `lo` and `span` hold the sentence's own lowest word position and highest minus
+ * lowest, `nodes` the sentence's tree in preorder as uvarints, left undecoded (`read/macula.ts` decodes one on demand).
+ * `lo`, `span` and `nodes` have one entry per sentence.
+ */
+export type MaculaTrees = { labels: string[]; pieces: string[]; lo: number[]; span: number[]; nodes: Uint8Array[] }
+
+/**
+ * The referents of `macula` v2, one row per reference, rows by word position. `word` holds the referring words' own
+ * positions (the segment stores their deltas); `kind`, `piece` and `ent` number `kinds`, `pieces` and `ents`; `ante` is
+ * the antecedent's position + 1, or 0 when the rule cannot fix it.
+ */
+export type MaculaReferents = {
+  ents: [form: string, strong: string][]
+  kinds: string[]
+  pieces: string[]
+  word: number[]
+  kind: number[]
+  piece: number[]
+  ent: number[]
+  ch: number[]
+  vs: number[]
+  ante: number[]
+}
+
+/**
+ * The `macula` table of an original: v 2 (decoded columns) or v 1 (as published, kept as the file has it; the reader sets
+ * `v: 1`, a model that leaves `v` out is v 1 too). The writer writes the version the model carries.
+ */
+export type MaculaModel =
+  | { release: string; v?: 1; trees?: unknown; referents?: unknown }
+  | { release: string; v: 2; trees?: MaculaTrees; referents?: MaculaReferents }
 
 /**
  * A bridge text of a book (`spec/cddl/book.cddl`, "Texts"): its pieces and events as in {@link OrigModel}, and which

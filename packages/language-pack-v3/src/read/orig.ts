@@ -6,12 +6,12 @@
  * wrong shape, a column of another length, a number outside its string table, word pieces that do not match the words,
  * an event out of the pieces. It imports no builder code and no Node module.
  */
-import { ColumnError, decodeUvarints } from '../codec/columns'
+import { ColumnError, decodeDeltas, decodeUvarints } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import { type CborMap, isMap } from '../codec/values'
 import { eventKind } from '../events'
-import { type Event, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
+import { type Event, type MaculaReferents, type MaculaTrees, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the original segment is malformed: ${what}`)
@@ -128,8 +128,61 @@ function readText(
   return { pieces, events, attrs }
 }
 
+function readTrees(value: unknown, n: number): MaculaTrees {
+  const table = map(value, 'macula.trees')
+  const labels = strings(table.labels, 'macula.trees.labels')
+  const pieces = strings(table.pieces, 'macula.trees.pieces')
+  if (!(table.lo instanceof Uint8Array)) bad('macula.trees.lo is not a byte string')
+  const lo = decodeDeltas(table.lo)
+  const span = numbers(table.span, 'macula.trees.span')
+  const nodes = table.nodes
+  if (!Array.isArray(nodes) || !nodes.every((node) => node instanceof Uint8Array)) bad('macula.trees.nodes is not a list of byte strings')
+  if (lo.length !== span.length || lo.length !== nodes.length) {
+    bad(`macula.trees has ${lo.length} lo, ${span.length} span and ${nodes.length} nodes`)
+  }
+  for (let i = 0; i < lo.length; i++) {
+    // Tested without overflow: lo + span < n.
+    if (span[i] > n - 1) bad(`sentence ${i} has the span ${span[i]}, and the book has ${n} words`)
+    if (lo[i] < 0 || lo[i] > n - 1 - span[i]) bad(`sentence ${i} starts at ${lo[i]} with the span ${span[i]}, and the book has ${n} words`)
+  }
+  return { labels, pieces, lo, span, nodes: nodes as Uint8Array[] }
+}
+
+function readReferents(value: unknown, n: number): MaculaReferents {
+  const table = map(value, 'macula.referents')
+  const kinds = strings(table.kinds, 'macula.referents.kinds')
+  const pieces = strings(table.pieces, 'macula.referents.pieces')
+  if (!Array.isArray(table.ents)) bad('macula.referents.ents is not a list')
+  const ents = table.ents.map((ent, i): [string, string] => {
+    if (!Array.isArray(ent) || ent.length !== 2 || typeof ent[0] !== 'string' || typeof ent[1] !== 'string') {
+      bad(`macula.referents.ents[${i}] is not [text, text]`)
+    }
+    return [ent[0], ent[1]]
+  })
+  const cols = map(table.cols, 'macula.referents.cols')
+  const col = (name: string): number[] => numbers(cols[name], `macula.referents.cols.${name}`)
+  const [deltas, kind, piece, ent, ch, vs, ante] = ['word', 'kind', 'piece', 'ent', 'ch', 'vs', 'ante'].map(col)
+  const rows = deltas.length
+  for (const [name, list] of Object.entries({ kind, piece, ent, ch, vs, ante })) {
+    if (list.length !== rows) bad(`macula.referents.cols.${name} has ${list.length} rows and cols.word has ${rows}`)
+  }
+  const word: number[] = []
+  let at = 0
+  for (let row = 0; row < rows; row++) {
+    at += deltas[row]
+    word.push(at)
+    if (at >= n) bad(`referent row ${row} is at the word ${at}, and the book has ${n} words`)
+    if (kind[row] >= kinds.length) bad(`referent row ${row} names the kind ${kind[row]}, and there are ${kinds.length}`)
+    if (piece[row] >= pieces.length) bad(`referent row ${row} names the piece ${piece[row]}, and there are ${pieces.length}`)
+    if (ent[row] >= ents.length) bad(`referent row ${row} names the entity ${ent[row]}, and there are ${ents.length}`)
+    if (ch[row] === 0 || vs[row] === 0) bad(`referent row ${row} has the chapter ${ch[row]} and the verse ${vs[row]}`)
+    if (ante[row] > n) bad(`referent row ${row} has the antecedent ${ante[row]}, and the book has ${n} words`)
+  }
+  return { ents, kinds, pieces, word, kind, piece, ent, ch, vs, ante }
+}
+
 /** The tables this reader knows, as `readSegment` takes them in `known`. */
-export const ORIG_TABLES: Readonly<Record<string, number[]>> = { words: [1], text: [1], macula: [1] }
+export const ORIG_TABLES: Readonly<Record<string, number[]>> = { words: [1], text: [1], macula: [1, 2] }
 
 /**
  * The model of an original segment. The words' texts come from the `form` table, so the word pieces are rebuilt from
@@ -149,9 +202,17 @@ export function origView(seg: Segment): OrigModel {
     if (t.macula !== undefined) {
       const macula = map(t.macula, 'the table "macula"')
       if (typeof macula.release !== 'string') bad('macula.release is not text')
-      model.macula = { release: macula.release }
-      if (macula.trees !== undefined) model.macula.trees = macula.trees
-      if (macula.referents !== undefined) model.macula.referents = macula.referents
+      if (h.tables.macula?.[0] === 2) {
+        const v2: Extract<NonNullable<OrigModel['macula']>, { v: 2 }> = { release: macula.release, v: 2 }
+        if (macula.trees !== undefined) v2.trees = readTrees(macula.trees, words.length)
+        if (macula.referents !== undefined) v2.referents = readReferents(macula.referents, words.length)
+        model.macula = v2
+      } else {
+        const v1: { release: string; v: 1; trees?: unknown; referents?: unknown } = { release: macula.release, v: 1 }
+        if (macula.trees !== undefined) v1.trees = macula.trees
+        if (macula.referents !== undefined) v1.referents = macula.referents
+        model.macula = v1
+      }
     }
     return model
   } catch (error) {

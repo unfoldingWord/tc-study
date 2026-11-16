@@ -674,13 +674,13 @@ describe('the segment, byte by byte', () => {
       ...tiny,
       words: [{ ...tiny.words[0], other: { c: '3', a: '1', b: '2' } }, tiny.words[1], tiny.words[2]],
       attrs: { 1: { z: '1', a: '2', m: '3' }, 3: { y: '1', b: '2' } },
-      macula: { release: 'r', trees, referents },
+      macula: { release: 'r', v: 1, trees, referents },
     }
     const b: OrigModel = {
       ...a,
       words: a.words.map((word) => (word.other === undefined ? word : { ...word, other: reverseKeys(word.other) as Record<string, string> })),
       attrs: Object.fromEntries(Object.entries(a.attrs!).map(([event, attrs]) => [event, reverseKeys(attrs) as Record<string, string>])),
-      macula: { release: 'r', trees: reverseKeys(trees), referents: reverseKeys(referents) },
+      macula: { release: 'r', v: 1, trees: reverseKeys(trees), referents: reverseKeys(referents) },
     }
     // The two really differ in the order of their keys.
     expect(Object.keys(a.words[0].other!)).not.toEqual(Object.keys(b.words[0].other!))
@@ -854,12 +854,12 @@ describe('MACULA', () => {
 
   test('the rows go to `macula` as they are, with the release of the resource', async () => {
     const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
-    expect(m.macula).toEqual({ release, trees, referents })
+    expect(m.macula).toEqual({ release, v: 1, trees, referents })
   })
 
   test('trees or referents alone are kept alone', async () => {
-    expect((await extractOrig(fake(tit(treesRow), refs), 'tit')).macula).toEqual({ release, trees })
-    expect((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula).toEqual({ release, referents })
+    expect((await extractOrig(fake(tit(treesRow), refs), 'tit')).macula).toEqual({ release, v: 1, trees })
+    expect((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula).toEqual({ release, v: 1, referents })
     expect('referents' in (await extractOrig(fake(tit(treesRow), refs), 'tit')).macula!).toBe(false)
   })
 
@@ -889,7 +889,7 @@ describe('MACULA', () => {
   })
 
   test('only the release, with no trees and no referents', () => {
-    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r' } }
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', v: 1 } }
     const seg = origSegment(m)
     expect(seg.t.macula).toEqual({ release: 'r' })
     expect(origView(seg)).toEqual(m)
@@ -901,11 +901,11 @@ describe('MACULA', () => {
     // 14 deep ({sentences: ...} counts as one): they fit with room to spare.
     let deep: unknown = 1
     for (let i = 0; i < MAX_DEPTH - 2; i++) deep = [deep]
-    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', trees: deep } }
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', v: 1, trees: deep } }
     await expect(writeSegment(origSegment(m))).rejects.toThrow()
     let fits: unknown = 1
     for (let i = 0; i < MAX_DEPTH - 3; i++) fits = [fits]
-    const ok: OrigModel = { ...m, macula: { release: 'r', trees: fits } }
+    const ok: OrigModel = { ...m, macula: { release: 'r', v: 1, trees: fits } }
     expect((await throughFile(ok)).model).toEqual(ok)
   })
 
@@ -913,7 +913,7 @@ describe('MACULA', () => {
     // With the body, `t` and `macula` that is 17 levels: over the old limit of 16, inside the limit of 64.
     let trees: unknown = 1
     for (let i = 0; i < 14; i++) trees = [trees]
-    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', trees } }
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', v: 1, trees } }
     expect((await throughFile(m)).model).toEqual(m)
   })
 

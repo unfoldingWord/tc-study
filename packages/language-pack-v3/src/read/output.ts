@@ -27,6 +27,8 @@ import { LEX_TABLES, lexView } from './lex'
 import { OBS_TABLES, obsView } from './obs'
 import { MAP_TABLES, mapView } from './map'
 import { ORIG_TABLES, origView } from './orig'
+import type { OrigModel } from '../model'
+import { rowOf, sentenceTree } from './macula'
 import { TOPICS_TABLES, topicsView, XTOPICS_TABLES, xtopicsView } from './topics'
 import { XMAP_TABLES, xmapView } from './xmap'
 
@@ -207,6 +209,23 @@ function topicsOut(seg: Segment): Record<string, unknown> {
   return { names: c.names, local: c.local, coverage: coverageOut(c.coverage) }
 }
 
+/** The `macula` of an original as the reader outputs it (`tests/README.md`): v1 as stored, v2 with its trees and rows decoded. */
+function maculaOut(m: OrigModel): unknown {
+  const macula = m.macula
+  if (macula === undefined || macula.v !== 2) return macula
+  const out: Record<string, unknown> = { release: macula.release, v: 2 }
+  const n = m.words.length
+  if (macula.trees !== undefined) {
+    const trees = macula.trees
+    out.trees = trees.lo.map((lo, i) => ({ lo, hi: lo + trees.span[i], tree: sentenceTree(trees, i, n) }))
+  }
+  if (macula.referents !== undefined) {
+    const refs = macula.referents
+    out.referents = refs.word.map((_, row) => rowOf(refs, row))
+  }
+  return out
+}
+
 /** What a class adds to `id` and `h`; `E_TABLE` for a class phase 1 does not decode. */
 function bodyOut(seg: Segment): Record<string, unknown> {
   switch (seg.h.class) {
@@ -216,7 +235,7 @@ function bodyOut(seg: Segment): Record<string, unknown> {
     }
     case 'orig': {
       const m = origView(seg)
-      return { words: m.words, pieces: m.pieces, events: m.events, attrs: attrsOf(m.attrs), macula: m.macula }
+      return { words: m.words, pieces: m.pieces, events: m.events, attrs: attrsOf(m.attrs), macula: maculaOut(m) }
     }
     case 'art':
       return { articles: artView(seg).articles }
