@@ -28,6 +28,8 @@
    - **Option B:** make it exact first. Taller writes the target's key and occurrence, the MACULA release is rebuilt, and then this plan runs. That puts Taller (Idiomas Puentes) and a new MACULA release before any of this ships.
 3. **Positions, not `CCCVVVWWW`.** Every word in v2 (tree leaves, referents) is an original word position (`ids.md`), the same numbers the alignment and `orig.words` use. A reader that needs `chapter:verse` gets it from the events, as today. Recommended, since Mini already maps alignment by position.
 
+**Abel approved this plan on 2026-11-16 ("Sí, opción A"): the format 3 exception holds, Option A, positions.** Every task below implements Option A; Option B is not built.
+
 ## Global Constraints
 
 Phase 1 and 2 Global Constraints hold (deterministic CBOR, no Node in readers, the spec is the authority, rulings in the ledger). In addition:
