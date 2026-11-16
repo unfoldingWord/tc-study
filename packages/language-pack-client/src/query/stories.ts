@@ -83,6 +83,7 @@ export async function storiesQuery(reader: PackReader, input?: string): Promise<
   const scope = input === undefined ? undefined : parseScope(input)
   const out = newAnswer<{ ref?: string; stories: StoryRef[] }>(reader, 'stories')
   const known = await fromMaps(out, reader)
+  if (reader.listed('obs') && !reader.installed('obs')) missingUnit(out, { unit: 'obs', bytes: reader.size('obs') })
   if (known === undefined) return out
   const stories: StoryRef[] = []
   for (const [n, k] of [...known].sort((a, b) => a[0] - b[0])) {
@@ -101,7 +102,7 @@ export async function storyQuery(reader: PackReader, n: number): Promise<Answer<
   const model: ObsModel | undefined = reader.installed('obs') ? await reader.obs() : undefined
   const none: StoryData['helps'] = { notes: 'none', questions: 'none', links: 'none' }
   if (model === undefined) {
-    missingUnit(out, { unit: 'obs', bytes: reader.size('obs') })
+    if (reader.listed('obs')) missingUnit(out, { unit: 'obs', bytes: reader.size('obs') })
     out.data = { ...refOf(n, known?.get(n)), helps: none }
     return out
   }

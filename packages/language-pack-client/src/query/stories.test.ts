@@ -8,6 +8,7 @@ import { buildSample, type Sample } from '../../test/sample'
 let sample: Sample
 let noTitle: Sample
 let noNotes: Sample
+let noObs: Sample
 let trust: { trustedKeys: Record<string, Uint8Array> }
 const bytesOf = (h: string) => Uint8Array.from(h.match(/../g)!, (p) => parseInt(p, 16))
 let server: FakeServer | undefined
@@ -28,6 +29,8 @@ beforeAll(async () => {
     },
   })
   noNotes = await buildSample({ revision: 3, tweak: { omit: (row) => row.key.startsWith('tn:es-419_gl/es-419/obs-tn:') } })
+  // A language whose catalog lists no obs unit at all.
+  noObs = await buildSample({ revision: 4, tweak: { omit: (row) => row.key.includes('es-419_gl/es-419/obs') } })
   trust = { trustedKeys: { [sample.keys.keyId]: bytesOf(sample.keys.publicKey) } }
 }, 120_000)
 
@@ -85,7 +88,7 @@ describe('stories', () => {
     const r = await open({ defaults: false, units: ['topics'], books: [] })
     const a = await r.stories('gen 1')
     expect(a.data).toBeNull()
-    expect(a.notInstalled.map((n) => n.unit)).toEqual(['xtopics'])
+    expect(a.notInstalled.map((n) => n.unit)).toEqual(['xtopics', 'obs'])
     expect(a.notInstalled[0]!.bytes).toBeGreaterThan(0)
   })
 
@@ -93,7 +96,7 @@ describe('stories', () => {
     const r = await open({ defaults: false, units: ['xtopics'], books: [] })
     const a = await r.stories('gen 1')
     expect(a.data!.stories.map((s) => s.title)).toEqual(['Story 1', 'Story 2'])
-    expect(a.notInstalled.map((n) => n.unit)).toEqual(['topics'])
+    expect(a.notInstalled.map((n) => n.unit)).toEqual(['topics', 'obs'])
   })
 
   test('stories() with no ref lists every story in order, without the obs unit', async () => {
@@ -151,6 +154,23 @@ describe('story', () => {
     expect(a.notInstalled[0]!.unit).toBe('obs')
     expect(a.notInstalled[0]!.bytes).toBe(r.size('obs'))
     expect(a.notInstalled[0]!.bytes).toBeGreaterThan(0)
+  })
+
+  test('stories() lists obs in notInstalled, with its bytes, when it is listed and not installed', async () => {
+    const r = await open({ defaults: false, units: NO_OBS, books: [] })
+    const a = await r.stories('gen 1')
+    expect(a.notInstalled.map((n) => n.unit)).toEqual(['obs'])
+    expect(a.notInstalled[0]!.bytes).toBe(r.size('obs'))
+    expect(a.notInstalled[0]!.bytes).toBeGreaterThan(0)
+  })
+
+  test('story(1) of a catalog that lists no obs does not offer to install it', async () => {
+    const r = await open({ defaults: false, units: NO_OBS, books: [] }, noObs)
+    expect(r.size('obs')).toBe(0)
+    const a = await r.story(1)
+    expect(a.data!.n).toBe(1)
+    expect(a.notInstalled.map((n) => n.unit)).not.toContain('obs')
+    expect((await r.stories()).notInstalled.map((n) => n.unit)).not.toContain('obs')
   })
 
   test('a language with stories and no notes: helps.notes is none, not 0', async () => {
