@@ -77,6 +77,25 @@ describe('export and import', () => {
     expect((await installedUnits(b)).length).toBeGreaterThan(3)
   })
 
+  test('an export limited to a book still carries the obs unit when it is installed', async () => {
+    const withObs = async (units?: string[]) => {
+      const srv = startFakeServer(sample)
+      const client = createClient({ store: memoryStore(), source: httpSource({ base: srv.url }), trust })
+      try {
+        await client.install('es-419', { books: ['tit'], ...(units !== undefined ? { defaults: false, units } : {}) })
+      } finally {
+        srv.stop()
+      }
+      return client
+    }
+    const full = await withObs()
+    expect((await installedUnits(full)).some((u) => u.key.endsWith('/obs'))).toBe(true)
+    const plain = await withObs(NO_OBS)
+    const a = await idsOf(await full.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] }))
+    const b = await idsOf(await plain.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] }))
+    expect(a.segments.length).toBeGreaterThan(b.segments.length)
+  })
+
   test('full without a book list holds every active unit and the common catalog', async () => {
     const a = await installed(sample)
     const bytes = await a.client.exportTransfer({ lang: 'es-419', mode: 'full' })

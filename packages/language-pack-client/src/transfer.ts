@@ -20,7 +20,7 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
 import { loadState, localCatalogIds, readStored, st, verifiedHave } from './install'
-import { activate } from './plan'
+import { activate, DEFAULT_UNITS } from './plan'
 import { hex, type InstalledCatalog, type InstalledState, installedOf, qualify } from './state'
 import type { BlobStore } from './store/types'
 import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFile } from './verify'
@@ -333,7 +333,7 @@ export async function exportTransfer(
     chosen = activeKeys
   } else {
     const seeds: string[] = []
-    for (const d of ['xmap', 'map', 'xtopics', 'topics']) seeds.push(...activeKeys.filter((k) => k.slice(k.indexOf('/') + 1) === d))
+    for (const d of DEFAULT_UNITS) seeds.push(...activeKeys.filter((k) => k.slice(k.indexOf('/') + 1) === d))
     const named = [...(o.books ?? []).map((b) => `book:${b}`), ...(o.units ?? [])]
     for (const n of named) {
       const keys = n.includes('/') ? activeKeys.filter((k) => k === n) : activeKeys.filter((k) => k.slice(k.indexOf('/') + 1) === n)
