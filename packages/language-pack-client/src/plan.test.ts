@@ -85,6 +85,16 @@ describe('planInstall', () => {
     expect(p.steps.map((s) => s.key)).toEqual(['es-419/art:tw:kt'])
     expect(p.unknown).toEqual(['nope'])
   })
+  test('obs downloads by default when the catalog lists it; a language without obs plans fine', () => {
+    const withObs = cat('fr', 1, [[21, 50], [22, 60]], [{ id: 'map', segments: [0] }, { id: 'obs', segments: [1] }])
+    const p = planInstall([common(), withObs], emptyState(), {}, new Set())
+    expect(p.steps.map((s) => s.key)).toEqual(['common/xmap', 'fr/map', 'fr/obs'])
+    expect(p.unknown).toEqual([])
+    const q = planInstall(cs, emptyState(), {}, new Set())
+    expect(q.unknown).toEqual([])
+    expect(q.steps.some((s) => s.key.endsWith('/obs'))).toBe(false)
+    expect(planInstall([common(), withObs], emptyState(), { defaults: false }, new Set()).steps).toEqual([])
+  })
   test('a need no catalog has is unknown, qualified', () => {
     const bad = cat('xx', 1, [[9, 1]], [{ id: 'book:gen', segments: [0], needs: ['orig:gen'] }])
     const p = planInstall([bad], emptyState(), { books: ['gen'], defaults: false }, new Set())

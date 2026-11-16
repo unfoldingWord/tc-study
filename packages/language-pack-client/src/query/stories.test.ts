@@ -31,6 +31,9 @@ beforeAll(async () => {
   trust = { trustedKeys: { [sample.keys.keyId]: bytesOf(sample.keys.publicKey) } }
 }, 120_000)
 
+/** The default units before OBS joined them: for tests that need obs absent. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+
 async function open(want: Parameters<ReturnType<typeof createClient>['install']>[1], content: Sample = sample) {
   server?.stop()
   server = startFakeServer(content, {})
@@ -138,7 +141,7 @@ describe('story', () => {
   })
 
   test('story(1) without obs gives the title and notInstalled obs with its bytes', async () => {
-    const r = await open({ books: [] })
+    const r = await open({ defaults: false, units: NO_OBS, books: [] })
     const a = await r.story(1)
     expect(a.data!.title).toBe('La creación')
     expect(a.data!.refs).toEqual(['gen 1:1-2:25'])

@@ -32,6 +32,9 @@ beforeAll(async () => {
   trust = { trustedKeys: { [sample.keys.keyId]: bytesOf(sample.keys.publicKey) } }
 }, 120_000)
 
+/** The default units before OBS joined them: for tests that need obs absent. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+
 async function open(opts: { defaults?: boolean; books?: string[]; units?: string[] }, content: Sample = sample) {
   server?.stop()
   server = startFakeServer(content, {})
@@ -83,7 +86,7 @@ describe('books', () => {
     expect((await r.books({ article: 'tw:kt/apostle' })).data!.books.tit!.state).toBe('count')
   })
   test('an article or a tW concept with obs not installed lists obs in notInstalled', async () => {
-    const r = await open({ books: ['tit'] })
+    const r = await open({ defaults: false, units: NO_OBS, books: ['tit'] })
     for (const q of [{ article: 'ta:translate/figs-metaphor' }, { concept: 'tw:kt/god' }]) {
       const a = await r.books(q)
       expect(a.data!.obs).toMatchObject({ state: 'none', installed: false })
@@ -126,7 +129,7 @@ describe('concept', () => {
     expect(a.revision.units.xmap).toBeGreaterThan(0)
   })
   test('only obs is missing', async () => {
-    const r = await open({ books: ['tit'] })
+    const r = await open({ defaults: false, units: NO_OBS, books: ['tit'] })
     // The obs unit is not installed here: it is the only thing missing.
     expect((await r.concept(METAPHOR)).notInstalled.map((n) => n.unit)).toEqual(['obs'])
   })
@@ -256,7 +259,7 @@ describe('OBS stories of a concept', () => {
     expect(((await r.concept('per:abraham')).data as { obs?: unknown }).obs).toBeUndefined()
   })
   test('obs not installed: concept obs is installed:false and notInstalled has obs', async () => {
-    const r = await open({ books: [] })
+    const r = await open({ defaults: false, units: NO_OBS, books: [] })
     const a = await r.concept('tw:kt/god')
     expect((a.data as { obs: unknown }).obs).toEqual({ installed: false })
     const n = a.notInstalled.find((x) => x.unit === 'obs')
@@ -266,7 +269,7 @@ describe('OBS stories of a concept', () => {
     const r = await open({ units: ['obs'], books: ['tit'] })
     expect((await r.books({ article: 'ta:translate/figs-metaphor' })).data!.obs).toEqual({ state: 'count', count: 1, installed: true })
     expect((await r.books({ concept: 'tw:kt/god' })).data!.obs).toEqual({ state: 'count', count: 1, installed: true })
-    const off = await open({ books: [] })
+    const off = await open({ defaults: false, units: NO_OBS, books: [] })
     const cell = (await off.books({ article: 'ta:translate/figs-metaphor' })).data!.obs!
     expect(cell).toMatchObject({ state: 'none', installed: false })
     expect(cell.bytes).toBeGreaterThan(0)

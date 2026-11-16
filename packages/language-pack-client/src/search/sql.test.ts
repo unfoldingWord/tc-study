@@ -55,6 +55,9 @@ function setup(content: Sample, index?: SearchIndex, store = memoryStore()): Lan
   return createClient({ store, source: httpSource({ base: server.url }), trust, ...(index ? { index } : {}) })
 }
 
+/** The default units before OBS joined them: for tests that need obs absent. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+
 const key = (hits: { kind: string; ref: string; book: string }[]) => hits.map((h) => `${h.kind}|${h.book}|${h.ref}`).sort()
 
 describe('sqlIndex through the client', () => {
@@ -166,7 +169,7 @@ describe('sqlIndex through the client', () => {
 
   test('notInstalled lists the books not installed, with bytes', async () => {
     const client = setup(sample, sqlIndex(bunDriver()))
-    await client.install('es-419', { books: ['tit'] })
+    await client.install('es-419', { books: ['tit'], defaults: false, units: NO_OBS })
     const a = await (await client.open('es-419')).search('Pablo')
     // Titus is installed; the sample also lists the obs unit, which is not.
     expect(a.data!.length).toBeGreaterThan(0)
@@ -209,7 +212,7 @@ describe('OBS in the search index', () => {
     expect((await r.search('serpiente')).data!.length).toBeGreaterThan(0)
   })
   test('obs not installed: no OBS hits and notInstalled obs', async () => {
-    const r = await readerWith(sqlIndex(bunDriver()), { books: ['tit'] })
+    const r = await readerWith(sqlIndex(bunDriver()), { units: NO_OBS, defaults: false, books: ['tit'] })
     const a = await r.search('creación')
     expect(a.data).toEqual([])
     expect(a.notInstalled.map((n) => n.unit)).toEqual(['obs'])

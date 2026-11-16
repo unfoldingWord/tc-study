@@ -38,12 +38,15 @@ let server: FakeServer | undefined
 afterEach(() => server?.stop())
 
 /** A client with Titus installed from the fake server (which is stopped again: the client keeps no source use). */
+/** The default units before OBS joined them: for tests that need obs absent. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+
 async function installed(content: Sample): Promise<{ client: LanguagePackClient; store: BlobStore }> {
   const srv = startFakeServer(content)
   const store = memoryStore()
   const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
   try {
-    await client.install('es-419', { books: ['tit'] })
+    await client.install('es-419', { books: ['tit'], defaults: false, units: NO_OBS })
   } finally {
     srv.stop()
   }
@@ -89,10 +92,10 @@ describe('export and import', () => {
     const srv = startFakeServer(sample)
     server = srv
     const client = createClient({ store: memoryStore(), source: httpSource({ base: srv.url }), trust })
-    await client.install('es-419', { books: ['tit'] })
+    await client.install('es-419', { books: ['tit'], defaults: false, units: NO_OBS })
     srv.set(sample2)
     await client.refresh('es-419')
-    await client.install('es-419', { books: ['tit'] })
+    await client.install('es-419', { books: ['tit'], defaults: false, units: NO_OBS })
     const newBook = await unitSegs(sample2.langCatalog, 'book:tit')
     const dropped = (await unitSegs(sample.langCatalog, 'book:tit')).filter((id) => !newBook.includes(id))
     expect(dropped.length).toBeGreaterThan(0)
@@ -430,7 +433,7 @@ describe('importOldPack', () => {
     expect(srv.hits).toEqual([])
 
     await client.refresh('es-419')
-    const inst = await client.install('es-419', { books: ['tit'] })
+    const inst = await client.install('es-419', { books: ['tit'], defaults: false, units: NO_OBS })
     expect(inst.waiting).toEqual([])
     const state = (await store.getState())!
     expect(state.active['es-419']?.origin).toBe('published')

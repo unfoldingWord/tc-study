@@ -737,6 +737,7 @@ describe('A4: a fresh reader reads what a query needs', () => {
   })
 })
 
+/** The default units before OBS joined them: these tests count segments of the Titus install without obs. */const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
 describe('install several segments at a time', () => {
   /** The segment ids of the Titus install, once each in plan order: xmap(2) map(2) xtopics(2) topics art:tw:kt orig:tit book:tit. */
   let order: string[]
@@ -744,7 +745,7 @@ describe('install several segments at a time', () => {
     const cats = [await verifyCatalogFile(sample.langCatalog, {}, { from: 'store' }), await verifyCatalogFile(sample.commonCatalog, {}, { from: 'store' })]
     const seen = new Set<string>()
     order = []
-    for (const step of planInstall(cats, emptyState(), { books: ['tit'] }, new Set()).steps) {
+    for (const step of planInstall(cats, emptyState(), { defaults: false, units: [...NO_OBS, 'book:tit'] }, new Set()).steps) {
       for (const s of step.segments) {
         if (seen.has(s.id)) continue
         seen.add(s.id)
@@ -798,7 +799,7 @@ describe('install several segments at a time', () => {
 
   test('install runs up to 4 segment requests at once', async () => {
     const { gate, client } = gatedSetup()
-    const run = client.install('es-419', { books: ['tit'] })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] })
     await gate.until(() => gate.held.size === 4)
     await new Promise((r) => setTimeout(r, 0))
     expect(gate.calls).toEqual(order.slice(0, 4)) // no fifth request while four are running
@@ -815,7 +816,7 @@ describe('install several segments at a time', () => {
     const { gate, client } = gatedSetup()
     gate.openAll()
     const done: number[] = []
-    const report = await client.install('es-419', { books: ['tit'] }, { concurrency: 1, onProgress: (p) => done.push(p.done) })
+    const report = await client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { concurrency: 1, onProgress: (p) => done.push(p.done) })
     expect(gate.calls).toEqual(order)
     expect(gate.max()).toBe(1)
     expect(report.fetched).toEqual(order)
@@ -825,14 +826,14 @@ describe('install several segments at a time', () => {
   test('a concurrency that is not a whole number from 1 up is E_ARG', async () => {
     const { client } = gatedSetup()
     for (const concurrency of [0, -1, 1.5, Number.NaN]) {
-      await expect(client.install('es-419', { books: ['tit'] }, { concurrency })).rejects.toMatchObject({ code: 'E_ARG' })
+      await expect(client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { concurrency })).rejects.toMatchObject({ code: 'E_ARG' })
     }
   })
 
   test('stops on E_NETWORK and keeps complete units', async () => {
     // order[4] is the first segment of common/xtopics: by then xmap and map are complete.
     const { gate, client, store, sets } = gatedSetup({ failSegment: (id) => (id === order[4] ? 503 : 'ok') })
-    const run = client.install('es-419', { books: ['tit'] })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] })
     const box = settled(run)
     await gate.until(() => gate.held.size === 4)
     await gate.release(order.slice(0, 4))
@@ -858,7 +859,7 @@ describe('install several segments at a time', () => {
 
   test('a 429 rejects with retryAfter after in-flight requests settle', async () => {
     const { gate, client, store } = gatedSetup({ failSegment: (id) => (id === order[1] ? 429 : 'ok') })
-    const run = client.install('es-419', { books: ['tit'] })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] })
     const box = settled(run)
     await gate.until(() => gate.held.size === 4)
     await gate.release([order[1]!])
@@ -876,7 +877,7 @@ describe('install several segments at a time', () => {
   test('abort stops new requests and keeps complete units', async () => {
     const { gate, client, store } = gatedSetup()
     const ac = new AbortController()
-    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { signal: ac.signal })
     await gate.until(() => gate.held.size === 4)
     await gate.release(order.slice(0, 4))
     await gate.until(() => gate.held.size === 4 && gate.calls.length === 8)
@@ -909,7 +910,7 @@ describe('install several segments at a time', () => {
     await client.refresh('es-419')
     armed = true
     const ac = new AbortController()
-    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { signal: ac.signal })
     const box = settled(run)
     await gate.until(() => gate.held.size === 4)
     await gate.release(order.slice(0, 2))
@@ -943,7 +944,7 @@ describe('install several segments at a time', () => {
       },
     })
     gate.openAll()
-    const e = await client.install('es-419', { books: ['tit'] }, { concurrency: 1, signal: ac.signal }).catch((x) => x)
+    const e = await client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { concurrency: 1, signal: ac.signal }).catch((x) => x)
     expect(e).toBe(ac.signal.reason)
     expect(gate.calls).toEqual(order)
     const units = (await store.getState())!.units
@@ -960,7 +961,7 @@ describe('install several segments at a time', () => {
       },
     })
     gate.openAll()
-    const e = await client.install('es-419', { books: ['tit'] }, { concurrency: 1, signal: ac.signal }).catch((x) => x)
+    const e = await client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { concurrency: 1, signal: ac.signal }).catch((x) => x)
     expect(e).toBe(ac.signal.reason)
     const setsAfter = sets()
     const units = (await store.getState())!.units
@@ -975,7 +976,7 @@ describe('install several segments at a time', () => {
     gate.openAll()
     let setsAtAbort = -1
     const e = await client
-      .install('es-419', { books: ['tit'] }, {
+      .install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, {
         concurrency: 1,
         signal: ac.signal,
         onProgress: (p) => {
@@ -1029,7 +1030,7 @@ describe('install several segments at a time', () => {
   test('after an abort, a late 503, a corrupt segment or an unexpected error does not replace the abort', async () => {
     const { client, store, answer, requested } = handSource()
     const ac = new AbortController()
-    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { signal: ac.signal })
     await requested(4)
     await answer(order[0]!, sample.segments.get(order[0]!)!)
     await answer(order[1]!, sample.segments.get(order[1]!)!) // xmap is complete
@@ -1048,7 +1049,7 @@ describe('install several segments at a time', () => {
   test('a network error recorded before the abort still wins, with its retryAfter', async () => {
     const { client, answer, requested } = handSource()
     const ac = new AbortController()
-    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, { signal: ac.signal })
     await requested(4)
     await answer(order[0]!, new ClientError('E_NETWORK', 'rate limited', { status: 429, retryAfter: 7 }))
     ac.abort()
@@ -1061,7 +1062,7 @@ describe('install several segments at a time', () => {
     const { gate, client, store } = gatedSetup({}, { failPut: (n) => n === 2 })
     await client.refresh('es-419')
     const before = await store.getState()
-    const run = client.install('es-419', { books: ['tit'] })
+    const run = client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] })
     const box = settled(run)
     await gate.until(() => gate.held.size === 4)
     await gate.release([order[1]!]) // put 1: stored; its worker asks order[4]
@@ -1079,7 +1080,7 @@ describe('install several segments at a time', () => {
   test('a progress callback that throws does not break a parallel install', async () => {
     const { gate, client } = gatedSetup()
     gate.openAll()
-    const report = await client.install('es-419', { books: ['tit'] }, {
+    const report = await client.install('es-419', { defaults: false, units: [...NO_OBS, 'book:tit'] }, {
       onProgress: () => {
         throw new Error('the screen is gone')
       },
