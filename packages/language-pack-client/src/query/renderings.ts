@@ -5,7 +5,7 @@
  * another stamp than the installed one is left out (ids.md "Positions in the original") and named in `notInstalled` with
  * `what: 'stale'`. No Node module here.
  */
-import { answer, BOOKS, type Cell, strongKey } from '@bt-synergy/language-pack-v3'
+import { answer, type BookModel, BOOKS, type Cell, strongKey } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
 import { type Answer, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
@@ -13,8 +13,8 @@ import { type Answer, missingUnit, newAnswer, releaseOf, usedUnit } from './enve
 export type RenderingsData = { strong: string; renderings: { text: string; count: number; refs: string[] }[] }
 
 /** The positions of each Strong key in an original, built once per model (the reader keeps the model, so the index lives as long as it). */
-const keyIndex = new WeakMap<object, Map<string, number[]>>()
-function positionsByKey(orig: { words: readonly { strong: string }[] }): Map<string, number[]> {
+const keyIndex = new WeakMap<object, Map<string, Int32Array>>()
+function positionsByKey(orig: { words: readonly { strong: string }[] }): Map<string, Int32Array> {
   let m = keyIndex.get(orig)
   if (m === undefined) {
     const built = new Map<string, number[]>()
@@ -24,26 +24,34 @@ function positionsByKey(orig: { words: readonly { strong: string }[] }): Map<str
       if (l === undefined) built.set(k, [i])
       else l.push(i)
     })
-    m = built
+    m = new Map([...built].map(([k, l]) => [k, Int32Array.from(l)]))
     keyIndex.set(orig, m)
   }
   return m
 }
 
-type TextLike = { pieces: readonly (readonly [string, boolean])[]; events: readonly (readonly [number, string, string])[]; align?: readonly (readonly number[])[] }
-type TextIndex = { byPos: Map<number, number[]>; pieceOf: Int32Array; at: (piece: number) => string }
+type TextModel = BookModel['texts'][number]
+/** CSR lists: the word ordinals aligned to original position p are `values[offsets[p]..offsets[p+1])`. */
+type TextIndex = { offsets: Int32Array; values: Int32Array; pieceOf: Int32Array; at: (piece: number) => string }
 const textIndexes = new WeakMap<object, TextIndex>()
 /** Per text, built once: the word ordinals aligned to each original position, the piece of each ordinal, and the chapter:verse at a piece. */
-function textIndex(text: TextLike): TextIndex {
+function textIndex(text: TextModel): TextIndex {
   let ix = textIndexes.get(text)
   if (ix !== undefined) return ix
-  const byPos = new Map<number, number[]>()
-  text.align?.forEach((ps, o) => {
-    for (const p of ps) {
-      const l = byPos.get(p)
-      if (l === undefined) byPos.set(p, [o])
-      else if (l[l.length - 1] !== o) l.push(o)
-    }
+  const align = text.align ?? []
+  let max = -1
+  let n = 0
+  for (const ps of align) for (const p of ps) {
+    if (p > max) max = p
+    n++
+  }
+  const offsets = new Int32Array(max + 2)
+  for (const ps of align) for (const p of ps) offsets[p + 1]!++
+  for (let i = 1; i < offsets.length; i++) offsets[i]! += offsets[i - 1]!
+  const fill = offsets.slice(0, max + 1)
+  const values = new Int32Array(n)
+  align.forEach((ps, o) => {
+    for (const p of ps) values[fill[p]!++] = o
   })
   const words: number[] = []
   text.pieces.forEach((piece, i) => {
@@ -66,7 +74,7 @@ function textIndex(text: TextLike): TextIndex {
     }
     return lo === 0 ? '' : list[lo - 1]![1]
   }
-  ix = { byPos, pieceOf: Int32Array.from(words), at: (piece) => `${last(chapters, piece)}:${last(verses, piece)}` }
+  ix = { offsets, values, pieceOf: Int32Array.from(words), at: (piece) => `${last(chapters, piece)}:${last(verses, piece)}` }
   textIndexes.set(text, ix)
   return ix
 }
@@ -130,15 +138,15 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
     usedUnit(out, reader, bookUnit)
     usedUnit(out, reader, origUnit)
     const byKey = positionsByKey(orig)
-    const positions = new Set<number>(byKey.get(key) ?? [])
-    if (positions.size === 0 && alt !== undefined) for (const i of byKey.get(alt) ?? []) positions.add(i)
+    const positions = new Set<number>(byKey.get(key))
+    if (positions.size === 0 && alt !== undefined) for (const i of byKey.get(alt) ?? new Int32Array()) positions.add(i)
     if (positions.size === 0) continue
     for (const text of model.texts) {
       if (text.align === undefined) continue
-      const ix = textIndex(text as TextLike)
+      const ix = textIndex(text)
       // Only the words aligned to the key are visited, in the order of the text.
       const cand = new Set<number>()
-      for (const p of positions) for (const o of ix.byPos.get(p) ?? []) cand.add(o)
+      for (const p of positions) if (p + 1 < ix.offsets.length) for (let k = ix.offsets[p]!; k < ix.offsets[p + 1]!; k++) cand.add(ix.values[k]!)
       if (cand.size === 0) continue
       let used = false
       let run: { pos: number; words: string[]; ref: string; last: number } | undefined

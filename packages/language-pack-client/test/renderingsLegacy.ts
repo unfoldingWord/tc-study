@@ -7,9 +7,9 @@
  * `what: 'stale'`. No Node module here.
  */
 import { answer, BOOKS, type Cell, strongKey } from '@bt-synergy/language-pack-v3'
-import { ClientError } from '../errors'
-import type { PackReader } from '../reader'
-import { type Answer, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
+import { ClientError } from '../src/errors'
+import type { PackReader } from '../src/reader'
+import { type Answer, missingUnit, newAnswer, releaseOf, usedUnit } from '../src/query/envelope'
 
 export type RenderingsData = { strong: string; renderings: { text: string; count: number; refs: string[] }[] }
 
