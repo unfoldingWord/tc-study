@@ -22,6 +22,12 @@ export type PacksServerOptions = {
   version?: string
 }
 
+/** One line of a search answer. A section hit has no book or reference: it shows its id (`tw:kt/grace#definition`). */
+export function hitLine(h: { book?: string; ref?: string; kind: string; id?: string; snippet?: string }): string {
+  const where = h.kind === 'section' ? (h.id ?? '') : `${bookName(h.book ?? '')} ${h.ref ?? ''}`
+  return `${where} [${h.kind}] ${String(h.snippet ?? '').replace(/\s+/g, ' ')}`
+}
+
 type Text = { content: { type: 'text'; text: string }[]; isError?: boolean }
 const ok = (text: string): Text => ({ content: [{ type: 'text', text }] })
 const fail = (text: string): Text => ({ content: [{ type: 'text', text }], isError: true })
@@ -367,7 +373,7 @@ export function createPacksServer(o: PacksServerOptions): McpServer {
       const ans = await r.search(a.text)
       const hits = ((ans.data ?? []) as any[]).slice(0, a.limit ?? 20)
       if (hits.length === 0) return `No match for "${a.text}" in the books on this computer.`
-      return hits.map((h) => `${bookName(h.book)} ${h.ref} [${h.kind}] ${String(h.snippet ?? '').replace(/\s+/g, ' ')}`).join('\n')
+      return hits.map(hitLine).join('\n')
     }),
   )
 
