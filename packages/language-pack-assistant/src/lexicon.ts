@@ -87,7 +87,8 @@ export const CUES: Record<string, string[][]> = {
   pt: [['livro', 'de'], ['carta', 'a'], ['carta', 'de']],
   en: [['book', 'of'], ['letter', 'to'], ['letter', 'of']],
 }
-type Concept = { forms: string[][]; ids: Set<string> }
+/** `whole`: the ids that have the name as a whole name or its first part, not only as a part after a comma ("Felipe, el apóstol"). */
+type Concept = { forms: string[][]; ids: Set<string>; whole: Set<string> }
 
 function variants(toks: string[], lang: string): string[][] {
   const out: string[][] = [toks]
@@ -204,7 +205,7 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
   }
   const concepts = new Map<string, Concept>()
   for (const [id, names] of all) {
-    for (const name of names.flatMap((n) => n.split(','))) {
+    for (const [name, part] of names.flatMap((n) => n.split(',').map((p, k) => [p, k > 0] as const))) {
       const toks = words(fold(name.replace(/\(.*?\)/g, ' '))).filter((t) => !stop.has(t))
       if (toks.length === 0) continue
       const forms = toks.map(formsOf)
@@ -212,8 +213,9 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
       if (toks.length === 1 && forms[0]![0]!.length < 3 && names.length > 1 && !PERSON(id)) continue
       if (toks.length === 1 && forms[0]!.some((f) => frameForms.has(f))) continue
       const key = forms.map((f) => f[0]).join(' ')
-      const c = concepts.get(key) ?? { forms, ids: new Set<string>() }
+      const c = concepts.get(key) ?? { forms, ids: new Set<string>(), whole: new Set<string>() }
       c.ids.add(id)
+      if (!part) c.whole.add(id)
       concepts.set(key, c)
     }
   }
@@ -357,7 +359,12 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
           const n = c.forms.length
           if (s + n > content.length) continue
           const span = content.slice(s, s + n)
-          if (c.forms.every((forms, x) => sameForms(forms, formsOf(toks[span[x]!]!)))) found.push({ n, span, ids: [...c.ids] })
+          if (!c.forms.every((forms, x) => sameForms(forms, formsOf(toks[span[x]!]!)))) continue
+          // A tW article that has the name only after a comma gives way to a tW article whose name it is ("apóstol" is tw:kt/apostle,
+          // not "Felipe, el apóstol"); other ids are left to the rules.
+          const tw = [...c.ids].filter((id) => id.startsWith('tw:'))
+          const wholeTw = tw.some((id) => c.whole.has(id))
+          found.push({ n, span, ids: [...c.ids].filter((id) => !wholeTw || !id.startsWith('tw:') || c.whole.has(id)) })
         }
       }
     }

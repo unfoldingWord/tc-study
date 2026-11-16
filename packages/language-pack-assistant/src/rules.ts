@@ -42,6 +42,15 @@ export function preferTw(ids: string[]): string[] {
   return ids.some((id) => id.startsWith('tw:names/')) ? ids.filter((id) => !id.startsWith('per:')) : ids
 }
 
+/**
+ * R37 e: a name that is both an article (`tw:*`, `ta:*`) and a topic (`sec:*`, `per:*`, …) asks about the article: "what does gospel
+ * mean" is `tw:kt/goodnews`, not a choice with the section topic of the same name, whose card would be empty.
+ */
+export function preferArticles(ids: string[]): string[] {
+  const articles = ids.filter((id) => /^(tw|ta):/.test(id))
+  return articles.length > 0 ? articles : ids
+}
+
 const isPerson = (id: string): boolean => id.startsWith('tw:names/') || id.startsWith('per:')
 
 /** One id gives a call; several give a `choose` of the same query over them. */
@@ -107,7 +116,7 @@ export function outcomeFor(query: QueryName, question: string, v: View, ctx: Rul
     }
     case 'concept': {
       const c = v.named[0]
-      return c === undefined ? undefined : overIds(c.ids, (id) => call('concept', { id }))
+      return c === undefined ? undefined : overIds(preferArticles(c.ids), (id) => call('concept', { id }))
     }
     case 'article': {
       const c = v.ta[0]

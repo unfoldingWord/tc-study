@@ -5,7 +5,7 @@ import { loadComplement, type NumbersComplement } from './complements'
 import type { Decision } from './decision'
 import { buildLexicon } from './lexicon'
 import { phrasesFor } from './phrases'
-import { EN, ES } from './rules.fixture'
+import { EN, ES, fixtureMaps } from './rules.fixture'
 import { applyRules, readQuestion, type RuleCtx } from './rules'
 
 const numbers = (lang: string): NumbersComplement => {
@@ -173,4 +173,38 @@ describe('Review Focus 4: one chapter however it is written', () => {
   test.each(['ÉXODO 7', 'exodo 7', '¿Éx. 7?', 'Exodo capítulo siete'])('%s', (q) => {
     expect(callOf(es(q))).toEqual({ query: 'passage', args: { ref: 'exo 7:1-25' } })
   })
+})
+
+describe('R37 e: a concept that is also a topic', () => {
+  const rigOf = (tag: 'es-419' | 'en', names: Record<string, string[]>, topics: Record<string, string>) => {
+    const lexicon = buildLexicon(fixtureMaps(tag, {}, names, topics), tag, numbers(tag.slice(0, 2)))
+    const ctx: RuleCtx = { phrases: phrasesFor(tag), listed: () => false, lastVerse: () => undefined, strongsOf: () => [] }
+    return (q: string) => {
+      const r = applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)
+      return 'decided' in r ? r.decided : undefined
+    }
+  }
+  test('asks about the article, not a choice with the topic', () => {
+    const en2 = rigOf('en', { 'tw:kt/goodnews': ['good news', 'gospel'], 'tw:kt/apostle': ['apostle'] }, { 'sec:2co/5.11-6.2': 'gospel', 'sec:act/1.12-26': 'apostle' })
+    const es2 = rigOf('es-419', { 'tw:kt/apostle': ['apóstol'], 'tw:kt/goodnews': ['evangelio'] }, { 'sec:act/1.12-26': 'apóstol', 'sec:mrk/1.1-8': 'evangelio' })
+    expect(en2('what does gospel mean')).toEqual(ruled({ query: 'concept', args: { id: 'tw:kt/goodnews' } }))
+    expect(en2('what is an apostle')).toEqual(ruled({ query: 'concept', args: { id: 'tw:kt/apostle' } }))
+    expect(es2('¿qué es un apóstol?')).toEqual(ruled({ query: 'concept', args: { id: 'tw:kt/apostle' } }))
+    expect(es2('qué significa evangelio')).toEqual(ruled({ query: 'concept', args: { id: 'tw:kt/goodnews' } }))
+    // A topic alone is still the topic.
+    const en3 = rigOf('en', {}, { 'sec:act/1.12-26': 'apostle' })
+    expect(en3('what is an apostle')).toEqual(ruled({ query: 'concept', args: { id: 'sec:act/1.12-26' } }))
+  })
+})
+
+test('R37 e: a tW name after a comma gives way to the tW article whose name it is', () => {
+  const lexicon = buildLexicon(fixtureMaps('es-419', {}, { 'tw:kt/apostle': ['apóstol'], 'tw:names/philiptheapostle': ['Felipe, el apóstol'] }, {}), 'es-419', numbers('es'))
+  const ctx: RuleCtx = { phrases: phrasesFor('es-419'), listed: () => false, lastVerse: () => undefined, strongsOf: () => [] }
+  const ask = (q: string) => applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)
+  expect(ask('¿qué es un apóstol?')).toEqual({ decided: ruled({ query: 'concept', args: { id: 'tw:kt/apostle' } }) })
+  expect(ask('quién fue Felipe')).toEqual({ decided: ruled({ query: 'concept', args: { id: 'tw:names/philiptheapostle' } }) })
+  // With no whole name, the part still counts.
+  const only = buildLexicon(fixtureMaps('es-419', {}, { 'tw:names/philiptheapostle': ['Felipe, el apóstol'] }, {}), 'es-419', numbers('es'))
+  expect(applyRules('el apóstol', readQuestion('el apóstol', only, ctx.phrases), ctx)).toEqual({ undecided: true })
+  expect(only.entities('el apóstol').entities).toEqual([{ kind: 'concept', ids: ['tw:names/philiptheapostle'], cls: 'name', start: 1, end: 2 }])
 })
