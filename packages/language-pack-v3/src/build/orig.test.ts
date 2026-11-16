@@ -15,7 +15,7 @@ const DATA = join(import.meta.dir, '..', '..', 'spec', 'tests', 'data')
 const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 const UHB = 'unfoldingWord/hbo/uhb'
 const MACULA = 'Biblica/el-x-koine/macula'
-const KNOWN = { words: [1], text: [1], macula: [1] }
+const KNOWN = { words: [1], text: [1], macula: [1, 2] }
 /** U+2060, which `find` takes out of a text. Built from its code point so that an editor cannot strip it. */
 const WORD_JOINER = String.fromCodePoint(0x2060)
 
@@ -849,18 +849,43 @@ describe('MACULA', () => {
   const macula = ref(MACULA, release, ['tit'])
   const treesRow: Row = { layer: 'sot', key: `${MACULA}/trees/TIT`, value: trees }
   const referentsRow: Row = { layer: 'sot', key: `${MACULA}/referents/TIT`, value: referents }
-  const tit = (...rest: Row[]) => [bookRow(UGNT, 'tit', [1]), chapterRow(UGNT, 'tit', 1, [chapterNode('1'), { type: 'para', marker: 'p', content: [w('α'), '.'] }]), ...rest]
+  const tit = (...rest: Row[]) => [bookRow(UGNT, 'tit', [1]), chapterRow(UGNT, 'tit', 1, [chapterNode('1'), verseNode('1'), { type: 'para', marker: 'p', content: [w('α'), w('β'), w('γ'), w('δ'), '.'] }]), ...rest]
   const refs = [ref(UGNT, 'v0.34#2023-09-27T02_19_31Z', ['tit']), macula]
 
-  test('the rows go to `macula` as they are, with the release of the resource', async () => {
+  // Labels most used first, ties by code point: & * adv s. Positions 0 to 3 are the four words.
+  const v2trees = {
+    labels: ['&', '*', 'adv', 's'],
+    pieces: [],
+    lo: [0],
+    span: [3],
+    nodes: [Uint8Array.from([3, 2, 9, 2, 1, 4, 6, 2, 7, 0, 1, 10])],
+  }
+
+  test('the trees go to `macula` v2 with the release of the resource, positions for ids (referents wait for M4)', async () => {
     const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
-    expect(m.macula).toEqual({ release, v: 1, trees, referents })
+    expect(m.macula).toEqual({ release, v: 2, trees: v2trees })
+    expect('referents' in m.macula!).toBe(false)
   })
 
-  test('trees or referents alone are kept alone', async () => {
-    expect((await extractOrig(fake(tit(treesRow), refs), 'tit')).macula).toEqual({ release, v: 1, trees })
-    expect((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula).toEqual({ release, v: 1, referents })
-    expect('referents' in (await extractOrig(fake(tit(treesRow), refs), 'tit')).macula!).toBe(false)
+  test('without a trees row the table has only the release', async () => {
+    expect((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula).toEqual({ release, v: 2 })
+  })
+
+  test('what the trees leave out is a line of the issues, and the words and text do not change', async () => {
+    const odd = { sentences: [['*', ['s', 1001001, 9009009], ['o', 7007001]], ['*', 1001009]] }
+    const issues: string[] = []
+    const m = await extractOrig(fake(tit({ ...treesRow, value: odd }), refs), 'tit', issues)
+    expect(issues).toEqual([
+      "MACULA trees: 3 word(s) whose place is not in this book's words: left out of the trees",
+      'MACULA trees: 1 part(s) left with no word: left out of the trees',
+      'MACULA trees: 1 sentence(s) left with no word: left out of the trees',
+    ])
+    expect(m.macula!.trees!.lo).toEqual([0])
+    const plain = await extractOrig(fake(tit(), refs), 'tit')
+    const a = origSegment(m).t
+    const b = origSegment(plain).t
+    expect(a.words).toEqual(b.words)
+    expect(a.text).toEqual(b.text)
   })
 
   test('without MACULA rows there is no `macula`; the rows of another book are not this book', async () => {
@@ -872,8 +897,8 @@ describe('MACULA', () => {
   test('the table is written as orig.cddl says and read back', async () => {
     const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
     const seg = origSegment(m)
-    expect(seg.h.tables).toEqual({ words: [1, true], text: [1, true], macula: [1, false] })
-    expect(seg.t.macula).toEqual({ release, trees, referents })
+    expect(seg.h.tables).toEqual({ words: [1, true], text: [1, true], macula: [2, false] })
+    expect(Object.keys(seg.t.macula as object).sort()).toEqual(['release', 'trees'])
     expect(origView(seg)).toEqual(m)
     const { model, skipped } = await throughFile(m)
     expect(model).toEqual(m)

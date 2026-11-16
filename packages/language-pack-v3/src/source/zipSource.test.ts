@@ -51,7 +51,7 @@ async function withMacula(): Promise<Uint8Array> {
   const manifest = JSON.parse(await zip.file('manifest.json')!.async('string'))
   const rows = [
     { key: `${MACULA}/referents/TIT`, entry: { words: [['ζωῆς', 'G2222']] } },
-    { key: `${MACULA}/trees/TIT`, entry: { sentences: [['*', ['s', 56001001]]] } },
+    { key: `${MACULA}/trees/TIT`, entry: { sentences: [['*', ['s', 1001001]]] } },
     { key: `${MACULA}/trees/PHM`, entry: { sentences: [] } },
   ]
   manifest.resources.push({ key: MACULA, role: 'original', stamp: '3b8aa380e8#2026-10-15T02_19_35.000Z', subject: 'Original Language Syntax', rows: { receipt: 1, sot: rows.length } })
@@ -74,10 +74,9 @@ describe('zipSource: MACULA', () => {
     const orig = await extractOrig(await zipSource(await withMacula()), 'tit')
     expect(orig.stamp).toBe('g987ab2025a')
     expect(orig.macula).toEqual({
-      v: 1,
+      v: 2,
       release: '3b8aa380e8#2026-10-15T02_19_35.000Z',
-      trees: { sentences: [['*', ['s', 56001001]]] },
-      referents: { words: [['ζωῆς', 'G2222']] },
+      trees: { labels: ['*', 's'], pieces: [], lo: [0], span: [0], nodes: [Uint8Array.from([0, 1, 3, 1, 1])] },
     })
   })
 })

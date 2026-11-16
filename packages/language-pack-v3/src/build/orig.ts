@@ -16,6 +16,7 @@ import type { Segment } from '../codec/container'
 import { hasOwn, isMap } from '../codec/values'
 import { eventCode } from '../events'
 import { verseId } from '../ids'
+import { buildMaculaTrees, maculaTreeIssues } from './macula/trees'
 import { type Event, type MaculaReferents, type MaculaTrees, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 import { ORIGINALS, type RowSource } from '../source/rows'
 
@@ -119,13 +120,13 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
  * - `stamp` is the book file's blob as format 2.0 records it (`g987ab2025a`), which the resource's `bookStamps` gives
  *   for this book (`ids.md`, "Positions in the original"). A source that does not record blobs has none, and then the
  *   stamp is the release tag of the resource (`v0.34` of `v0.34#2023-09-27T02_19_31Z`: `ids.md` names the tag, with no date).
- * - MACULA rows `{resource}/trees/{BOOK}` and `{resource}/referents/{BOOK}` go to `macula` as they are, and `release`
- *   is the stamp of the MACULA resource.
+ * - MACULA rows `{resource}/trees/{BOOK}` become the `macula` v2 trees of the book ({@link buildMaculaTrees}), and `release`
+ *   is the stamp of the MACULA resource. What the trees leave out is a line in `issues`. The referents are not built yet (`macula` has none).
  *
  * Throws `Error` when the source has no text of the book, has it from two resources, or has rows that are not what
  * format 2.0 writes.
  */
-export async function extractOrig(source: RowSource, book: string): Promise<OrigModel> {
+export async function extractOrig(source: RowSource, book: string, issues?: string[]): Promise<OrigModel> {
   const upper = book.toUpperCase()
   let resource: string | undefined
   let listed: number[] | undefined
@@ -190,9 +191,12 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
   const ordered = [...chunks.entries()].sort(([a], [b]) => a - b).map(([, chunk]) => chunk)
   const model: OrigModel = { book, key: resource, stamp, ...readDocument(ordered) }
   if (macula.resource !== undefined) {
-    model.macula = { release: refOf(macula.resource).stamp, v: 1 }
-    if (macula.trees !== undefined) model.macula.trees = macula.trees
-    if (macula.referents !== undefined) model.macula.referents = macula.referents
+    model.macula = { release: refOf(macula.resource).stamp, v: 2 }
+    if (macula.trees !== undefined) {
+      const { trees, counts } = buildMaculaTrees(macula.trees, model.pieces, model.events)
+      model.macula.trees = trees
+      issues?.push(...maculaTreeIssues(counts))
+    }
   }
   return model
 }
