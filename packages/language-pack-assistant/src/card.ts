@@ -5,7 +5,7 @@
 import { type Answer, languageTn, type PackReader } from '@bt-synergy/language-pack-client'
 import { UGNT, UHB } from '@bt-synergy/language-pack-v3'
 import type { Call, Decision } from './decision'
-import { type Fragment, fragmentsOf } from './fragments'
+import { type Fragment, fragmentsOf, type VerseAnswers } from './fragments'
 
 export type Card = {
   question: string
@@ -162,6 +162,31 @@ async function query(reader: PackReader, call: Call, words?: (t: string) => stri
   }
 }
 
+/** The verses of a range in one chapter ("jon 3:5-10" gives jon 3:5 … jon 3:10), at most `max`; `undefined` for one verse or another form. */
+export function versesOf(ref: string, max: number): string[] | undefined {
+  const m = /^([a-z0-9]{3}) (\d+):(\d+)-(\d+)$/.exec(ref.trim())
+  if (m === null) return undefined
+  const [from, to] = [Number(m[3]), Number(m[4])]
+  if (to <= from) return undefined
+  return Array.from({ length: Math.min(to - from + 1, max) }, (_, k) => `${m[1]} ${m[2]}:${from + k}`)
+}
+
+/** The passage answer of each verse of a range (a card shows at most `limit` pieces, so no more verses are read). */
+async function verseAnswers(reader: PackReader, call: Call, limit: number): Promise<VerseAnswers | undefined> {
+  if (call.query !== 'passage' && call.query !== 'context') return undefined
+  const list = versesOf(String(call.args.ref ?? ''), limit)
+  if (list === undefined) return undefined
+  const out: VerseAnswers = []
+  for (const ref of list) {
+    try {
+      out.push(await reader.passage(ref))
+    } catch (e) {
+      if ((e as { code?: string }).code !== 'E_ARG') throw e
+    }
+  }
+  return out
+}
+
 /** The pieces, missing units and coverage of a call. A concept reads its article (the default section) and the books it is used in. */
 export async function piecesOf(reader: PackReader, call: Call, limit: number, words?: (t: string) => string[]): Promise<Pick<Card, 'pieces' | 'missing' | 'coverage'>> {
   const pieces: Fragment[] = []
@@ -170,7 +195,8 @@ export async function piecesOf(reader: PackReader, call: Call, limit: number, wo
   const take = async (c: Call, a: Answer<unknown> | undefined, first: boolean): Promise<void> => {
     if (a === undefined) return
     await citeMaps(reader, c, a)
-    pieces.push(...fragmentsOf(c, a, reader))
+    const each = a.data !== null && first ? await verseAnswers(reader, c, limit) : undefined
+    pieces.push(...fragmentsOf(c, a, reader, each))
     for (const n of a.notInstalled) if (!missing.some((x) => x.unit === n.unit)) missing.push(n)
     if (first && a.coverage !== undefined) coverage = a.coverage
   }

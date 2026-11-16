@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'bun:test'
 import type { PackReader } from '@bt-synergy/language-pack-client'
-import { booksOf, cardOf, normalizeStrong, now, piecesOf, renderingsOf } from './card'
+import { booksOf, cardOf, normalizeStrong, now, piecesOf, renderingsOf, versesOf } from './card'
 import { contentWords } from './words'
 import { LINK, sampleReader } from './card.fixture'
 import type { Decision } from './decision'
@@ -119,4 +119,31 @@ test('R33: search sends the content words; with no hits, each word alone and the
   const r = await piecesOf(stub, { query: 'search', args: { text: '¿Dónde dice la palabra amor y gracia?' } }, 8, words)
   expect(sent).toEqual(['amor gracia', 'gracia', 'amor'])
   expect(r.pieces.map((p) => p.id)).toEqual(['note:tit/b', 'note:tit/c', 'note:tit/a'])
+})
+
+test('a passage range: one verse fragment per verse in text order, then the notes, questions and links (R37 a)', async () => {
+  const { pieces } = await piecesOf(reader, { query: 'passage', args: { ref: 'tit 1:1-3' } }, 20)
+  const verses = pieces.filter((p) => p.kind === 'verse')
+  for (const p of verses) expect(p.id).not.toMatch(/\d+-\d+$/)
+  const leads = pieces.slice(0, 3)
+  expect(leads.map((p) => p.kind)).toEqual(['verse', 'verse', 'verse'])
+  expect(leads.map((p) => p.ref)).toEqual(['tit 1:1', 'tit 1:2', 'tit 1:3'])
+  // The literal text leads each verse: the three ids share one resource.
+  expect(new Set(leads.map((p) => p.id.split(' ')[0])).size).toBe(1)
+  const firstHelp = pieces.findIndex((p) => p.kind !== 'verse')
+  expect(firstHelp).toBeGreaterThanOrEqual(3)
+  const single = await reader.passage('tit 1:2')
+  expect(leads[1]!.cite).toEqual(single.cites.find((c) => c.res === leads[1]!.cite.res && c.id === undefined)!)
+})
+
+test('a whole chapter reads no more verses than the card shows', async () => {
+  const { pieces } = await piecesOf(reader, { query: 'passage', args: { ref: 'tit 1:1-999' } }, 4)
+  expect(pieces.map((p) => p.ref)).toEqual(['tit 1:1', 'tit 1:2', 'tit 1:3', 'tit 1:4'])
+})
+
+test('versesOf splits a range in one chapter only', () => {
+  expect(versesOf('jon 3:5-7', 8)).toEqual(['jon 3:5', 'jon 3:6', 'jon 3:7'])
+  expect(versesOf('jon 3:5', 8)).toBeUndefined()
+  expect(versesOf('jon 3:5-4:2', 8)).toBeUndefined()
+  expect(versesOf('jon 3:1-999', 2)).toEqual(['jon 3:1', 'jon 3:2'])
 })

@@ -118,16 +118,35 @@ function rows(b: Build, book: string, kind: 'note' | 'question' | 'link', list: 
   return out
 }
 
-function passage(b: Build, d: PassageData): Fragment[] {
+/** The verse fragments of one passage answer: the language's literal text first, then the other texts. */
+function verses(b: Build, d: PassageData): Fragment[] {
   const first = preferred(d.texts)
   const texts = first < 0 ? [] : [d.texts[first]!, ...d.texts.filter((t, i) => i !== first && t.text !== '')]
-  const [lead, ...rest] = texts.flatMap((t) => verse(b, d.book, d.ref, t.res, t.text))
+  return texts.flatMap((t) => verse(b, d.book, d.ref, t.res, t.text))
+}
+
+/** One passage answer for each verse of a range, with its own cites: the card then shows a fragment per verse (spec part 5). */
+export type VerseAnswers = Answer<PassageData>[]
+
+function passage(b: Build, d: PassageData, each?: VerseAnswers): Fragment[] {
+  let leads: Fragment[]
+  let rest: Fragment[]
+  if (each !== undefined && each.length > 0) {
+    // One fragment per verse, in text order, from the literal text; the other texts of each verse come after the helps.
+    const per = each.map((a) => (a.data === null ? [] : verses({ ...b, cites: a.cites }, a.data)))
+    leads = per.flatMap((v) => v.slice(0, 1))
+    rest = per.flatMap((v) => v.slice(1))
+  } else {
+    const all = verses(b, d)
+    leads = all.slice(0, 1)
+    rest = all.slice(1)
+  }
   return [
-    ...(lead !== undefined ? [lead] : []),
+    ...leads,
     ...rows(b, d.book, 'note', d.notes),
     ...rows(b, d.book, 'question', d.questions),
     ...rows(b, d.book, 'link', d.links),
-    // The other texts of the verse come after the helps.
+    // The other texts of the verses come after the helps.
     ...rest,
   ]
 }
@@ -230,16 +249,16 @@ function search(b: Build, hits: Hit[]): Fragment[] {
 }
 
 /** The fragments of an answer, in the spec's ranking order for its query (part 5). */
-export function fragmentsOf(call: Call, answer: Answer<unknown>, reader: PackReader): Fragment[] {
+export function fragmentsOf(call: Call, answer: Answer<unknown>, reader: PackReader, each?: VerseAnswers): Fragment[] {
   const d = answer.data
   if (d === null || d === undefined) return []
   const b: Build = { cites: answer.cites, license: licenses(reader) }
   switch (answer.query) {
     case 'passage':
-      return passage(b, d as PassageData)
+      return passage(b, d as PassageData, each)
     case 'context': {
       const c = d as ContextData
-      return [...passage(b, c.passage), ...c.concepts.flatMap((x) => (x.article !== null ? sections(b, x.article) : []))]
+      return [...passage(b, c.passage, each), ...c.concepts.flatMap((x) => (x.article !== null ? sections(b, x.article) : []))]
     }
     case 'article':
       return sections(b, d as ArticleData)
