@@ -16,7 +16,8 @@ import type { Segment } from '../codec/container'
 import { hasOwn, isMap } from '../codec/values'
 import { eventCode } from '../events'
 import { verseId } from '../ids'
-import { buildMaculaTrees, maculaTreeIssues } from './macula/trees'
+import { buildMaculaReferents, maculaReferentIssues } from './macula/referents'
+import { buildMaculaTrees,maculaTreeIssues } from './macula/trees'
 import { type Event, type MaculaReferents, type MaculaTrees, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 import { ORIGINALS, type RowSource } from '../source/rows'
 
@@ -121,7 +122,7 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
  *   for this book (`ids.md`, "Positions in the original"). A source that does not record blobs has none, and then the
  *   stamp is the release tag of the resource (`v0.34` of `v0.34#2023-09-27T02_19_31Z`: `ids.md` names the tag, with no date).
  * - MACULA rows `{resource}/trees/{BOOK}` become the `macula` v2 trees of the book ({@link buildMaculaTrees}), and `release`
- *   is the stamp of the MACULA resource. What the trees leave out is a line in `issues`. The referents are not built yet (`macula` has none).
+ *   is the stamp of the MACULA resource. What the trees leave out is a line in `issues`. The referents become columns too ({@link buildMaculaReferents}); what they leave out, or leave without an antecedent, is a line too.
  *
  * Throws `Error` when the source has no text of the book, has it from two resources, or has rows that are not what
  * format 2.0 writes.
@@ -196,6 +197,11 @@ export async function extractOrig(source: RowSource, book: string, issues?: stri
       const { trees, counts } = buildMaculaTrees(macula.trees, model.pieces, model.events)
       model.macula.trees = trees
       issues?.push(...maculaTreeIssues(counts))
+    }
+    if (macula.referents !== undefined) {
+      const { referents, counts } = buildMaculaReferents(macula.referents, model.words, model.pieces, model.events)
+      model.macula.referents = referents
+      issues?.push(...maculaReferentIssues(counts))
     }
   }
   return model

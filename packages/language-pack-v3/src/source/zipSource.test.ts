@@ -50,7 +50,7 @@ async function withMacula(): Promise<Uint8Array> {
   const zip = await JSZip.loadAsync(readFileSync(join(DATA, 'originals-tit.langpack.zip')))
   const manifest = JSON.parse(await zip.file('manifest.json')!.async('string'))
   const rows = [
-    { key: `${MACULA}/referents/TIT`, entry: { words: [['ζωῆς', 'G2222']] } },
+    { key: `${MACULA}/referents/TIT`, entry: { words: [['ζωῆς', 'G2222']], verses: {} } },
     { key: `${MACULA}/trees/TIT`, entry: { sentences: [['*', ['s', 1001001]]] } },
     { key: `${MACULA}/trees/PHM`, entry: { sentences: [] } },
   ]
@@ -77,6 +77,7 @@ describe('zipSource: MACULA', () => {
       v: 2,
       release: '3b8aa380e8#2026-10-15T02_19_35.000Z',
       trees: { labels: ['*', 's'], pieces: [], lo: [0], span: [0], nodes: [Uint8Array.from([0, 1, 3, 1, 1])] },
+      referents: { ents: [], kinds: [], pieces: [], word: [], kind: [], piece: [], ent: [], ch: [], vs: [], ante: [] },
     })
   })
 })

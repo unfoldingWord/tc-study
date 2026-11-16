@@ -844,7 +844,7 @@ describe('origView rejects a segment that is not an original', () => {
 describe('MACULA', () => {
   // The real Titus MACULA part is not in the sample (its license is its own): these values have its shape.
   const trees = { sentences: [['*', ['s', 1001001, 1001002], ['adv', 1001003, ['&', 1001004]]]] }
-  const referents = { verses: { '1:1': [['ουσ', 0, [['r', '', 1, 10, 17]]]] }, words: [['x', 'y']] }
+  const referents = { verses: { '1:1': [['β', 0, [['r', '', 1, 10, 0]]], ['nowhere', 0, [['s', '', 0, 0, 0]]]] }, words: [['x', 'y']] }
   const release = '3b8aa380e8#2026-10-15T02_19_35.000Z'
   const macula = ref(MACULA, release, ['tit'])
   const treesRow: Row = { layer: 'sot', key: `${MACULA}/trees/TIT`, value: trees }
@@ -861,14 +861,26 @@ describe('MACULA', () => {
     nodes: [Uint8Array.from([3, 2, 9, 2, 1, 4, 6, 2, 7, 0, 1, 10])],
   }
 
-  test('the trees go to `macula` v2 with the release of the resource, positions for ids (referents wait for M4)', async () => {
-    const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
-    expect(m.macula).toEqual({ release, v: 2, trees: v2trees })
-    expect('referents' in m.macula!).toBe(false)
+  test('the trees and the referents go to `macula` v2 with the release of the resource, positions for ids and keys', async () => {
+    const issues: string[] = []
+    const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit', issues)
+    // `β` is the second word; its one reference is to the verse 1:10 (not in the book), so the antecedent is empty.
+    // `nowhere` is no word of the verse: its row is left out and counted.
+    expect(m.macula).toEqual({
+      release,
+      v: 2,
+      trees: v2trees,
+      referents: { ents: [['x', '']], kinds: ['r'], pieces: [''], word: [1], kind: [0], piece: [0], ent: [0], ch: [1], vs: [10], ante: [0] },
+    })
+    expect(issues).toEqual([
+      'MACULA referents: 1 referring word(s) not found in their verse, with 1 reference(s): left out',
+      'MACULA referents: 1 of 1 reference(s) with an antecedent the rule cannot fix: ante left empty',
+    ])
   })
 
-  test('without a trees row the table has only the release', async () => {
-    expect((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula).toEqual({ release, v: 2 })
+  test('without a trees row the table has the release and the referents', async () => {
+    expect(Object.keys((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula!).sort()).toEqual(['referents', 'release', 'v'])
+    expect((await extractOrig(fake(tit(), refs), 'tit')).macula).toBeUndefined()
   })
 
   test('what the trees leave out is a line of the issues, and the words and text do not change', async () => {
@@ -898,7 +910,7 @@ describe('MACULA', () => {
     const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
     const seg = origSegment(m)
     expect(seg.h.tables).toEqual({ words: [1, true], text: [1, true], macula: [2, false] })
-    expect(Object.keys(seg.t.macula as object).sort()).toEqual(['release', 'trees'])
+    expect(Object.keys(seg.t.macula as object).sort()).toEqual(['referents', 'release', 'trees'])
     expect(origView(seg)).toEqual(m)
     const { model, skipped } = await throughFile(m)
     expect(model).toEqual(m)
