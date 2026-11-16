@@ -19,6 +19,15 @@ obs-tables = {
   ? "links": obs-helps,        ; optional, v1 (OBS tWL)
   ? "study-notes": obs-helps,  ; optional, v1 (OBS SN)
   ? "study-questions": obs-helps,   ; optional, v1 (OBS SQ)
+  ; DRAFT (OBS 5M, phase 0; not built, not in any reader yet): the Five Movements session manual (OBS Theological Formation).
+  ; All optional, so a reader that does not know them skips them (container.md). They never use the table "strings": with
+  ; them or without them, every other table of the segment has the same bytes.
+  ? "tf-parts": tf-parts,      ; optional, v1: the parts of each story's session, in order; the coverage
+  ? "tf-questions": tf-questions,   ; optional, v1: observation, discourse, theology and journal questions
+  ? "tf-terms": tf-terms,      ; optional, v1: the translation terms of M1, per frame
+  ? "tf-shared": tf-shared,    ; optional, v1: blocks the stories share, stored once
+  ? "tf-frames": tf-frames,    ; optional, v1: frame text taken from the manual where "stories" lacks the frame (empty today)
+  ? "tf-framework": tf-framework,   ; optional, v1: the five movements by code
 }
 
 story = {
@@ -48,4 +57,96 @@ obs-helps = {
   ? "refText": [* [row: uint, tstr]],
   ? "concept": column,
   "cols": { * tstr => column },
+}
+
+; ---- DRAFT: OBS Five Movements (5M), phase 0 ----
+;
+; Source: one OBS Theological Formation resource of the segment's language (Door43 "OBS Theological Formation", en_obs-tf
+; v4 today), listed in the header's "res" and in the catalog's "resources" with its own release, license, rights and
+; attribution. The frames, the titles, the "A Bible story from" lines and the images are not here: they are the story's in
+; "stories". Every frame a 5M row names is story × 100 + frame of "stories" (ids.md), after the reviewed correspondence of
+; the build (spec/obs-5m-checks.md).
+;
+; The codes are fixed and never translated. Parts, in session order:
+;   intro, frames, community, m1, m2, drafting, m3, checking, m4, m5, conclusion
+; Lists (the question kinds and the terms):
+;   observation (m1), terms (m1), discourse (m2), theology (m2), journal (m3)
+; A table writes the codes it uses in its own "codes" list, and numbers them from 0. A reader skips a row whose code it does
+; not know.
+
+; One row per block of a story's session, in reading order: the stories in ascending order, and inside a story the parts in
+; the order above. A part's first row has no "list": it is the part's heading and lead text. A row with "list" is the heading
+; and lead text of a list, whose rows are in tf-questions or tf-terms. A row with "shared" shows that block of tf-shared; its
+; title is the block's. The "frames" part has a row with no title and no text: the app shows the story's frames there. A
+; part a story lacks has no row, and an app skips it.
+tf-parts = {
+  "res": res-index,
+  "stories": uvarints,         ; the coverage: the stories that have a session in this language, ascending (en: 1-50; id: 1-16)
+  "codes": strtab,
+  "n": uint,
+  "story": uvarints,
+  "part": uvarints,            ; a number of "codes"
+  "list": column,              ; uints, a number of "codes"; present on the heading rows of lists
+  "title": column,             ; texts, as published in the language
+  "text": column,              ; texts, minimal markdown
+  "shared": column,            ; uints, a row of tf-shared
+}
+
+; One row per question, ordered by story, then part, then k. The id of a row is "{story}/{part}/{k}" ("1/m1/3"): k counts
+; the questions of the part from 1, in the order of the source, across its lists (m2: discourse first, then theology).
+tf-questions = {
+  "res": res-index,
+  "codes": strtab,
+  "n": uint,
+  "story": uvarints,
+  "part": uvarints,            ; a number of "codes"
+  "list": uvarints,            ; a number of "codes"
+  "k": uvarints,
+  "frames": { "count": uvarints, "ids": uvarints },   ; per row, how many frames it names (0 for none), then all the ids
+  "q": column,                 ; texts, the question
+  "a": column,                 ; texts with "has": the manual's answer (observation and discourse); an app may hide it
+  ? "refText": [* [row: uint, tstr]],   ; the frame label as the source wrote it, when the build corrected it
+}
+
+; One row per translation term, ordered by frame, then k. The id of a row is "{story}:{frame}/{k}" ("1:1/2").
+tf-terms = {
+  "res": res-index,
+  "n": uint,
+  "frame": uvarints,
+  "k": uvarints,
+  "term": column,              ; texts: the paragraph's first bold span, as published
+  "text": column,              ; texts: the whole paragraph, as published (term and guidance)
+  ? "refText": [* [row: uint, tstr]],
+}
+
+; The blocks the stories transclude, each once: drafting, checking, M4, M5, the conclusion, and the Community Study sections
+; of the devotional units that a story names. "key" is the transclusion as the source writes it ("movement_4",
+; "obs-devotionals-unit-3#Community Study: The Practice of Worship—Praising God as a Community").
+tf-shared = {
+  "res": res-index,
+  "n": uint,
+  "key": column,               ; texts
+  "title": column,             ; texts: the block's first heading
+  "text": column,              ; texts: the rest, minimal markdown
+}
+
+; Frames that the language's OBS resource lacks (a whole story, or one frame), with the text of the manual instead (the
+; approved hybrid); an app marks them as manual text. Absent when no frame needs it, which is the case of en and id today.
+tf-frames = {
+  "res": res-index,
+  "n": uint,
+  "frame": uvarints,
+  "text": column,              ; texts
+  "origin": uvarints,          ; per row, the resource the text comes from (a res-index)
+}
+
+; The five movements: code (m1-m5) and name, from the headings of the source. The framing text of the method
+; (transclusions/overview.md) is not here until its license is confirmed.
+tf-framework = {
+  "res": res-index,
+  "codes": strtab,
+  "n": uint,
+  "code": uvarints,
+  "name": column,              ; texts
+  ? "text": column,            ; texts with "has": the purpose of each movement, once its source is licensed
 }
