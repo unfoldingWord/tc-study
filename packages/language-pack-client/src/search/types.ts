@@ -10,8 +10,9 @@ export const SEARCH_FILTER_KEYS: Record<keyof SearchFilters, true> = { books: tr
 
 export const DEFAULT_LIMIT = 20
 
-/** Version of the index layout. A stored index with another version is dropped and rebuilt by `init()`. */
-export const INDEX_VERSION = 3
+/** Version of the index layout. A stored index with another version is dropped and rebuilt by `init()`. 4: the C2 layout (stems, role)
+ * with the OBS rows (book `obs`), above both the OBS-era index (no version) and the C2 index without OBS (3). */
+export const INDEX_VERSION = 4
 
 /**
  * `ref` is the reference as the resource has it (`1:1`), `res` the resource key, `id` the row id of a note, question or link.

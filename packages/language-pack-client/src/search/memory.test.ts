@@ -71,6 +71,13 @@ describe('memoryIndex with OBS', () => {
 })
 
 describe('memoryIndex stems', () => {
+  test('OBS rows match by stem too', async () => {
+    const ix = memoryIndex()
+    await ix.addObs('es', { lang: 'es', res: [['r/obs', 'v1']], stories: [{ res: 'r/obs', n: 1, title: 'La creación', frames: [{ n: 1, text: 'Las gracias de Dios' }] }] }, 'o1')
+    const hits = await ix.search('es', 'gracia')
+    expect(hits.map((h) => [h.kind, h.book, h.ref])).toEqual([['text', 'obs', '01:01']])
+    expect(hits[0]!.snippet).toContain('«gracias»')
+  })
   test('a stem finds other forms; the snippet marks the original word; other languages need the exact word', async () => {
     const ix = memoryIndex()
     await ix.addBook('es-419', book('rut', 'Las gracias de Dios'), 's1')

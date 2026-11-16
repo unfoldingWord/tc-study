@@ -368,6 +368,31 @@ describe('sqlIndex stems', () => {
     await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
     expect((await ix.search('es', 'gracia')).length).toBe(1)
   })
+  test('an OBS-era database (no meta, no stems, OBS rows) is rebuilt by init, and OBS rows then have stems', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE VIRTUAL TABLE pieces USING fts5(body, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED, tokenize = 'unicode61 remove_diacritics 2');
+      INSERT INTO pieces VALUES ('Las gracias de Dios', 'text', 'es', 'obs', '01:01', 'r/obs', '', 'o1');
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('o1', 'es', 'obs');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('o1')).toBe(false)
+    expect(await ix.search('es', 'gracias')).toEqual([])
+    await ix.addObs('es', { lang: 'es', res: [['r/obs', 'v1']], stories: [{ res: 'r/obs', n: 1, title: 'La creación', frames: [{ n: 1, text: 'Las gracias de Dios' }] }] }, 'o1')
+    const hits = await ix.search('es', 'gracia')
+    expect(hits.map((h) => [h.kind, h.book, h.ref])).toEqual([['text', 'obs', '01:01']])
+    expect(hits[0]!.snippet).toContain('«gracias»')
+    await ix.init()
+    expect(await ix.has('o1')).toBe(true)
+  })
+  test('a version 3 database (C2 without OBS) is rebuilt by init', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT); INSERT INTO meta VALUES ('version', '3');
+      CREATE VIRTUAL TABLE pieces USING fts5(body, stems, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, role UNINDEXED, seg UNINDEXED);
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('s1', 'es', 'rut');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('s1')).toBe(false)
+  })
   test('section hits carry their role; other hits have none', async () => {
     const ix = sqlIndex(bunDriver())
     await ix.init()

@@ -168,7 +168,7 @@ The phone has not been measured yet: that is C3.
 - **OPFS.** Only memory, IndexedDB and the Node folder store exist; an OPFS store for big installs is an app (or a later task), through `BlobStore`.
 - **Phone timings.** Only desktop numbers are here; the targets above are checked on the 2 GB phone in C3.
 - **Stems.** Snowball stems for es, pt and en are built in (`stemWord`, `stemForms`): the index keeps every form of each token and a query word matches any form. Other languages match folded words, as they are.
-- **Search index details.** `search` has a `section` kind: one row per article section, hit id `<article id>#<sid>`; `art:` units are indexed like books. `books({ strong })` answers from the xmap `strong` counts. `INDEX_VERSION` is 2: an older index is dropped and rebuilt on `init`, and `has` answers false so the books are indexed again.
+- **Search index details.** `search` has a `section` kind: one row per article section, hit id `<article id>#<sid>`; `art:` units are indexed like books. `books({ strong })` answers from the xmap `strong` counts. OBS rows (book `obs`) get stems like the others. `INDEX_VERSION` is 4: an older index (OBS-era without stems, or C2 without OBS) is dropped and rebuilt on `init`, and `has` answers false so the books are indexed again.
 - **Key distribution.** The app decides which public keys it trusts and how it gets them.
 
 ## Open items (after C1, 2026-11-06)
