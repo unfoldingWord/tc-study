@@ -17,6 +17,12 @@ test('canonical ids (R29)', () => {
   expect(canonStrong('H2617a')).toBe('H2617a')
   expect(canonStrong('G5485')).toBe('G5485')
   expect(canonId('note:tit/m2jl')).toBe('note:tit/m2jl')
+  // OBS: the story and the frame in two digits.
+  expect(canonId('frame:obs 1:2')).toBe('frame:obs 01:02')
+  expect(canonId('frame:obs 01:02')).toBe('frame:obs 01:02')
+  expect(canonId('obsnote:1:2/n001')).toBe('obsnote:01:02/n001')
+  expect(canonId('obsquestion:01:1/q001')).toBe('obsquestion:01:01/q001')
+  expect(canonId('story:obs 7')).toBe('story:obs 07')
 })
 
 test('a passage: the literal text first, then the notes, questions and links of the verse; cites and links from the answer', async () => {
@@ -63,4 +69,27 @@ test('a section hit keeps the id section:<article>#<section> and links to the ar
   expect(f.map((x) => x.id)).toEqual(['section:tw:kt/grace#definicion', 'section:tw:kt/grace#otra'])
   expect(f[0]!.link).toBe('articulo:tw:kt/grace#definition')
   expect(f[1]!.link).toBe('pieza:section:tw:kt/grace#otra')
+})
+
+const search = async (text: string) => fragmentsOf({ query: 'search', args: { text } }, await reader.search(text), reader)
+
+test('OBS search hits: a frame, a question, a note and a story title, with obs: links and the cite of the hit', async () => {
+  const hits = await reader.search('Dios creó')
+  const f = fragmentsOf({ query: 'search', args: { text: 'Dios creó' } }, hits, reader)
+  expect(f.some((x) => x.id.startsWith('verse:') && x.id.includes('obs'))).toBe(false)
+  const frame = f.find((x) => x.id === 'frame:obs 01:01')!
+  expect(frame.kind).toBe('frame')
+  expect(frame.link).toBe('obs:01:01')
+  expect(frame.ref).toBe('obs 01:01')
+  expect(hits.cites).toContainEqual(frame.cite)
+  const q = f.find((x) => x.id === 'obsquestion:01:01/q001')!
+  expect(q.kind).toBe('obsquestion')
+  expect(q.link).toBe('obs:01:01')
+  const note = (await search('metáfora')).find((x) => x.kind === 'obsnote')!
+  expect(note.id).toBe('obsnote:01:02/n001')
+  expect(note.link).toBe('obs:01:02')
+  const story = (await search('La creación')).find((x) => x.kind === 'story')!
+  expect(story.id).toBe('story:obs 01')
+  expect(story.link).toBe('obs:01')
+  for (const x of [...f, note, story]) expect(x.link).toMatch(LINK)
 })

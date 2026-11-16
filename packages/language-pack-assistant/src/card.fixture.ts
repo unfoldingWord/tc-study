@@ -13,4 +13,4 @@ export async function sampleReader(without: string[] = []): Promise<PackReader> 
   return openFromSegments({ lang: 'es-419', catalogs, get: async (id) => (gone.has(id) ? undefined : s.segments.get(id)) })
 }
 
-export const LINK = /^(ref:[a-z0-9]{3} [^\s:]+:\S+|concepto:\S+|articulo:\S+#\S+|pieza:\S+)$/
+export const LINK = /^(ref:[a-z0-9]{3} [^\s:]+:\S+|concepto:\S+|articulo:\S+#\S+|pieza:\S+|obs:\d{2}(:\d{2})?)$/

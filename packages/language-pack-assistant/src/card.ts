@@ -25,23 +25,59 @@ const TN = 'unfoldingWord/en/tn'
 type Res = readonly (readonly [string, string])[] | undefined
 const release = (res: Res, key: string): string | undefined => res?.find((r) => r[0] === key)?.[1]
 
+type ObsField = { stories?: { n: number; frames?: string[] }[] }
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+
+/** The OBS help table an article's use in the stories comes from (the links for `tw:`, the notes for `ta:`), and its release. */
+async function obsTable(reader: PackReader, id: string): Promise<[string, string] | undefined> {
+  const model = reader.installed('obs') ? await reader.obs() : undefined
+  const table = id.startsWith('tw:') ? model?.links : model?.notes
+  if (model === undefined || table === undefined) return undefined
+  const rel = release(model.res, table.res)
+  return rel === undefined ? undefined : [table.res, rel]
+}
+
 /**
  * The answers of the maps (`concept`, `books`, `topics`) carry no cites: their data comes from the maps. The card cites the
  * resource the maps name for each datum (a concept's `source`, the usage source of an article, a topic's `source`), with the release
- * the map core lists for it. Nothing is cited that the maps do not name.
+ * the map core lists for it. Nothing is cited that the maps do not name. The use of an article in the Open Bible Stories is cited
+ * from the `obs` unit's links (tW) or notes (tA), with `ref` `obs NN:FF` (a frame), `obs NN` (a story) or `obs` (the books cell).
  */
 async function citeMaps(reader: PackReader, call: Call, a: Answer<unknown>): Promise<void> {
   if (a.data === null || !['concept', 'books', 'topics'].includes(a.query)) return
   const m = await reader.maps()
-  const push = (res: string | undefined, rel: string | undefined, id: string): void => {
-    if (res !== undefined && rel !== undefined) a.cites.push({ res, release: rel, id })
+  const push = (res: string | undefined, rel: string | undefined, id: string, ref?: string): void => {
+    if (res !== undefined && rel !== undefined) a.cites.push({ res, release: rel, id, ...(ref !== undefined ? { ref } : {}) })
   }
   if (a.query === 'concept') {
-    const d = a.data as { found?: boolean; id?: string; concept?: { source?: string } }
+    const d = a.data as { found?: boolean; id?: string; concept?: { source?: string }; obs?: ObsField }
     if (d.found === true && d.id !== undefined) push(d.concept?.source, release(m.xmap?.core.res, d.concept?.source ?? ''), d.id)
+    const stories = d.obs?.stories ?? []
+    if (d.id === undefined || stories.length === 0) return
+    const id = d.id
+    // An article's stories come from the obs unit; a person, place or event's from its topic in xtopics.
+    const from: [string, string] | undefined =
+      id.startsWith('tw:') || id.startsWith('ta:')
+        ? await obsTable(reader, id)
+        : (() => {
+            const source = m.xtopics?.core.topics.get(id)?.source
+            const rel = release(m.xtopics?.core.res, source ?? '')
+            return source !== undefined && rel !== undefined ? [source, rel] : undefined
+          })()
+    if (from === undefined) return
+    for (const s of stories) {
+      if (s.frames !== undefined && s.frames.length > 0) for (const f of s.frames) push(from[0], from[1], id, `obs ${f}`)
+      else push(from[0], from[1], id, `obs ${pad2(s.n)}`)
+    }
     return
   }
   if (a.query === 'books') {
+    const obsCell = (a.data as { obs?: { state: string } }).obs
+    const asked = (call.args.article ?? call.args.concept) as string | undefined
+    if (asked !== undefined && obsCell !== undefined && obsCell.state !== 'none' && obsCell.state !== 'zero' && /^t[wa]:/.test(asked)) {
+      const from = await obsTable(reader, asked)
+      if (from !== undefined) push(from[0], from[1], asked, 'obs')
+    }
     if (typeof call.args.strong === 'string') {
       // The counts of a Strong key come from the original text of the book: the Greek or the Hebrew source of the xmap.
       const orig = call.args.strong.startsWith('H') ? UHB : UGNT
@@ -237,9 +273,11 @@ export async function piecesOf(reader: PackReader, call: Call, limit: number, wo
       sections.push(...(await take(c, await query(reader, c), false)))
     }
     const books = article ? { query: 'books' as const, args: { article: id } } : { query: 'books' as const, args: { concept: id } }
-    const used = await take(books, await query(reader, books), false)
     const own = pieces.filter((p) => p.kind === 'concept')
-    pieces = [...sections, ...own, ...used, ...pieces.filter((p) => p.kind !== 'concept')]
+    const stories = pieces.filter((p) => p.kind !== 'concept')
+    // The frames or stories of the concept say more than the OBS cell of its books: that cell is left out then.
+    const used = (await take(books, await query(reader, books), false)).filter((p) => p.id !== 'book:obs' || stories.length === 0)
+    pieces = [...sections, ...own, ...used, ...stories]
   }
   return { pieces: pieces.slice(0, limit), missing, ...(coverage !== undefined ? { coverage } : {}) }
 }

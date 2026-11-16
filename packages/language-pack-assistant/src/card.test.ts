@@ -181,3 +181,34 @@ test('versesOf splits a range in one chapter only', () => {
   expect(versesOf('jon 3:5-4:2', 8)).toBeUndefined()
   expect(versesOf('jon 3:1-999', 2)).toEqual(['jon 3:1', 'jon 3:2'])
 })
+
+test('OBS in a concept card: a tW concept lists its frames after the books, a tA concept its stories, cited from the obs unit', async () => {
+  const obs = (await reader.obs())!
+  const tw = obs.links!.rows[0]!.concept!
+  const { pieces } = await piecesOf(reader, { query: 'concept', args: { id: tw } }, 50)
+  const frames = pieces.filter((p) => p.kind === 'frame')
+  expect(frames.map((p) => p.id)).toEqual(['frame:obs 01:01'])
+  expect(frames[0]!.link).toBe('obs:01:01')
+  expect(frames[0]!.cite.res).toBe(obs.links!.res)
+  expect(frames[0]!.cite.release).toBe(obs.res.find(([k]) => k === obs.links!.res)![1])
+  const lastBook = pieces.map((p) => p.kind).lastIndexOf('book')
+  expect(pieces.indexOf(frames[0]!)).toBeGreaterThan(lastBook)
+  // The frames say more than the OBS cell of the books: the card leaves that cell out.
+  expect(pieces.some((p) => p.id === 'book:obs')).toBe(false)
+  const ta = obs.notes!.rows[0]!.concept!
+  const t = await piecesOf(reader, { query: 'concept', args: { id: ta } }, 50)
+  const story = t.pieces.find((p) => p.kind === 'story')!
+  expect(story.id).toBe('story:obs 01')
+  expect(story.link).toBe('obs:01')
+  expect(story.cite.res).toBe(obs.notes!.res)
+  for (const p of [...pieces, ...t.pieces]) expect(p.link).toMatch(LINK)
+})
+
+test('OBS in a books card: the obs cell is a book:obs piece by its count, cited from the obs unit', async () => {
+  const obs = (await reader.obs())!
+  const tw = obs.links!.rows[0]!.concept!
+  const { pieces } = await piecesOf(reader, { query: 'books', args: { article: tw } }, 50)
+  const cell = pieces.find((p) => p.id === 'book:obs')!
+  expect(cell.link).toBe('pieza:book:obs')
+  expect(cell.cite.res).toBe(obs.links!.res)
+})

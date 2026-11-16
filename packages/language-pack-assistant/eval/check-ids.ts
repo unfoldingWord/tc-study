@@ -3,7 +3,8 @@
  * Eval only (Node and Bun). `bun eval/check-ids.ts --lang es-419 --file eval/questions/es-tune.jsonl` (with `LP3_STAGING=1` the first time).
  *
  * The id grammar (spec part 2): `verse:<res> <book> <c>:<v>`, `note:<book>/<rowid>`, `question:<book>/<rowid>`, `link:<book>/<rowid>`,
- * `section:<article id>#<sid>`, `concept:<id>`, `rendering:<strong>/<form>`, `book:<code>`, `topic:<id>`.
+ * `section:<article id>#<sid>`, `concept:<id>`, `rendering:<strong>/<form>`, `book:<code>`, `topic:<id>`; OBS: `frame:obs NN:FF`,
+ * `obsnote:NN:FF/<rowid>`, `obsquestion:NN:FF/<rowid>`, `story:obs NN` and `book:obs`.
  * `<res>` is the resource key (`es-419_gl/es-419/glt`) or its last part (`glt`).
  */
 import { readFileSync } from 'node:fs'
@@ -118,7 +119,29 @@ export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> 
         return a.data.renderings.some((r) => r.text === rest.slice(slash + 1)) ? good : bad(`${rest.slice(0, slash)} has no rendering ${rest.slice(slash + 1)}`)
       }
       case 'book':
-        return isBook(rest) ? good : bad(`not a book code: ${rest}`)
+        return isBook(rest) || rest === 'obs' ? good : bad(`not a book code: ${rest}`)
+      case 'frame':
+      case 'story': {
+        const m = kind === 'frame' ? /^obs (\d+):(\d+)$/.exec(rest) : /^obs (\d+)$/.exec(rest)
+        if (m === null) return bad(`not a ${kind} id`)
+        const model = await reader.obs()
+        if (model === undefined) return bad('obs is not installed')
+        const story = model.stories.find((s) => s.n === Number(m[1]))
+        if (story === undefined) return bad(`no story ${m[1]}`)
+        if (kind === 'story') return good
+        return story.frames.some((f) => f.n === Number(m[2])) ? good : bad(`no frame ${m[2]} in story ${m[1]}`)
+      }
+      case 'obsnote':
+      case 'obsquestion': {
+        const m = /^(\d+):(\d+)\/(.+)$/.exec(rest)
+        if (m === null) return bad(`not an ${kind} id`)
+        const model = await reader.obs()
+        if (model === undefined) return bad('obs is not installed')
+        const table = kind === 'obsnote' ? model.notes : model.questions
+        if (table === undefined) return bad(`obs has no ${kind === 'obsnote' ? 'note' : 'question'} table`)
+        const frame = Number(m[1]) * 100 + Number(m[2])
+        return table.rows.some((r) => r.id === m[3] && r.frame === frame) ? good : bad(`no row ${m[3]} at ${m[1]}:${m[2]} in the obs ${kind}s`)
+      }
       case 'topic':
         return (await topics()).has(rest) ? good : bad(`no topic ${rest} in xtopics`)
       default:

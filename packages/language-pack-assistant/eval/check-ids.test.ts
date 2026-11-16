@@ -132,3 +132,22 @@ test('checkFile flags a line whose expect has none of call, choose and search', 
   const out = await checkFile(reader, lines.map((l) => JSON.stringify(l)).join('\n'))
   expect(out.filter((r) => !r.check.ok).map((r) => r.line)).toEqual([2, 3])
 })
+
+test('OBS ids: a frame, a story, an OBS note and question, and the obs cell of the books', async () => {
+  const obs = (await reader.obs())!
+  const note = obs.notes!.rows[0]!
+  const q = obs.questions!.rows[0]!
+  const at = (frame: number) => `${String(Math.floor(frame / 100)).padStart(2, '0')}:${String(frame % 100).padStart(2, '0')}`
+  expect(await verdict('frame:obs 01:01')).toBe(true)
+  expect(await verdict('frame:obs 1:1')).toBe(true)
+  expect(await verdict('frame:obs 01:99')).toBe(false)
+  expect(await verdict('frame:obs 49:01')).toBe(false)
+  expect(await verdict('story:obs 01')).toBe(true)
+  expect(await verdict('story:obs 49')).toBe(false)
+  expect(await verdict(`obsnote:${at(note.frame)}/${note.id}`)).toBe(true)
+  expect(await verdict(`obsnote:${at(note.frame)}/nope`)).toBe(false)
+  expect(await verdict(`obsnote:01:09/${note.id}`)).toBe(false)
+  expect(await verdict(`obsquestion:${at(q.frame)}/${q.id}`)).toBe(true)
+  expect(await verdict(`obsquestion:${at(q.frame)}/${note.id}`)).toBe(false)
+  expect(await verdict('book:obs')).toBe(true)
+})

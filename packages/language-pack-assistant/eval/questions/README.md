@@ -77,7 +77,9 @@ The mix as it really is, per language, by the shape of `expect` (the table above
 Found with the reader's own queries. The id grammar:
 
 `verse:<res> <book> <c>:<v>`, `note:<book>/<rowid>`, `question:<book>/<rowid>`, `link:<book>/<rowid>`, `section:<article id>#<sid>`,
-`concept:<id>`, `rendering:<strong>/<form>`, `book:<code>`, `topic:<id>`.
+`concept:<id>`, `rendering:<strong>/<form>`, `book:<code>`, `topic:<id>`. Open Bible Stories (`NN` the story, `FF` the frame, two
+digits each): `frame:obs NN:FF`, `obsnote:NN:FF/<rowid>`, `obsquestion:NN:FF/<rowid>`, `story:obs NN`, and `book:obs` for the OBS cell
+of `books`.
 
 - passage and context: the verse of the main text (`glt`) first, then notes (non-introduction first), then one question.
 - concept: `section:<id>#<default section>` first, then `concept:<id>`. article: the default section.

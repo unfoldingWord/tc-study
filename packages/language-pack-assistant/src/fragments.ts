@@ -8,10 +8,13 @@ import type { Call } from './decision'
 
 export type Cite = Answer<unknown>['cites'][number]
 
-export type FragmentKind = 'verse' | 'note' | 'question' | 'link' | 'section' | 'concept' | 'rendering' | 'book' | 'topic'
+export type FragmentKind = 'verse' | 'note' | 'question' | 'link' | 'section' | 'concept' | 'rendering' | 'book' | 'topic' | 'frame' | 'obsnote' | 'obsquestion' | 'story'
 
 export type Fragment = {
-  /** `verse:<last part of res> <book> <c>:<v>`, `note:<book>/<rowid>`, `section:<article id>#<sid>`, `rendering:<key>/<form>`, … (R29). */
+  /**
+   * `verse:<last part of res> <book> <c>:<v>`, `note:<book>/<rowid>`, `section:<article id>#<sid>`, `rendering:<key>/<form>`, … (R29);
+   * OBS: `frame:obs NN:FF`, `obsnote:NN:FF/<rowid>`, `obsquestion:NN:FF/<rowid>`, `story:obs NN`, `book:obs`.
+   */
   id: string
   kind: FragmentKind
   title: string
@@ -21,7 +24,7 @@ export type Fragment = {
   length: number
   cite: Cite
   license?: string
-  /** `ref:<book> <c>:<v>`, `concepto:<id>`, `articulo:<id>#<role>` or `pieza:<fragment id>`. */
+  /** `ref:<book> <c>:<v>`, `concepto:<id>`, `articulo:<id>#<role>`, `pieza:<fragment id>`, or for OBS `obs:NN:FF` (a frame) and `obs:NN` (a story). */
   link: string
 }
 
@@ -38,8 +41,19 @@ export function canonStrong(key: string): string {
   return `${m[1]!.toUpperCase()}${digits}${m[3]!.toLowerCase()}`
 }
 
-/** A fragment id in the form ids compare in (R29): `verse:` with the last part of the resource key, `rendering:` with a canonical key and a folded form; others as written. */
+const pad2 = (n: string | number): string => String(Number(n)).padStart(2, '0')
+/** `1:2` → `01:02`: an OBS frame as the `obs` unit writes it. */
+const frameAt = (ref: string): string => ref.split(':').map(pad2).join(':')
+
+/**
+ * A fragment id in the form ids compare in (R29): `verse:` with the last part of the resource key, `rendering:` with a canonical key and a
+ * folded form, OBS ids with the story and frame in two digits; others as written.
+ */
 export function canonId(id: string): string {
+  let m = /^(frame:obs |story:obs )(\d+(?::\d+)?)$/.exec(id)
+  if (m !== null) return `${m[1]}${frameAt(m[2]!)}`
+  m = /^(obsnote:|obsquestion:)(\d+:\d+)\/(.+)$/.exec(id)
+  if (m !== null) return `${m[1]}${frameAt(m[2]!)}/${m[3]}`
   if (id.startsWith('verse:')) {
     const rest = id.slice('verse:'.length)
     const sp = rest.indexOf(' ')
@@ -161,26 +175,55 @@ function sections(b: Build, d: ArticleData): Fragment[] {
   return out
 }
 
-type ConceptData = { id?: string; found?: boolean; names?: string[] }
+type ObsStories = { stories?: { n: number; title: string; frames?: string[] }[] }
+type ConceptData = { id?: string; found?: boolean; names?: string[]; obs?: ObsStories }
 
-function concept(b: Build, d: ConceptData): Fragment[] {
-  if (d.found !== true || d.id === undefined) return []
-  const cite = b.cites.find((c) => c.id === d.id && c.section === undefined && c.ref === undefined)
+/** An OBS frame (`NN:FF`) or a whole story (`NN`) as a piece, with the cite the card gave it (`ref: obs NN:FF` or `obs NN`). */
+function obsPiece(b: Build, about: string, at: string, title: string): Fragment[] {
+  const frame = at.includes(':')
+  const ref = `obs ${at}`
+  const cite = b.cites.find((c) => c.ref === ref && c.id === about)
   if (cite === undefined) return []
-  const title = d.names?.[0] ?? d.id
-  return [withLicense(b, { id: `concept:${d.id}`, kind: 'concept', title, concepts: [d.id], length: title.length, cite, link: `concepto:${d.id}` })]
+  const id = frame ? `frame:${ref}` : `story:${ref}`
+  return [withLicense(b, { id, kind: frame ? 'frame' : 'story', title, ref, concepts: [about], length: title.length, cite, link: `obs:${at}` })]
+}
+
+/** The Open Bible Stories that use a concept (the answer's `obs` field): each frame a tW article is linked from, else each story. */
+function obsUse(b: Build, about: string, obs: ObsStories | undefined): Fragment[] {
+  return (obs?.stories ?? []).flatMap((s) =>
+    s.frames !== undefined && s.frames.length > 0
+      ? s.frames.flatMap((f) => obsPiece(b, about, frameAt(f), `${s.title} ${frameAt(f)}`))
+      : obsPiece(b, about, pad2(s.n), s.title),
+  )
+}
+
+/** The concept piece, then where it is used in the Open Bible Stories. */
+function concept(b: Build, d: ConceptData): Fragment[] {
+  if (d.id === undefined) return []
+  const out: Fragment[] = []
+  const cite = b.cites.find((c) => c.id === d.id && c.section === undefined && c.ref === undefined)
+  if (d.found === true && cite !== undefined) {
+    const title = d.names?.[0] ?? d.id
+    out.push(withLicense(b, { id: `concept:${d.id}`, kind: 'concept', title, concepts: [d.id], length: title.length, cite, link: `concepto:${d.id}` }))
+  }
+  return [...out, ...obsUse(b, d.id, d.obs)]
 }
 
 function books(b: Build, d: BooksData, about: string | undefined): Fragment[] {
   // A Strong key is cited as the key that answered (padded, or with a suffix), which may differ from the one asked.
   const strong = about !== undefined && /^[GH]\d+[a-z]?$/i.test(about)
-  const cite = b.cites.find((c) => c.section === undefined && (strong ? c.id !== undefined && /^[GH]\d+[a-z]?$/i.test(c.id) : c.id === about))
+  const cite = b.cites.find((c) => c.section === undefined && c.ref === undefined && (strong ? c.id !== undefined && /^[GH]\d+[a-z]?$/i.test(c.id) : c.id === about))
   if (cite === undefined) return []
-  const cells = Object.entries(d.books).filter(([, c]) => c.state !== 'none' && c.state !== 'zero')
+  const counts = (c: { state: string }): boolean => c.state !== 'none' && c.state !== 'zero'
+  const cells = Object.entries(d.books).filter(([, c]) => counts(c))
+  // The OBS cell is cited from the obs unit's help table (`ref: obs`), which the card adds when the cell counts.
+  const obsCite = b.cites.find((c) => c.ref === 'obs' && c.id === about)
+  if (d.obs !== undefined && counts(d.obs) && obsCite !== undefined) cells.push(['obs', d.obs])
   cells.sort(([, x], [, y]) => (y.count ?? 0) - (x.count ?? 0))
   return cells.map(([code]) => {
     const id = `book:${code}`
-    return withLicense(b, { id, kind: 'book' as const, title: code, concepts: about !== undefined ? [about] : [], length: code.length, cite, link: `pieza:${id}` })
+    const by = code === 'obs' ? obsCite! : cite
+    return withLicense(b, { id, kind: 'book' as const, title: code, concepts: about !== undefined ? [about] : [], length: code.length, cite: by, link: `pieza:${id}` })
   })
 }
 
@@ -220,14 +263,33 @@ function renderings(b: Build, d: RenderingsData): Fragment[] {
 }
 
 const HIT_KIND: Record<string, FragmentKind> = { text: 'verse', note: 'note', question: 'question', link: 'link', section: 'section' }
+const OBS_KIND: Record<string, FragmentKind> = { text: 'frame', title: 'story', note: 'obsnote', question: 'obsquestion' }
+
+/** An OBS hit (book `obs`, ref `NN:FF`, a title `NN:0`): a frame, a story, or a row of the OBS notes or questions, opened by `obs:`. */
+function obsHit(h: Hit, cite: Cite): Omit<Fragment, 'license'> | undefined {
+  const kind = OBS_KIND[h.kind]
+  if (kind === undefined) return undefined
+  const at = kind === 'story' ? pad2(h.ref.split(':')[0]!) : frameAt(h.ref)
+  let id: string
+  if (kind === 'frame' || kind === 'story') id = `${kind}:obs ${at}`
+  else if (h.id === undefined) return undefined
+  else id = `${kind}:${at}/${h.id}`
+  return { id, kind, title: `obs ${at}`, ref: `obs ${at}`, concepts: [], length: h.snippet.length, cite, link: `obs:${at}` }
+}
 
 function search(b: Build, hits: Hit[]): Fragment[] {
   // The search query pushes one cite per hit, in the hits' order.
   const out: { f: Fragment; score: number }[] = []
   hits.forEach((h, i) => {
     const cite = b.cites[i]
+    if (cite === undefined) return
+    if (h.book === 'obs') {
+      const f = obsHit(h, cite)
+      if (f !== undefined) out.push({ f: withLicense(b, f), score: h.score })
+      return
+    }
     const kind = HIT_KIND[h.kind]
-    if (cite === undefined || kind === undefined) return
+    if (kind === undefined) return
     const where = `${h.book} ${h.ref}`
     let id: string
     if (kind === 'verse') id = `verse:${lastPart(h.res)} ${where}`
