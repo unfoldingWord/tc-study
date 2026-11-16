@@ -55,3 +55,12 @@ test('an answer with no data gives no fragments', async () => {
   const a = await reader.passage('gen 1:1')
   expect(fragmentsOf({ query: 'passage', args: { ref: 'gen 1:1' } }, a, reader)).toEqual([])
 })
+
+test('a section hit keeps the id section:<article>#<section> and links to the article by its role', () => {
+  const hit = { kind: 'section', book: '', ref: '', res: 'r/tw', id: 'tw:kt/grace#definicion', role: 'definition', snippet: 's', score: 1 }
+  const answer = { query: 'search', data: [hit, { ...hit, id: 'tw:kt/grace#otra', role: undefined }], cites: [{ res: 'r/tw', release: '1', id: 'tw:kt/grace' }, { res: 'r/tw', release: '1', id: 'tw:kt/grace' }], notInstalled: [] } as never
+  const f = fragmentsOf({ query: 'search', args: { text: 'x' } }, answer, reader)
+  expect(f.map((x) => x.id)).toEqual(['section:tw:kt/grace#definicion', 'section:tw:kt/grace#otra'])
+  expect(f[0]!.link).toBe('articulo:tw:kt/grace#definition')
+  expect(f[1]!.link).toBe('pieza:section:tw:kt/grace#otra')
+})

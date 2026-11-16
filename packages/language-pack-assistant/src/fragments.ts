@@ -243,7 +243,7 @@ function search(b: Build, hits: Hit[]): Fragment[] {
       concepts: article !== undefined ? [article] : [],
       length: h.snippet.length,
       cite,
-      link: kind === 'verse' ? `ref:${h.book} ${startOf(h.ref)}` : `pieza:${id}`,
+      link: kind === 'verse' ? `ref:${h.book} ${startOf(h.ref)}` : kind === 'section' && h.role !== undefined ? `articulo:${article}#${h.role}` : `pieza:${id}`,
     }
     out.push({ f: withLicense(b, f), score: h.score })
   })
