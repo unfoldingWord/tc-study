@@ -128,6 +128,11 @@ jobs:
             echo "::error::compare needs parts and mode no-upload"
             exit 1
           fi
+          # OBS is a parts unit: the comparison builds whole packs, which carry no obs unit, so the two would not match.
+          if [ "$OBS" = true ] && [ "$COMPARE" = true ]; then
+            echo "::error::obs cannot be combined with compare: the whole packs have no obs unit"
+            exit 1
+          fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
           if [ -n "$REQUESTED_COMPAT" ] && ! [[ "$REQUESTED_COMPAT" =~ ^f[0-9]+\.[0-9]+-u[A-Za-z0-9_.]+-p[0-9]+-q[0-9]+-a[0-9]+-t[0-9]+$ ]]; then
             echo "::error::compat is not a compat key"
@@ -238,7 +243,7 @@ jobs:
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
           # Parts in both modes. A parts publish is measured too: its time and memory are what carrying units saves.
           if [ "$PARTS" = true ]; then args+=(--parts); fi
-          if [ "$OBS" = true ]; then args+=(--obs); fi
+          if [ "$OBS" = true ] && [ "$PARTS" = true ]; then args+=(--obs); fi
           if [ "$MODE" = no-upload ] || [ "$PARTS" = true ]; then
             command -v /usr/bin/time > /dev/null || { sudo apt-get update -q && sudo apt-get install -y time; }
             runner=(/usr/bin/time -v -o "$RUNNER_TEMP/packs-out/time.txt")
