@@ -80,3 +80,13 @@ test('R32: books {concept:<Strong key>} and books {strong:<same key>} are the sa
   expect(sameCall(strong, { query: 'books', args: { strong: 'G5486' } })).toBe(false)
   expect(sameCall({ query: 'books', args: { concept: 'per:abraham' } }, { query: 'books', args: { strong: 'per:abraham' } })).toBe(false)
 })
+
+test('books by article and by concept are the same call for tw: and ta: ids, not for a topic id (R37 b)', () => {
+  const books = (args: Record<string, string>) => ({ query: 'books' as const, args })
+  expect(sameCall(books({ article: 'tw:kt/grace' }), books({ concept: 'tw:kt/grace' }))).toBe(true)
+  expect(sameCall(books({ concept: 'ta:translate/figs-rquestion' }), books({ article: 'ta:translate/figs-rquestion' }))).toBe(true)
+  expect(sameCall(books({ article: 'tw:names/paul' }), books({ concept: 'tw:names/paul' }))).toBe(true)
+  expect(sameCall(books({ article: 'per:paul' }), books({ concept: 'per:paul' }))).toBe(false)
+  expect(sameCall(books({ article: 'tw:kt/grace' }), books({ concept: 'tw:kt/faith' }))).toBe(false)
+  expect(sameCall({ query: 'concept', args: { id: 'tw:kt/grace' } }, books({ concept: 'tw:kt/grace' }))).toBe(false)
+})

@@ -31,10 +31,18 @@ export function sameValue(a: unknown, b: unknown): boolean {
 
 const STRONG = /^[GH]\d+[a-z]?$/
 
-/** `books {concept:<Strong key>}` and `books {strong:<key>}` are the same call (R32). */
+/**
+ * `books {concept:<Strong key>}` and `books {strong:<key>}` are the same call (R32). `books {article:X}` and `books {concept:X}` are
+ * the same call when X is a `tw:` or `ta:` id (R37 b): the client's `booksQuery` takes `article ?? concept` and reads the same usage
+ * cells for either key. They differ for any other id (a topic, `per:*`): `article` refuses it (`E_ARG`), `concept` reads the topic's
+ * occurrences; so those stay apart.
+ */
 function canonCall(c: Call): Call {
+  if (c.query !== 'books') return c
   const k = c.args.concept
-  if (c.query === 'books' && typeof k === 'string' && STRONG.test(k)) return { query: 'books', args: { strong: k } }
+  if (typeof k === 'string' && STRONG.test(k)) return { query: 'books', args: { strong: k } }
+  const a = c.args.article
+  if (typeof a === 'string' && c.args.concept === undefined && /^(tw|ta):/.test(a)) return { query: 'books', args: { concept: a } }
   return c
 }
 
