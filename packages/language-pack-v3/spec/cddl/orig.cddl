@@ -152,7 +152,10 @@ macula-v2 = {
 ;   t % 3 == 2   a piece of the word at lo + (t - 2) / 3, followed by one uvarint: its number in "pieces".
 ; `lo` and `span` are the sentence's own, in the same order as "nodes" (one number of each per sentence; three lists of the
 ; same length). A sentence's positions are all in lo .. lo + span. The list is used up exactly by one root: a tree cut
-; short, with bytes left, or with a second root is E_BODY (tests/README.md). Positions are those of this segment's
+; short, with bytes left, or with a second root is E_BODY (tests/README.md). The root is a part (t % 3 == 0): a tree
+; whose root is a word or a piece is E_BODY, and so is a part with 0 children. The writer writes `lo` and `span` exactly
+; (the lowest and the highest leaf); a reader checks only that lo .. lo + span lies inside the book's words and that every
+; leaf lies inside lo .. lo + span, not that they are exact. Positions are those of this segment's
 ; "words" (ids.md, Positions in the original).
 ;
 ; Builder rules (a reader checks none of them; it checks only the E_BODY list of tests/README.md).
@@ -183,3 +186,7 @@ macula-v2 = {
 ;   - What is left out: a tree leaf (a word or a piece) whose place cannot be found in this book's words, and a referring
 ;     word whose place cannot be found. Both are counted in the build report, per book. An antecedent the rule cannot fix is
 ;     left empty (0), not left out.
+;   - After the leaves are dropped, a part left with no word or piece is dropped too, recursively (a part's children are
+;     its remaining parts and leaves; a part with none goes), and it is counted with the sentence's dropped leaves. A
+;     sentence left with no word is dropped and counted. This is done before `lo` and `span` are computed, so a tree
+;     never has a part with 0 children.
