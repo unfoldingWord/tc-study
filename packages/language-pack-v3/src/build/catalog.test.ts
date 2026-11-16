@@ -535,8 +535,15 @@ describe('patch catalogs', () => {
     const refuses = (extra: object) => buildCatalog({ about: patchAbout, resources: [aquifer(extra as never)], segments: [] })
     await expect(refuses({ review: 'perfect' })).rejects.toThrow(/review/)
     await expect(refuses({ source: 1 })).rejects.toThrow(/source/)
-    for (const name of ['hi', 'hi-x-aquifer1x', 'hi-x-Aq', 'hi-aquifer']) {
+    for (const name of ['hi', 'hi-x-aquifer1x', 'hi-x-Aq', 'hi-aquifer', 'pt-x-x-aq', 'pt-br']) {
       await expect(buildCatalog({ about: { ...patchAbout, catalog: name }, resources: [], segments: [], patch: true })).rejects.toThrow(/patch catalog name/)
+    }
+  })
+
+  test('the base language of a patch name may be any tag: pt-br-x-aquifer and es-419-x-aquifer are accepted', async () => {
+    for (const name of ['pt-br-x-aquifer', 'es-419-x-aquifer']) {
+      const built = await buildCatalog({ about: { ...patchAbout, catalog: name }, resources: [], segments: [], patch: true })
+      expect(built.bytes.length).toBeGreaterThan(0)
     }
   })
 

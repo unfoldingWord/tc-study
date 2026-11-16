@@ -181,7 +181,8 @@ function textOf(node: Node): string {
 
 const SAFE_HREF = /^(https?:|mailto:)/i
 
-const clean = (text: string): string => text.replace(/\\n/g, '\n')
+// U+E000 and U+E001 stand for bold while the text is built (`wrap`), so the input never keeps them.
+const clean = (text: string): string => text.replace(/\\n/g, '\n').replace(/[]/g, '')
 
 /** What the converter calls for a Manual link: the text it becomes. */
 export type LinkResolver = (link: { code: string; contentId: string; label: string }) => string
@@ -236,7 +237,7 @@ function inline(nodes: Node[], link: LinkResolver | undefined): string {
       const text = inline(node.children, link).trim()
       const href = attr(node, 'href')
       // Only http(s) and mailto links are kept; `javascript:`, `data:` and the like leave the text alone.
-      out += href === undefined || text === '' || !SAFE_HREF.test(href.trim()) ? text : `[${text}](${href.trim()})`
+      out += href === undefined || text === '' || !SAFE_HREF.test(href.trim()) ? text : `[${text}](${href.trim().replace(/[()<> ]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)})`
     } else if (node.tag === 'data' && attr(node, 'class') === 'resource-ref' && link !== undefined) {
       out += link({ code: attr(node, 'data-resource-code') ?? '', contentId: attr(node, 'data-content-id') ?? '', label: inline(node.children, undefined).trim() })
     } else if (BLOCKS.has(node.tag)) {

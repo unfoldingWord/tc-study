@@ -75,6 +75,7 @@ export const NOT_ROW_DEPENDENCIES: Readonly<Record<string, string>> = {
 /** Workspace packages the row producers depend on that partsCode.test.ts does not scan, and why. */
 export const NOT_SCANNED: Readonly<Record<string, string>> = {
   'resource-cache': 'only its types are imported; the store is cache-adapter-indexeddb, which is scanned',
+  'language-pack-client': 'read-only client, used only by aquifer-measure; writes no rows',
   'language-pack-v3':
     'format 3 builds its own container and makes no 2.0 parts rows; counting it would rebuild every 2.0 language on each format 3 change',
 }

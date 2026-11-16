@@ -146,7 +146,9 @@ where Door43 has none). It is a language catalog like any other, marked by its n
 
 - **Name.** `{lang}-x-{source}`, for example `hi-x-aquifer`: a BCP 47 tag with a private-use subtag, so it passes the
   same tag check as any language and is served, listed and read as one (`serving.md`). `{source}` is 1 to 8 characters of
-  `[a-z0-9]`, so the tag stays within the Worker's pattern `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. `about.catalog`, the header `lang`
+  `[a-z0-9]`, so the tag stays within the Worker's pattern `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. `{lang}` is any language tag
+  (`pt-br`, `es-419`), so a patch name matches `^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*-x-[a-z0-9]{1,8}$`. **The base language is the tag
+  with its `-x-{source}` suffix removed.** `about.catalog`, the header `lang`
   and the `lang` of its segments are that tag.
 - **Units.** Its units are `book:<book>` segments with `texts: []` (`book.cddl` already allows a language with notes and
   no text of a book) that carry only `notes` and/or `questions`. A book unit needs **only `orig:<book>`**: no `art:` group (its `ta:` concepts resolve
@@ -159,6 +161,11 @@ where Door43 has none). It is a language catalog like any other, marked by its n
   - `review`: the review level of the source's articles, one of `"none"`, `"community"`, `"professional"` or `"mixed"`
     (when the articles differ). A reader refuses any other value (`E_BODY`, like a bad `about.direction`).
   An app takes its notice from `review` and its credit from `attribution`, `rights` and `license`.
+- **Merging.** A reader that merges a patch does it per book and per table (`notes`, `questions`, `links`): the base's
+  table wins whenever the base has that table for that book installed, and the patch fills only a missing table.
+- **Provenance of rows.** Every row shown from a patch carries its provenance: the `source`, `review`, `license`,
+  `rights`, `attribution` and `release` of its resource entry.
+- **Article ids.** The `ta:` ids of patch rows resolve in the base language.
 - **Signed** like every published catalog (above), with the same publisher key. `about.publisher` is the one who
   publishes the pack; the source and the original publisher are on the resource entry.
 

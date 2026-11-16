@@ -82,6 +82,16 @@ describe('htmlToMarkdown', () => {
     expect(htmlToMarkdown('<p><a href="javascript:alert(1)">x</a> <a href=" JaVaScRiPt:y">y</a> <a href="data:text/html,z">z</a> <a href="https://a/b">ok</a> <a href="mailto:m@x">m</a></p>')).toBe('x y z [ok](https://a/b) [m](mailto:m@x)')
   })
 
+  test('a kept href cannot break out of the link: ( ) < > and spaces are percent-encoded', () => {
+    expect(htmlToMarkdown('<p><a href="https://a)[x](javascript:alert(1))">t</a> <a href="https://a/b c<d>">u</a></p>')).toBe(
+      '[t](https://a%29[x]%28javascript:alert%281%29%29) [u](https://a/b%20c%3Cd%3E)',
+    )
+  })
+
+  test('U+E000 and U+E001 in the input are dropped, so they cannot forge bold', () => {
+    expect(htmlToMarkdown('<p>abc</p>')).toBe('abc')
+  })
+
   test('NUL and control characters are dropped, tab and newline stay', () => {
     expect(htmlToMarkdown('<p>a&#0;b&#x1;c&#8;d&#127;e&#9;f&#10;g</p>')).toBe('abcde\tf\ng')
   })

@@ -320,7 +320,7 @@ export async function buildCatalog(o: {
   needs?: (s: BuiltSegment) => string[]
   patch?: boolean
 }): Promise<BuiltSegment> {
-  if (o.patch === true && !/^[a-z]{2,3}-x-[a-z0-9]{1,8}$/.test(o.about.catalog)) throw new Error(`The catalog ${JSON.stringify(o.about.catalog)} is not a patch catalog name: {lang}-x-{source}, the source of 1 to 8 characters of a-z and 0-9`)
+  if (o.patch === true && !/^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*-x-[a-z0-9]{1,8}$/.test(o.about.catalog)) throw new Error(`The catalog ${JSON.stringify(o.about.catalog)} is not a patch catalog name: {lang}-x-{source} ({lang} any language tag), the source of 1 to 8 characters of a-z and 0-9`)
   const about = encodeAbout(o.about)
   const resources = encodeResources(o.resources)
 

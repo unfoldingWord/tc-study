@@ -36,6 +36,8 @@ export const SUBJECTS: Record<PatchKind, string> = { tn: 'TSV Translation Notes'
 export type BaseBooks = { tn: readonly string[]; tq: readonly string[] }
 
 export type PatchInput = {
+  /** Who adapted the resources when a notice does not name them (default `Mission Mutual`). */
+  adapter?: string
   /** The base language (`hi`). */
   lang: string
   /** The aggregator, 1 to 8 characters of a-z and 0-9 (`aquifer`). */
@@ -91,8 +93,17 @@ export function reviewOf(articles: Iterable<AquiferArticle>, note?: (line: strin
 
 type LicenseInfo = { licenses?: { eng?: { name?: string } }[]; copyright?: { dates?: string; holder?: { name?: string } } }
 
+/** Who adapted the resource when the metadata does not say. */
+export const DEFAULT_ADAPTER = 'Mission Mutual'
+
+/** The adapter named by an adaptation notice ("... adapted by X"), or `undefined` when it does not name one. */
+export function adapterOf(notice: string): string | undefined {
+  const m = /\badapted\b[^.]*?\bby\s+([^.;,]+?)\s*\.?$/i.exec(plainNotice(notice))
+  return m?.[1]
+}
+
 /** The SPDX license and the rights line of a resource's `license_info`. Throws `Error` when the license is not CC-BY-SA-4.0 (a license is never guessed). */
-export function licenseOf(info: unknown, key: string): { license: string; rights: string } {
+export function licenseOf(info: unknown, key: string, adapter = DEFAULT_ADAPTER): { license: string; rights: string } {
   const li = (typeof info === 'object' && info !== null ? info : {}) as LicenseInfo
   const name = li.licenses?.[0]?.eng?.name
   const license = licenseId(typeof name === 'string' ? name.replace(/\s+licen[sc]e$/i, '') : undefined)
@@ -100,7 +111,7 @@ export function licenseOf(info: unknown, key: string): { license: string; rights
   const holder = li.copyright?.holder?.name
   const dates = li.copyright?.dates
   if (typeof holder !== 'string' || holder === '' || typeof dates !== 'string' || dates === '') throw new Error(`${key}: license_info has no copyright holder or dates`)
-  return { license, rights: `© ${dates} ${holder}; adapted by Mission Mutual` }
+  return { license, rights: `© ${dates} ${holder}; adapted by ${adapter}` }
 }
 
 const canon = (books: Iterable<string>): string[] => [...new Set(books)].sort((a, b) => bookNumber(a) - bookNumber(b))
@@ -171,7 +182,9 @@ export async function buildPatch(o: PatchInput): Promise<PatchBuild> {
   for (const [kind, source] of sources) {
     if (source === undefined || built[kind].length === 0) continue
     const key = keys[kind]
-    const { license, rights } = licenseOf(source.metadata.license_info, key)
+    const attribution = plainNotice(source.metadata.adaptation_notice ?? '')
+    if (attribution === '') throw new Error(`${key}: adaptation_notice is empty, and the attribution of a patch is never left out`)
+    const { license, rights } = licenseOf(source.metadata.license_info, key, adapterOf(source.metadata.adaptation_notice ?? '') ?? o.adapter ?? DEFAULT_ADAPTER)
     const resource: CatalogResource = {
       key,
       title: source.metadata.title ?? key,
@@ -183,8 +196,7 @@ export async function buildPatch(o: PatchInput): Promise<PatchBuild> {
       review: reviewOf(used[kind], (line) => report.push(`${key} ${line}`)),
       books: bookSet(built[kind]),
     }
-    const attribution = plainNotice(source.metadata.adaptation_notice ?? '')
-    if (attribution !== '') resource.attribution = attribution
+    resource.attribution = attribution
     resources.push(resource)
   }
 
