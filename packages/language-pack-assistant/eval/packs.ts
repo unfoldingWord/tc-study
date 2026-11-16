@@ -43,9 +43,16 @@ export async function installPacks(lang: string): Promise<{ reader: PackReader; 
   const store = fsStore(CACHE)
   let fetchedBytes = 0
   const counting: typeof fetch = async (input, init) => {
-    if ((init?.method ?? 'GET') !== 'GET') throw new Error('the evaluation sends GET requests only')
+    const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+    if (method.toUpperCase() !== 'GET') throw new Error('the evaluation sends GET requests only')
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-    if (!url.startsWith(STAGING)) throw new Error(`not the staging URL: ${url}`)
+    let origin: string
+    try {
+      origin = new URL(url).origin
+    } catch {
+      throw new Error(`not the staging URL: ${url}`)
+    }
+    if (origin !== new URL(STAGING).origin) throw new Error(`not the staging URL: ${url}`)
     const res = await fetch(input, init)
     fetchedBytes += Number(res.headers.get('Content-Length') ?? 0)
     return res
