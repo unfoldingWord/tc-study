@@ -39,6 +39,10 @@ phrases, templates and complements. Another base gets rules and search only. `co
 
 A decision carries `interpretation`, one line of what was understood, in the question's language.
 
+Since C2.1: concept and article cards show every section of the article, OBS pieces and ids are part of the card, `renderings` reads an
+index built once per book (fast), and the chain treats question words as non-content words. Staging `es-419` (revision 7) names all
+66 books. Gate on the second held-out sets: `eval/RESULTS.md`.
+
 ## Fragment
 
 `card.pieces` are `Fragment`s: `{ id, kind, title, ref?, concepts, length, cite, license?, link }`. `kind` is one of `verse`, `note`,
