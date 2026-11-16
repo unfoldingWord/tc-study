@@ -17,6 +17,8 @@ export type MaculaReferentCounts = {
   /** Rows kept, and among them those whose antecedent the rule could not fix (`ante` 0). */
   kept: number
   open: number
+  /** Targets whose verse is not a verse (one of x, y is 0 and the other not, or a verse with a 0): left out. */
+  badTargets: number
 }
 
 /**
@@ -68,7 +70,7 @@ export function buildMaculaReferents(
   }
   const named = value.words as unknown[]
   const verses = verseSpans(pieces, events)
-  const counts: MaculaReferentCounts = { words: 0, rows: 0, kept: 0, open: 0 }
+  const counts: MaculaReferentCounts = { words: 0, rows: 0, kept: 0, open: 0, badTargets: 0 }
 
   const keysOf = new Map<string, string[]>()
   const keys = (verse: string): string[] => {
@@ -150,8 +152,16 @@ export function buildMaculaReferents(
         if (!Array.isArray(target) || target.length !== 5 || typeof target[0] !== 'string' || typeof target[1] !== 'string') throw bad(target)
         const [kind, piece, x, y, n] = target as [string, string, number, number, number]
         if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) throw bad(target)
-        const ent = entOf(n)
+        if ((x === 0) !== (y === 0)) {
+          counts.badTargets++
+          continue
+        }
         const [tc, tv] = x === 0 ? [ch, vs] : [x, y]
+        if (tc === 0 || tv === 0) {
+          counts.badTargets++
+          continue
+        }
+        const ent = entOf(n)
         const at = ante(`${tc}:${tv}`, n)
         counts.kept++
         if (at === 0) counts.open++
@@ -182,6 +192,7 @@ export function buildMaculaReferents(
 export function maculaReferentIssues(counts: MaculaReferentCounts): string[] {
   const lines: string[] = []
   if (counts.words > 0) lines.push(`MACULA referents: ${counts.words} referring word(s) not found in their verse, with ${counts.rows} reference(s): left out`)
+  if (counts.badTargets > 0) lines.push(`MACULA referents: ${counts.badTargets} reference(s) with no valid verse: left out`)
   if (counts.open > 0) lines.push(`MACULA referents: ${counts.open} of ${counts.kept} reference(s) with an antecedent the rule cannot fix: ante left empty`)
   return lines
 }

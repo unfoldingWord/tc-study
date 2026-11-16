@@ -17,7 +17,7 @@ import { hasOwn, isMap } from '../codec/values'
 import { eventCode } from '../events'
 import { verseId } from '../ids'
 import { buildMaculaReferents, maculaReferentIssues } from './macula/referents'
-import { buildMaculaTrees,maculaTreeIssues } from './macula/trees'
+import { buildMaculaTrees, maculaTreeIssues } from './macula/trees'
 import { type Event, type MaculaReferents, type MaculaTrees, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 import { ORIGINALS, type RowSource } from '../source/rows'
 

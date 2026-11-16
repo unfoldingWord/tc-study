@@ -69,7 +69,7 @@ describe('buildMaculaReferents', () => {
     expect(referents.ante[0] - 1).toBe(1)
     expect(referents.kinds).toEqual(['s'])
     expect(referents.pieces).toEqual([''])
-    expect(counts).toEqual({ words: 0, rows: 0, kept: 1, open: 0 })
+    expect(counts).toEqual({ words: 0, rows: 0, kept: 1, open: 0, badTargets: 0 })
   })
 
   test('Ruth 2:4: 0, 0 is the verse of the referring word; and its antecedent is in that verse', () => {
@@ -146,7 +146,7 @@ describe('buildMaculaReferents', () => {
     const { referents, counts } = build(ruth, published)
     expect(referents.word).toEqual([])
     expect(referents.ents).toEqual([])
-    expect(counts).toEqual({ words: 3, rows: 4, kept: 0, open: 0 })
+    expect(counts).toEqual({ words: 3, rows: 4, kept: 0, open: 0, badTargets: 0 })
     expect(maculaReferentIssues(counts)).toEqual(['MACULA referents: 3 referring word(s) not found in their verse, with 4 reference(s): left out'])
   })
 
@@ -164,10 +164,46 @@ describe('buildMaculaReferents', () => {
     expect(referents.pieces).toEqual(['', 'ו'])
     expect(referents.ents).toEqual([['בֹעַז', 'H1162'], ['רוּת', 'H7327']])
     expect(referents.ent).toEqual([1, 0, 0])
-    expect(counts).toEqual({ words: 0, rows: 0, kept: 3, open: 0 })
-    expect(maculaReferentIssues({ words: 0, rows: 0, kept: 5, open: 2 })).toEqual([
+    expect(counts).toEqual({ words: 0, rows: 0, kept: 3, open: 0, badTargets: 0 })
+    expect(maculaReferentIssues({ words: 0, rows: 0, kept: 5, open: 2, badTargets: 0 })).toEqual([
       'MACULA referents: 2 of 5 reference(s) with an antecedent the rule cannot fix: ante left empty',
     ])
+  })
+
+  test('a target with one of x, y 0, or a referring verse 0:N, is dropped and counted, not written', () => {
+    const published = {
+      words: [['רוּת', 'H7327']],
+      verses: { '2:3': [[referentKey('וַתֵּלֶךְ'), 0, [['s', '', 2, 0, 0], ['s', '', 0, 5, 0], ['s', '', 2, 2, 0]]]] },
+    }
+    const { referents, counts } = build(ruth, published)
+    expect(referents.word).toEqual([5])
+    expect(referents.vs).toEqual([2])
+    expect(counts.badTargets).toBe(2)
+    expect(counts.kept).toBe(1)
+    expect(maculaReferentIssues(counts)).toEqual(['MACULA referents: 2 reference(s) with no valid verse: left out'])
+    const zero = { words: [['רוּת', 'H7327']], verses: { '0:3': [[referentKey('וַתֵּלֶךְ'), 0, [['s', '', 0, 0, 0]]]] } }
+    expect(build(ruth, zero).counts.words).toBe(1)
+    const withZeroVerse = book({ 0: { 3: [['וַתֵּלֶךְ', 'H1980']] } })
+    const out = build(withZeroVerse, zero)
+    expect(out.referents.word).toEqual([])
+    expect(out.counts.badTargets).toBe(1)
+  })
+
+  test('the referring word is occurrence 0 and a later word has the same key', () => {
+    const b = book({ 1: { 1: [['καὶ', 'G25320'], ['Ἰησοῦς', 'G24240'], ['καί', 'G25320']] } })
+    const published = { words: [['Ἰησοῦς', 'G2424']], verses: { '1:1': [[referentKey('καὶ'), 0, [['r', '', 0, 0, 0]]]] } }
+    const { referents } = build(b, published)
+    expect(referents.word).toEqual([0])
+    expect(referents.ante).toEqual([2])
+  })
+
+  test('two words with the entity Strong and the form rule leaves exactly one: that one', () => {
+    const b = book({ 1: { 1: [['λέγει', 'G30040'], ['ἄνθρωπος', 'G04440'], ['ἄνθρωπος', 'G04440'], ['θεός', 'G04440']] } })
+    const one = { words: [['θεοῦ', 'G444']], verses: { '1:1': [[referentKey('λέγει'), 0, [['r', '', 0, 0, 0]]]] } }
+    // key θεου: contained by none of the keys of the first two and not equal to θεοσ... use a form that fits only the third.
+    const fits = { words: [['θεός', 'G444']], verses: { '1:1': [[referentKey('λέγει'), 0, [['r', '', 0, 0, 0]]]] } }
+    expect(build(b, one).referents.ante).toEqual([0])
+    expect(build(b, fits).referents.ante).toEqual([4])
   })
 
   test('a value that is not the published shape throws', () => {
