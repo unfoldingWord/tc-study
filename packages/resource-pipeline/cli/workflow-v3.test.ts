@@ -28,7 +28,8 @@ describe('language-packs.yml format 3 steps', () => {
     expect(inputs.obs.type).toBe('boolean')
     expect(inputs.obs.default).toBe(false)
     expect(text).toContain('OBS: ${{ inputs.obs }}')
-    expect(text).toContain('if [ "$OBS" = true ]; then args+=(--obs); fi')
+    expect(text).toContain('if [ "$OBS" = true ] && [ "$PARTS" = true ]; then args+=(--obs); fi')
+    expect(text).toContain('if [ "$OBS" = true ] && [ "$COMPARE" = true ]; then')
     expect(text.split('args+=(--obs)').length).toBe(2)
   })
 
@@ -145,11 +146,29 @@ describe('language-packs.yml format 3 steps', () => {
     }
     // And only whole blocks were added: every 2.0 step is the same object.
     const before = (Bun.YAML.parse(old.stdout) as typeof doc).jobs.packs.steps
-    // The one 2.0 line added since: the obs flag, passed only when the input is true.
+    // The 2.0 lines added since, all for OBS: the --obs flag, passed only with parts when the input is true, and the
+    // guard that refuses obs with compare (a comment and four lines).
+    const NL = String.fromCharCode(10)
+    const obsGuard = [
+      '# OBS is a parts unit: the comparison builds whole packs, which carry no obs unit, so the two would not match.',
+      'if [ "$OBS" = true ] && [ "$COMPARE" = true ]; then',
+      'echo "::error::obs cannot be combined with compare: the whole packs have no obs unit"',
+    ]
     const withoutObs = (s: Step): Step => {
       if (typeof s.run !== 'string') return s
-      const drop = 'if [ "$OBS" = true ]; then args+=(--obs); fi'
-      return { ...s, run: s.run.split(String.fromCharCode(10)).filter((l) => l.trim() !== drop).join(String.fromCharCode(10)) }
+      const lines = s.run.split(NL)
+      const out: string[] = []
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i].trim()
+        if (l === 'if [ "$OBS" = true ] && [ "$PARTS" = true ]; then args+=(--obs); fi') continue
+        // The guard: its comment, its if line and its echo, then `exit 1` and `fi`.
+        if (l === obsGuard[0] && lines[i + 1]?.trim() === obsGuard[1] && lines[i + 2]?.trim() === obsGuard[2]) {
+          i += 4
+          continue
+        }
+        out.push(lines[i])
+      }
+      return { ...s, run: out.join(NL) }
     }
     const kept = steps.filter((s) => before.some((b) => b.name === s.name)).map(withoutObs)
     expect(kept).toEqual(before)

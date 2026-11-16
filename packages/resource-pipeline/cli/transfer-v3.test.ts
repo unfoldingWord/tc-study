@@ -56,7 +56,7 @@ function files(dir: string, prefix = ''): Record<string, string> {
   if (!existsSync(join(dir, prefix))) return result
   for (const e of readdirSync(join(dir, prefix), { withFileTypes: true })) {
     const p = prefix === '' ? e.name : `${prefix}/${e.name}`
-    if (p === 'report.txt') continue // build-v3's report is not part of a pack
+    if (p === 'report.txt' || p === 'units.json') continue // build-v3's report and unit sizes are not part of a pack
     if (e.isDirectory()) Object.assign(result, files(dir, p))
     else result[p] = Buffer.from(readFileSync(join(dir, p))).toString('hex')
   }

@@ -417,7 +417,7 @@ describe('the spec fixtures', () => {
   test('a cut file: whole entries are stored, the cut one is missing, and nothing is activated from a unit that lacks it', async () => {
     const store = memoryStore()
     const r = await offline(store, {}).importTransfer(file('transferencia-cortada', 'cut.tcpack'))
-    expect(r.missing).toEqual(['12e4f2c8c44626fda329709ee53f852cef3d93046a36f145f2196738f794469b'])
+    expect(r.missing).toEqual(['4d594775635152ce4ec12cbc211f9315b5c21d9a5577777563f982077a92254d'])
     expect(r.stored.some((id) => id.startsWith('644fd73e'))).toBe(true)
     expect(r.stored).not.toContain(r.missing[0]!)
     expect(r.catalogs.map((c) => c.name)).toEqual(['es-419'])
