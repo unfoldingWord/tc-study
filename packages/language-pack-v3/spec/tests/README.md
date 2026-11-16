@@ -234,7 +234,7 @@ integer, a word is an integer. In a row, `word` is the referring word's position
 is the text of `referents.kinds` (`"r"`, `"s"`, `"c"`, `"a"`, `"p"`, `"o"`), `piece` the text of `referents.pieces` (`""` when the
 whole word refers), `form` and `strong` the entity's two texts, `ch` and `vs` the numbers as the file has them, and
 `ante` the antecedent's position, that is `cols.ante - 1`, **absent** when `cols.ante` is 0 (an absent value is an absent
-key). Example: `{"word": 4, "kind": "r", "piece": "", "form": "יוֹנָה", "strong": "H3124", "ch": 1, "vs": 1, "ante": 2}`.
+key). Example, an illustration with the positions of Jonah 1:1 counted from 0 (ויהי 0, דבר 1, יהוה 2, אל 3, יונה 4, בן 5, אמתי 6, לאמר 7): `{"word": 7, "kind": "s", "piece": "", "form": "יוֹנָה", "strong": "H3124", "ch": 1, "vs": 1, "ante": 4}`.
 The root of a `tree` is always a part, and a part always has at least one child (a part with 0 children is `E_BODY`, so `[label]` alone is not output). The reader gives v1 and v2 the way each is stored; it does not turn one into the other.
 
 Example: `{"form": "Παῦλος", "lemma": "Παῦλος", "morph": "Gr,N,,,,,NMS,", "strong": "G39720"}`. The word at position `n` is
@@ -447,8 +447,7 @@ types, these are `E_BODY` too:
   - `trees`: `lo`, `span` and `nodes` with different numbers of sentences; an index outside `trees.labels` or `trees.pieces`;
     a tree that is cut short (the list ends before the children it announced), that has bytes left after its root, or that
     has more than one root; a tree whose root is a word or a piece (the root must be a part), or a part with 0 children;
-    `lo + span` not below `n` (`n` the number of rows of `words`; the sum is made without overflow, as `lo > n - 1 - span`
-    is tested); a word or a piece whose position is outside `lo .. lo + span` or outside the book's words (`0 .. n - 1`).
+    `span > n - 1`, or `lo > n - 1 - span` (`n` the number of rows of `words`; so `lo + span` is below `n`, tested without overflow); a word or a piece whose position is outside `lo .. lo + span` or outside the book's words (`0 .. n - 1`).
     A reader does not require `lo` and `span` to be the exact lowest and highest leaf. A node deeper than 64 levels (a
     part or a leaf counts as a node; the root is level 1).
   - `referents`: the columns of `cols` with unequal numbers of rows; an index outside `kinds`, `pieces` or `ents`; a word

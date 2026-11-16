@@ -188,5 +188,5 @@ macula-v2 = {
 ;     left empty (0), not left out.
 ;   - After the leaves are dropped, a part left with no word or piece is dropped too, recursively (a part's children are
 ;     its remaining parts and leaves; a part with none goes), and it is counted with the sentence's dropped leaves. A
-;     sentence left with no word is dropped and counted. This is done before `lo` and `span` are computed, so a tree
+;     sentence left with no word or piece is dropped and counted. This is done before `lo` and `span` are computed, so a tree
 ;     never has a part with 0 children.
