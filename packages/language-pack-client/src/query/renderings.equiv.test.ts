@@ -83,4 +83,20 @@ describe('renderings: indexed and scan agree', () => {
     expect(a.data!.strong).toBe('G3972')
     expect(a.data!.renderings.length).toBeGreaterThan(0)
   })
+
+  test('a malformed text that aligns more words than it has pieces: the extra entries are skipped', async () => {
+    const reader = await open(['tit'])
+    const good = await renderingsQuery(reader, { strong: 'G39720' })
+    expect(good.data!.renderings.length).toBeGreaterThan(0)
+    const bad: PackReader = {
+      ...reader,
+      book: async (b) => {
+        const m = await reader.book(b)
+        if (m === undefined) return m
+        return { ...m, texts: m.texts.map((t) => (t.align === undefined ? t : { ...t, align: [...t.align, ...t.align] })) }
+      },
+    }
+    const now = await renderingsQuery(bad, { strong: 'G39720' })
+    expect(now.data!.renderings).toEqual(good.data!.renderings)
+  })
 })

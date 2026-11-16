@@ -71,6 +71,18 @@ test('a section hit keeps the id section:<article>#<section> and links to the ar
   expect(f[1]!.link).toBe('pieza:section:tw:kt/grace#otra')
 })
 
+test('a section whose role is unknown links by its section id, not #unknown', async () => {
+  const id = (await reader.articles('tw:kt'))![0]!.id
+  const a = await reader.article(id, 'all')
+  const first = a.data!.sections[0]!
+  const unknown = { ...a, data: { ...a.data!, sections: [{ ...first, role: 'unknown' }, ...a.data!.sections.slice(1)] } } as never
+  const f = fragmentsOf({ query: 'article', args: { id } }, unknown, reader)
+  expect(f[0]!.link).toBe(`articulo:${id}#${first.sid}`)
+  const hit = { kind: 'section', book: '', ref: '', res: 'r/tw', id: 'tw:kt/grace#s3', role: 'unknown', snippet: 's', score: 1 }
+  const sa = { query: 'search', data: [hit], cites: [{ res: 'r/tw', release: '1', id: 'tw:kt/grace' }], notInstalled: [] } as never
+  expect(fragmentsOf({ query: 'search', args: { text: 'x' } }, sa, reader)[0]!.link).toBe('articulo:tw:kt/grace#s3')
+})
+
 const search = async (text: string) => fragmentsOf({ query: 'search', args: { text } }, await reader.search(text), reader)
 
 test('OBS search hits: a frame, a question, a note and a story title, with obs: links and the cite of the hit', async () => {

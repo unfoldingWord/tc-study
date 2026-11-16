@@ -6,8 +6,9 @@
  * `--out run2` writes `eval/results/<lang>-<set>-run2.json` (the second gate run keeps the first run's files).
  * `--set test2` is refused unless `LP3_GATE=1`: the second held-out sets are run once (R35); `test` is tune data since C2.1. Card time is warm (R34): the
  * assistant is created and one question is asked before the timing starts.
+ * An existing `test2` result file is never overwritten unless `--out` names a new file.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAssistant } from '../src/assistant'
@@ -68,6 +69,14 @@ export function summarize(lang: string, set: string, rows: { decision: { kind: s
   return row
 }
 
+/** Where a run writes. A `test2` result is never overwritten: the held-out set is run once (R35), so an existing file stops the run unless `--out` names a new one. */
+export function resultPath(root: string, lang: string, set: string, out: string | undefined): string {
+  if (out !== undefined && !/^[a-z0-9]+$/.test(out)) throw new Error('--out must be letters and digits')
+  const path = join(root, 'eval/results', `${lang}-${set}${out !== undefined ? `-${out}` : ''}.json`)
+  if (set === 'test2' && existsSync(path)) throw new Error(`${path} exists: a test2 result is not overwritten; name a new file with --out`)
+  return path
+}
+
 if (process.argv[1]?.endsWith('run.ts')) {
   const arg = (k: string): string | undefined => {
     const i = process.argv.indexOf(k)
@@ -80,6 +89,7 @@ if (process.argv[1]?.endsWith('run.ts')) {
   if (set !== 'tune' && set !== 'test' && set !== 'test2') throw new Error('--set must be tune, test or test2')
   // C2.1: `test` is tune data now; `test2` is the held-out set, run once.
   if (set === 'test2' && process.env.LP3_GATE !== '1') throw new Error('the test2 sets are held out: --set test2 needs LP3_GATE=1')
+  const target = resultPath(ROOT, lang, set, arg('--out')) // before the questions are read: a refused run opens nothing
   const items = readFileSync(join(ROOT, 'eval/questions', `${lang}-${set}.jsonl`), 'utf8')
     .split('\n')
     .filter((l) => l.trim() !== '')

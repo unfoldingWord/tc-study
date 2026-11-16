@@ -161,6 +161,8 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
         run = undefined
       }
       for (const ordinal of [...cand].sort((x, y) => x - y)) {
+        // A malformed text can align more words than it has pieces: skip those entries.
+        if (ordinal >= ix.pieceOf.length) continue
         const hit = (text.align[ordinal] ?? []).find((p) => positions.has(p))
         if (hit === undefined) continue
         const word = text.pieces[ix.pieceOf[ordinal]!]![0]

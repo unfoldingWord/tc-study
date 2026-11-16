@@ -170,7 +170,7 @@ function sections(b: Build, d: ArticleData): Fragment[] {
   for (const s of d.sections) {
     const cite = b.cites.find((c) => c.id === d.id && c.section === s.sid)
     if (cite === undefined) continue
-    out.push(withLicense(b, { id: `section:${d.id}#${s.sid}`, kind: 'section', title: s.title ?? d.title, concepts: [d.id], length: s.md.length, cite, link: `articulo:${d.id}#${s.role}` }))
+    out.push(withLicense(b, { id: `section:${d.id}#${s.sid}`, kind: 'section', title: s.title ?? d.title, concepts: [d.id], length: s.md.length, cite, link: `articulo:${d.id}#${s.role === 'unknown' ? s.sid : s.role}` }))
   }
   return out
 }
@@ -305,7 +305,7 @@ function search(b: Build, hits: Hit[]): Fragment[] {
       concepts: article !== undefined ? [article] : [],
       length: h.snippet.length,
       cite,
-      link: kind === 'verse' ? `ref:${h.book} ${startOf(h.ref)}` : kind === 'section' && h.role !== undefined ? `articulo:${article}#${h.role}` : `pieza:${id}`,
+      link: kind === 'verse' ? `ref:${h.book} ${startOf(h.ref)}` : kind === 'section' && h.role !== undefined ? (h.role === 'unknown' ? `articulo:${h.id}` : `articulo:${article}#${h.role}`) : `pieza:${id}`,
     }
     out.push({ f: withLicense(b, f), score: h.score })
   })
