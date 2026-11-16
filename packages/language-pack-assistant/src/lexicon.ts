@@ -87,7 +87,7 @@ export const CUES: Record<string, string[][]> = {
   pt: [['livro', 'de'], ['carta', 'a'], ['carta', 'de']],
   en: [['book', 'of'], ['letter', 'to'], ['letter', 'of']],
 }
-/** `whole`: the ids that have the name as a whole name or its first part, not only as a part after a comma ("Felipe, el apóstol"). */
+/** `whole`: the ids that have the name as a whole name, not only as a part of one ("el apóstol" of "Felipe, el apóstol"). */
 type Concept = { forms: string[][]; ids: Set<string>; whole: Set<string> }
 
 function variants(toks: string[], lang: string): string[][] {
@@ -205,7 +205,9 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
   }
   const concepts = new Map<string, Concept>()
   for (const [id, names] of all) {
-    for (const [name, part] of names.flatMap((n) => n.split(',').map((p, k) => [p, k > 0] as const))) {
+    // A part: a piece after a comma ("Felipe, el apóstol"), or a later name that starts with a stop word ("Felipe", "el apóstol").
+    const isPart = (p: string, i: number, k: number): boolean => k > 0 || (i > 0 && stop.has(words(fold(p))[0] ?? ''))
+    for (const [name, part] of names.flatMap((n, i) => n.split(',').map((p, k) => [p, isPart(p, i, k)] as const))) {
       const toks = words(fold(name.replace(/\(.*?\)/g, ' '))).filter((t) => !stop.has(t))
       if (toks.length === 0) continue
       const forms = toks.map(formsOf)

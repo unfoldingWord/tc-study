@@ -197,12 +197,15 @@ describe('R37 e: a concept that is also a topic', () => {
   })
 })
 
-test('R37 e: a tW name after a comma gives way to the tW article whose name it is', () => {
+test('R37 e: a tW name that is part of a title gives way to the tW article whose name it is', () => {
   const lexicon = buildLexicon(fixtureMaps('es-419', {}, { 'tw:kt/apostle': ['apóstol'], 'tw:names/philiptheapostle': ['Felipe, el apóstol'] }, {}), 'es-419', numbers('es'))
   const ctx: RuleCtx = { phrases: phrasesFor('es-419'), listed: () => false, lastVerse: () => undefined, strongsOf: () => [] }
   const ask = (q: string) => applyRules(q, readQuestion(q, lexicon, ctx.phrases), ctx)
   expect(ask('¿qué es un apóstol?')).toEqual({ decided: ruled({ query: 'concept', args: { id: 'tw:kt/apostle' } }) })
   expect(ask('quién fue Felipe')).toEqual({ decided: ruled({ query: 'concept', args: { id: 'tw:names/philiptheapostle' } }) })
+  // The same title split by the maps into two names, as the es-419 map holds it.
+  const split = buildLexicon(fixtureMaps('es-419', {}, { 'tw:kt/apostle': ['apóstol', 'apostolado'], 'tw:names/philiptheapostle': ['Felipe', 'el apóstol'] }, {}), 'es-419', numbers('es'))
+  expect(applyRules('¿qué es un apóstol?', readQuestion('¿qué es un apóstol?', split, ctx.phrases), ctx)).toEqual({ decided: ruled({ query: 'concept', args: { id: 'tw:kt/apostle' } }) })
   // With no whole name, the part still counts.
   const only = buildLexicon(fixtureMaps('es-419', {}, { 'tw:names/philiptheapostle': ['Felipe, el apóstol'] }, {}), 'es-419', numbers('es'))
   expect(applyRules('el apóstol', readQuestion('el apóstol', only, ctx.phrases), ctx)).toEqual({ undecided: true })
