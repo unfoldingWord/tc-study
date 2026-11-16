@@ -96,7 +96,9 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
   function finish<T extends PassageData | ContextData>(a: Answer<T>, ref: string): Answer<T> {
     for (const c of a.cites) {
       const m = marks.get(c.res)
-      if (m !== undefined && c.patch === undefined) c.patch = m
+      // A cite is the patch's only if its key is a resource of the patch catalog AND under that catalog's source: a base resource whose key
+      // collides with a patch key (a patch built wrongly) is not marked.
+      if (m !== undefined && c.patch === undefined && c.res.startsWith(`${m.source ?? m.patch.split('-x-').pop()}/`)) c.patch = m
     }
     const { book: name } = parsePassage(ref)
     const unit = `book:${name}`

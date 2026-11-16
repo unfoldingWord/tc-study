@@ -119,6 +119,22 @@ describe('patchedReader', () => {
     expect(a.cites.find((c) => c.res === 'door43/hi/tn')!.patch).toBeUndefined()
   })
 
+  test('a base cite whose key collides with a key of the patch catalog is not marked', async () => {
+    const colliding: BookModel = {
+      lang: PATCH,
+      book: 'tit',
+      orig: ORIG,
+      res: [['door43/hi/tn', 'x']],
+      texts: [],
+      questions: { res: 'door43/hi/tn', rows: [aquiferRow('aq-q-tit', TIT)] },
+    }
+    const resources = [{ key: 'door43/hi/tn', title: 't', subject: 't', release: 'x', license: 'CC-BY-SA-4.0', source: 'aquifer', review: 'none' }]
+    const p = await fixture(PATCH, [{ unit: 'book:tit', seg: bookSegment(colliding), book: 'tit' }], resources)
+    const reader = openFromSegments({ lang: PATCH, catalogs: [p.catalog], get: p.get })
+    const a = await patchedReader(base, [reader]).passage('tit 1:1')
+    expect(a.cites.find((c) => c.res === 'door43/hi/tn' && c.id === 'base-n1')!.patch).toBeUndefined()
+  })
+
   test('a book the base lacks: the patch rows alone (no text), the base unit reported as not installed', async () => {
     const a = await patchedReader(base, [patch]).passage('rut 1:1')
     expect(a.data!.texts).toEqual([])
@@ -202,6 +218,19 @@ describe('a patch catalog through the client', () => {
     // no map and no article group of the patch itself: only its book, and the common units the install brings
     expect(keys.filter((k) => k.startsWith(`${PATCH}/`))).toEqual([`${PATCH}/book:tit`])
     const a = await (await client.open(PATCH)).passage('tit 1:1')
+    expect(a.data!.notes.map((n) => n.id)).toEqual(['aq-n1'])
+  })
+
+  test('a patch catalog travels on its own: exported to a .tcpack and imported into an empty store with trusted keys', async () => {
+    const client = make()
+    await client.install(PATCH, { books: ['tit'] })
+    const bytes = await client.exportTransfer({ lang: PATCH, mode: 'full', books: ['tit'] })
+    const empty = createClient({ store: memoryStore(), trust })
+    const report = await empty.importTransfer(bytes)
+    expect(report.rejected).toEqual([])
+    expect(report.missing).toEqual([])
+    expect(report.activated).toContain(`${PATCH}/book:tit`)
+    const a = await (await empty.open(PATCH)).passage('tit 1:1')
     expect(a.data!.notes.map((n) => n.id)).toEqual(['aq-n1'])
   })
 
