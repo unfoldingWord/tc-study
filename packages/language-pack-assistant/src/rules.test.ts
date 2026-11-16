@@ -15,8 +15,8 @@ const numbers = (lang: string): NumbersComplement => {
 }
 const KEYS: Record<string, string[]> = { 'tw:kt/grace': ['H2580', 'G54850', 'H2587', 'G54851'], 'tw:kt/covenant': ['H1285'], 'tw:kt/sin': [] }
 
-function rig(tag: 'es-419' | 'en', listed: string[] = ['jhn', 'rut', 'tit', 'exo']) {
-  const lexicon = buildLexicon(tag === 'en' ? EN : ES, tag, numbers(tag === 'en' ? 'en' : 'es'))
+function rig(tag: 'es-419' | 'en' | 'pt-BR', listed: string[] = ['jhn', 'rut', 'tit', 'exo']) {
+  const lexicon = buildLexicon(tag === 'en' ? EN : ES, tag, numbers(tag.slice(0, 2)))
   const ctx: RuleCtx = {
     phrases: phrasesFor(tag),
     listed: (c) => listed.includes(c),
@@ -43,6 +43,17 @@ describe('1. a reference', () => {
   test('with a context phrase it is the context', () => {
     expect(callOf(es('ayúdame a traducir Tito 2:11'))).toEqual({ query: 'context', args: { ref: 'tit 2:11' } })
     expect(callOf(en('everything about Titus 2:11'))).toEqual({ query: 'context', args: { ref: 'tit 2:11' } })
+  })
+  test('"in its context", "background for" and their es and pt forms ask for the context', () => {
+    const pt = rig('pt-BR')
+    const ctx = { query: 'context', args: { ref: 'tit 1:12' } }
+    expect(callOf(es('Tito 1:12 en su contexto'))).toEqual(ctx)
+    expect(callOf(es('el contexto de Tito 1:12'))).toEqual(ctx)
+    expect(callOf(en('Titus 1:12 in its context'))).toEqual(ctx)
+    expect(callOf(en('background for Titus 1:12'))).toEqual(ctx)
+    expect(callOf(pt('Tito 1:12 no seu contexto'))).toEqual(ctx)
+    expect(callOf(pt('contexto de Tito 1:12'))).toEqual(ctx)
+    expect(callOf(en('Titus 1:12'))).toEqual({ query: 'passage', args: { ref: 'tit 1:12' } })
   })
 })
 
