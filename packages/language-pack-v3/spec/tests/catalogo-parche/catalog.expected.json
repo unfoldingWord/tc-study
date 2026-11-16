@@ -35,7 +35,7 @@
     },
     "v": 1
   },
-  "id": "29247fae66e5610bf5e3dca9ad392efff1773195763daceb820704cadc61a96d",
+  "id": "40a55a2137d819d42d3609f5262a1ead8a8b0d5bde16cb2df73c87c3bcd426f7",
   "requires": [
     [
       "common",
@@ -71,7 +71,6 @@
     {
       "id": "book:tit",
       "needs": [
-        "map",
         "orig:tit"
       ],
       "segments": [

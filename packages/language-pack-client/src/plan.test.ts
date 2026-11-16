@@ -92,6 +92,19 @@ describe('planInstall', () => {
   })
 })
 
+describe('a patch catalog', () => {
+  const patch = () => cat('hi-x-aquifer', 1, [[21, 50]], [{ id: 'book:tit', segments: [0], needs: ['orig:tit'] }], ['common'])
+  test('a book:tit unit that needs only orig:tit is planned and activates, with no map unit anywhere', () => {
+    const cs = [common(), patch()]
+    const p = planInstall(cs, emptyState(), { books: ['tit'] }, new Set())
+    expect(p.steps.map((s) => s.key)).toContain('hi-x-aquifer/book:tit')
+    expect(p.unknown).toEqual([])
+    const r = activate(emptyState(), cs, new Set([1, 2, 3, 21].map(hexOf)))
+    expect(r.state.units['hi-x-aquifer/book:tit']!.needs).toEqual(['common/orig:tit'])
+    expect(r.waiting).toEqual([])
+  })
+})
+
 describe('activate', () => {
   test('orig:rut missing keeps book:rut waiting and names the segment; map activates', () => {
     const have = new Set([hexOf(11), hexOf(12), hexOf(14)])

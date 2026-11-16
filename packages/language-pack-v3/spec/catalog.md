@@ -39,6 +39,8 @@ A **unit** is what a device installs or replaces at once:
 Each unit lists the units it needs (`needs`). A unit may carry `optional: true`: a device installs it only when asked. Every `aligned:{part}` unit must carry it (with the value `true`) and no other unit may; no unit lists an optional unit in `needs`, and an optional unit lists no `needs` (rules of the builder; a reader does not check them). The part of an `aligned:{part}` id must be a group (`cddl/aligned.cddl`), or the catalog is `E_BODY`. A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
 notes and links point to that the catalog builds (the others are reported and not listed). The lexicon is not needed to read; an app downloads it when asked.
 
+A patch book is the exception: see "Patch catalogs".
+
 A bridged book names the original's stamp, so its unit needs `orig:<book>` like any book. The local catalog of the bridge lists the
 `orig:<book>` of each book it builds, and a need is resolved in the book's own catalog first, then in a catalog it requires: the
 bridged book finds its original there and activates with no common catalog. Only a book the `originals` source lacks waits for an
@@ -143,11 +145,13 @@ A patch catalog fills the gaps of a language from a second source (for Hindi, th
 where Door43 has none). It is a language catalog like any other, marked by its name, and the base always wins.
 
 - **Name.** `{lang}-x-{source}`, for example `hi-x-aquifer`: a BCP 47 tag with a private-use subtag, so it passes the
-  same tag check as any language and is served, listed and read as one (`serving.md`). `about.catalog`, the header `lang`
+  same tag check as any language and is served, listed and read as one (`serving.md`). `{source}` is 1 to 8 characters of
+  `[a-z0-9]`, so the tag stays within the Worker's pattern `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. `about.catalog`, the header `lang`
   and the `lang` of its segments are that tag.
 - **Units.** Its units are `book:<book>` segments with `texts: []` (`book.cddl` already allows a language with notes and
-  no text of a book) that carry only `notes` and/or `questions`. A book unit needs `orig:<book>` and `map`, and **no
-  `art:` group**: its `ta:` concepts resolve in the base language, which the app opens beside the patch. It `requires` the
+  no text of a book) that carry only `notes` and/or `questions`. A book unit needs **only `orig:<book>`**: no `art:` group (its `ta:` concepts resolve
+  in the base language, which the app opens beside the patch) and no `map` (the patch has no map unit and common has only
+  `xmap`, so the need could never be met; the reader takes the map from the base language). It `requires` the
   published common catalog like any language catalog. A patch has a book only where the base lacks that table.
 - **Provenance.** It lives on the `resources` entries, the only provenance slot of format 3 (the `res` of a segment
   header points to it). A resource entry may carry two optional fields, which a Door43 resource does not:

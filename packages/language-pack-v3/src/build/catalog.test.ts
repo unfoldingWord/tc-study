@@ -535,21 +535,24 @@ describe('patch catalogs', () => {
     const refuses = (extra: object) => buildCatalog({ about: patchAbout, resources: [aquifer(extra as never)], segments: [] })
     await expect(refuses({ review: 'perfect' })).rejects.toThrow(/review/)
     await expect(refuses({ source: 1 })).rejects.toThrow(/source/)
+    for (const name of ['hi', 'hi-x-aquifer1x', 'hi-x-Aq', 'hi-aquifer']) {
+      await expect(buildCatalog({ about: { ...patchAbout, catalog: name }, resources: [], segments: [], patch: true })).rejects.toThrow(/patch catalog name/)
+    }
   })
 
-  test('needsOfBook in patch mode lists the original and the map, and no article group', () => {
+  test('needsOfBook in patch mode lists the original only: no map, no article group', () => {
     const row = (id: string, concept: string): HelpRow => ({ id, ref: '1:1', from: 56_001_001, to: 56_001_001, concept, cols: {} })
     const book: BookModel = { lang: 'hi-x-aquifer', book: 'tit', orig: ['unfoldingWord/el-x-koine/ugnt', 'g987ab2025a'], res: [], texts: [], notes: { res: 'aquifer/hi/tn', rows: [row('a', 'ta:translate/figs-metaphor'), row('b', 'tw:kt/grace')] } }
-    expect(needsOfBook(book, undefined, { patch: true })).toEqual(['map', 'orig:tit'])
+    expect(needsOfBook(book, undefined, { patch: true })).toEqual(['orig:tit'])
     expect(needsOfBook(book)).toEqual(['art:ta:translate', 'art:tw:kt', 'map', 'orig:tit'])
   })
 
   test('buildCatalog with patch: true takes the needs of a book without art groups, and throws on an art need', async () => {
     const stub = await bookStub()
-    const ok = await buildCatalog({ about: patchAbout, resources: [aquifer()], segments: [stub], patch: true, needs: () => ['map', 'orig:tit'] })
+    const ok = await buildCatalog({ about: patchAbout, resources: [aquifer()], segments: [stub], patch: true, needs: () => ['orig:tit'] })
     const view = catalogView((await readSegment(ok.bytes, { known: CATALOG_TABLES })).seg)
-    expect(view.units).toEqual([{ id: 'book:tit', segments: [0], needs: ['map', 'orig:tit'] }])
-    await expect(buildCatalog({ about: patchAbout, resources: [aquifer()], segments: [stub], patch: true, needs: () => ['art:ta:translate', 'map'] })).rejects.toThrow(/patch catalog/)
+    expect(view.units).toEqual([{ id: 'book:tit', segments: [0], needs: ['orig:tit'] }])
+    await expect(buildCatalog({ about: patchAbout, resources: [aquifer()], segments: [stub], patch: true, needs: () => ['art:ta:translate', 'orig:tit'] })).rejects.toThrow(/patch catalog/)
     // The default is unchanged: an art need is accepted.
     await buildCatalog({ about: patchAbout, resources: [aquifer()], segments: [stub], needs: () => ['art:ta:translate', 'map'] })
   })

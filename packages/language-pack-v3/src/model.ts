@@ -239,10 +239,10 @@ export type About = {
   direction?: 'ltr' | 'rtl'
 }
 
-/** A resource a catalog lists (`catalog.cddl`, `resource`). `books` is the 9-byte book set (`ids.ts`, `bookSet`): all zeros for a resource without books. */
 export const REVIEW_LEVELS = ['none', 'community', 'professional', 'mixed'] as const
 export type ReviewLevel = (typeof REVIEW_LEVELS)[number]
 
+/** A resource a catalog lists (`catalog.cddl`, `resource`). `books` is the 9-byte book set (`ids.ts`, `bookSet`): all zeros for a resource without books. */
 export type CatalogResource = {
   key: string
   title: string

@@ -163,12 +163,13 @@ const ARTICLE_CONCEPT = /^(tw|ta):([^/:]+)\//
  * every unit it needs is complete (`catalog.md`), and a group no segment of this catalog supplies would keep the book from ever
  * activating. Without it every group is listed.
  *
- * With `patch: true` (the book of a patch catalog, `catalog.md`, "Patch catalogs") no group is listed: only `orig:<book>` and `map`,
- * because its `ta:` and `tw:` concepts resolve in the base language.
+ * With `patch: true` (the book of a patch catalog, `catalog.md`, "Patch catalogs") only `orig:<book>` is needed: no article group (its `ta:` and `tw:`
+ * concepts resolve in the base language) and no `map` (a patch has no map unit and common has only `xmap`; the patch reader takes the
+ * map from the base language).
  */
 export function needsOfBook(book: BookModel, groups?: ReadonlySet<string>, o: { patch?: boolean } = {}): string[] {
+  if (o.patch === true) return [`orig:${book.book}`]
   const needs = new Set<string>([`orig:${book.book}`, 'map'])
-  if (o.patch === true) return [...needs].sort(compareCodePoints)
   for (const table of [book.notes, book.links]) {
     for (const row of table?.rows ?? []) {
       const m = row.concept === undefined ? null : ARTICLE_CONCEPT.exec(row.concept)
@@ -319,6 +320,7 @@ export async function buildCatalog(o: {
   needs?: (s: BuiltSegment) => string[]
   patch?: boolean
 }): Promise<BuiltSegment> {
+  if (o.patch === true && !/^[a-z]{2,3}-x-[a-z0-9]{1,8}$/.test(o.about.catalog)) throw new Error(`The catalog ${JSON.stringify(o.about.catalog)} is not a patch catalog name: {lang}-x-{source}, the source of 1 to 8 characters of a-z and 0-9`)
   const about = encodeAbout(o.about)
   const resources = encodeResources(o.resources)
 
