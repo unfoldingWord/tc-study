@@ -2,9 +2,9 @@
  * The runner: the assistant (`createAssistant` with the committed complements) over a question set, with the staging packs and the
  * SQL index (R30). Writes `eval/results/<lang>-<set>.json` (every question, its decision, interpretation, top 3 piece ids and score)
  * and prints a summary row. Node and Bun only.
- *   `LP3_STAGING=1 bun eval/run.ts --lang <es|pt|en> --set <tune|test> [--out <name>]`
+ *   `LP3_STAGING=1 bun eval/run.ts --lang <es|pt|en> --set <tune|test|test2> [--out <name>]`
  * `--out run2` writes `eval/results/<lang>-<set>-run2.json` (the second gate run keeps the first run's files).
- * `--set test` is refused unless `LP3_GATE=1`: the test sets are held out and are run once (R35). Card time is warm (R34): the
+ * `--set test2` is refused unless `LP3_GATE=1`: the second held-out sets are run once (R35); `test` is tune data since C2.1. Card time is warm (R34): the
  * assistant is created and one question is asked before the timing starts.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -77,8 +77,9 @@ if (process.argv[1]?.endsWith('run.ts')) {
   const set = arg('--set') ?? ''
   const spec = LANGS[lang]
   if (!spec) throw new Error('--lang must be es, pt or en')
-  if (set !== 'tune' && set !== 'test') throw new Error('--set must be tune or test')
-  if (set === 'test' && process.env.LP3_GATE !== '1') throw new Error('the test sets are held out: --set test needs LP3_GATE=1')
+  if (set !== 'tune' && set !== 'test' && set !== 'test2') throw new Error('--set must be tune, test or test2')
+  // C2.1: `test` is tune data now; `test2` is the held-out set, run once.
+  if (set === 'test2' && process.env.LP3_GATE !== '1') throw new Error('the test2 sets are held out: --set test2 needs LP3_GATE=1')
   const items = readFileSync(join(ROOT, 'eval/questions', `${lang}-${set}.jsonl`), 'utf8')
     .split('\n')
     .filter((l) => l.trim() !== '')

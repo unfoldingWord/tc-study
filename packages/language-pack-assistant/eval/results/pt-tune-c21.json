@@ -1,0 +1,2578 @@
+{
+ "summary": {
+  "lang": "pt",
+  "set": "tune",
+  "n": 100,
+  "callsCorrect": 58,
+  "accepted": 62,
+  "correctAccepted": 48,
+  "acceptedWithSearch": 89,
+  "correctAcceptedWithSearch": 49,
+  "top3": {
+   "hit": 0,
+   "of": 0
+  },
+  "cardMs": {
+   "median": 2.1,
+   "p95": 119.9,
+   "over300": 0
+  },
+  "steps": {
+   "rule": 61,
+   "classifier": 1,
+   "choose": 11,
+   "search": 27
+  }
+ },
+ "questions": [
+  {
+   "q": "Tito 2:11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 2:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: La carta de Pablo a Tito 2:11"
+   },
+   "interpretation": "Passagem: La carta de Pablo a Tito 2:11",
+   "top3": [
+    "verse:glt tit 2:11",
+    "note:tit/y44u",
+    "note:tit/gp2z"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "Mostre João 3:16",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Mostre João 3:16"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Mostre João 3:16"
+   },
+   "interpretation": "Busca: Mostre João 3:16",
+   "top3": [
+    "section:tw:names/philippi#bible-references",
+    "section:tw:names/amorite#bible-references",
+    "section:tw:other/deliverer#examples"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 196
+  },
+  {
+   "q": "O que dizem as notas de Rute 1:16?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que dizem as notas de Rute 1:16?"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: O que dizem as notas de Rute 1:16?"
+   },
+   "interpretation": "Busca: O que dizem as notas de Rute 1:16?",
+   "top3": [
+    "section:tw:names/philippi#bible-references",
+    "section:tw:names/amorite#bible-references",
+    "section:tw:other/deliverer#examples"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 156.1
+  },
+  {
+   "q": "ajudas para Mateus 5:3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "ajudas para Mateus 5:3"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: ajudas para Mateus 5:3"
+   },
+   "interpretation": "Busca: ajudas para Mateus 5:3",
+   "top3": [
+    "section:tw:names/ruth#bible-references",
+    "section:tw:names/adam#bible-references",
+    "section:tw:kt/repent#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 119.6
+  },
+  {
+   "q": "Salmo 23:1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Salmo 23:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Salmo 23:1"
+   },
+   "interpretation": "Busca: Salmo 23:1",
+   "top3": [
+    "section:tw:other/prosper#bible-references",
+    "section:tw:other/teach#bible-references",
+    "section:tw:other/lots#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 51.7
+  },
+  {
+   "q": "tito dois onze",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 2:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: La carta de Pablo a Tito 2:11"
+   },
+   "interpretation": "Passagem: La carta de Pablo a Tito 2:11",
+   "top3": [
+    "verse:glt tit 2:11",
+    "note:tit/y44u",
+    "note:tit/gp2z"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.7
+  },
+  {
+   "q": "Gênesis 12, versículo 1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "gen 12:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: El libro del Génesis 12:1"
+   },
+   "interpretation": "Passagem: El libro del Génesis 12:1",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.7
+  },
+  {
+   "q": "Quero ver Romanos 8:28 com as notas",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rom 8:28"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: La carta de Pablo a los Romanos 8:28"
+   },
+   "interpretation": "Passagem: La carta de Pablo a los Romanos 8:28",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.6
+  },
+  {
+   "q": "Êx 7:14",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "exo 7:14"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: El libro del Éxodo 7:14"
+   },
+   "interpretation": "Passagem: El libro del Éxodo 7:14",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.3
+  },
+  {
+   "q": "Como traduzo Hebreus 11:1?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Como traduzo Hebreus 11:1?"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Como traduzo Hebreus 11:1?"
+   },
+   "interpretation": "Busca: Como traduzo Hebreus 11:1?",
+   "top3": [
+    "section:tw:names/sarah#bible-references",
+    "section:tw:names/lazarus#bible-references",
+    "section:tw:names/joppa#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 154.7
+  },
+  {
+   "q": "1 João 4:8",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "1 João 4:8"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: 1 João 4:8"
+   },
+   "interpretation": "Busca: 1 João 4:8",
+   "top3": [
+    "section:tw:names/nileriver#bible-references",
+    "section:tw:kt/tempt#bible-references",
+    "section:tw:kt/demonpossessed#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 218.7
+  },
+  {
+   "q": "Lucas capítulo 15 versículo 11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "luk 15:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: El evangelio según Lucas 15:11"
+   },
+   "interpretation": "Passagem: El evangelio según Lucas 15:11",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.8
+  },
+  {
+   "q": "notas de Filipenses 4:13",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "php 4:13"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: La carta de Pablo a los Filipenses 4:13"
+   },
+   "interpretation": "Passagem: La carta de Pablo a los Filipenses 4:13",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.8
+  },
+  {
+   "q": "Sl 119:105",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Sl 119:105"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Sl 119:105"
+   },
+   "interpretation": "Busca: Sl 119:105",
+   "top3": [
+    "section:tw:kt/blood#bible-references",
+    "section:ta:translate/bita-humanbehavior#s32",
+    "section:tw:other/astray#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 25.4
+  },
+  {
+   "q": "Atos 2:38",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Atos 2:38"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Atos 2:38"
+   },
+   "interpretation": "Busca: Atos 2:38",
+   "top3": [
+    "section:tw:names/tamar#bible-references",
+    "section:tw:other/betray#examples",
+    "section:tw:other/companion#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 123.1
+  },
+  {
+   "q": "Rute um dezesseis",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Rute um dezesseis"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Rute um dezesseis"
+   },
+   "interpretation": "Busca: Rute um dezesseis",
+   "top3": [
+    "section:tw:names/ephrathah#bible-references",
+    "section:tw:names/ruth#bible-references",
+    "section:tw:names/moab#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 20.7
+  },
+  {
+   "q": "O que significa João 1:1?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que significa João 1:1?"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: O que significa João 1:1?"
+   },
+   "interpretation": "Busca: O que significa João 1:1?",
+   "top3": [
+    "section:tw:names/jehoiada#definition",
+    "section:tw:names/saul#bible-references",
+    "section:tw:names/silas#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 119.9
+  },
+  {
+   "q": "Mt 28:19-20",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "mat 28:19-20"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: El evangelio según Mateo 28:19-20"
+   },
+   "interpretation": "Passagem: El evangelio según Mateo 28:19-20",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.7
+  },
+  {
+   "q": "Apocalipse 21:4",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Apocalipse 21:4"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Apocalipse 21:4"
+   },
+   "interpretation": "Busca: Apocalipse 21:4",
+   "top3": [
+    "section:tw:other/conceive#bible-references",
+    "section:tw:kt/tempt#bible-references",
+    "section:tw:other/heir#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 87
+  },
+  {
+   "q": "Isaías 53:5",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "isa 53:5"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passagem: El libro de Isaías 53:5"
+   },
+   "interpretation": "Passagem: El libro de Isaías 53:5",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.6
+  },
+  {
+   "q": "O que é a graça?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/grace"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: gracia"
+   },
+   "interpretation": "Conceito: gracia",
+   "top3": [
+    "section:tw:kt/grace#definition",
+    "section:tw:kt/grace#translation-suggestions",
+    "section:tw:kt/grace#bible-references"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 16.4
+  },
+  {
+   "q": "O que significa redimir?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/redeem"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: redimir"
+   },
+   "interpretation": "Conceito: redimir",
+   "top3": [
+    "section:tw:kt/redeem#definition",
+    "section:tw:kt/redeem#translation-suggestions",
+    "section:tw:kt/redeem#bible-references"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "Quem foi Abraão?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Quem foi Abraão?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Quem foi Abraão?"
+   },
+   "interpretation": "Busca: Quem foi Abraão?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 5.2
+  },
+  {
+   "q": "Fale-me sobre Abrão",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Fale-me sobre Abrão"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Fale-me sobre Abrão"
+   },
+   "interpretation": "Busca: Fale-me sobre Abrão",
+   "top3": [
+    "section:ta:translate/figs-cometaphor#s1"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 11.5
+  },
+  {
+   "q": "O que é uma aliança?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que é uma aliança?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: O que é uma aliança?"
+   },
+   "interpretation": "Busca: O que é uma aliança?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.5
+  },
+  {
+   "q": "definição de justificar",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/justice"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/justify"
+      }
+     }
+    ],
+    "interpretation": "Conceito: justicia, ou Conceito: Justificar?"
+   },
+   "interpretation": "Conceito: justicia, ou Conceito: Justificar?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.2
+  },
+  {
+   "q": "O que quer dizer santo?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/holy"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/saint"
+      }
+     }
+    ],
+    "interpretation": "Conceito: santo, ou Conceito: Santos?"
+   },
+   "interpretation": "Conceito: santo, ou Conceito: Santos?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 0.5
+  },
+  {
+   "q": "explique a palavra pecado",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/sin"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: pecado"
+   },
+   "interpretation": "Conceito: pecado",
+   "top3": [
+    "section:tw:kt/sin#definition",
+    "section:tw:kt/sin#translation-suggestions",
+    "section:tw:kt/sin#bible-references"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.3
+  },
+  {
+   "q": "Quem era Moisés?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/moses"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: Moisés"
+   },
+   "interpretation": "Conceito: Moisés",
+   "top3": [
+    "section:tw:names/moses#facts",
+    "section:tw:names/moses#bible-references",
+    "section:tw:names/moses#examples"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "O que era o Egito?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que era o Egito?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: O que era o Egito?"
+   },
+   "interpretation": "Busca: O que era o Egito?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2
+  },
+  {
+   "q": "informação sobre Jerusalém",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/jerusalem"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: Jerusalén"
+   },
+   "interpretation": "Conceito: Jerusalén",
+   "top3": [
+    "section:tw:names/jerusalem#facts",
+    "section:tw:names/jerusalem#bible-references",
+    "section:tw:names/jerusalem#examples"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.4
+  },
+  {
+   "q": "O que significa arrepender-se?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que significa arrepender-se?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: O que significa arrepender-se?"
+   },
+   "interpretation": "Busca: O que significa arrepender-se?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "o que é a salvação?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "o que é a salvação?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: o que é a salvação?"
+   },
+   "interpretation": "Busca: o que é a salvação?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "Quem foi Boaz?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/boaz"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: Booz"
+   },
+   "interpretation": "Conceito: Booz",
+   "top3": [
+    "section:tw:names/boaz#facts",
+    "section:tw:names/boaz#bible-references",
+    "section:tw:names/boaz#word-data"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.7
+  },
+  {
+   "q": "o reino de Deus, o que é?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/king"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/kingdom"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/queen"
+      }
+     }
+    ],
+    "interpretation": "Conceito: rey, Conceito: reino, ou Conceito: Reina?"
+   },
+   "interpretation": "Conceito: rey, Conceito: reino, ou Conceito: Reina?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 0.7
+  },
+  {
+   "q": "O que é o templo?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/temple"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: templo"
+   },
+   "interpretation": "Conceito: templo",
+   "top3": [
+    "section:tw:kt/temple#definition",
+    "section:tw:kt/temple#translation-suggestions",
+    "section:tw:kt/temple#bible-references"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.5
+  },
+  {
+   "q": "Quem era o faraó?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Quem era o faraó?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Quem era o faraó?"
+   },
+   "interpretation": "Busca: Quem era o faraó?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "significado de esperança",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "significado de esperança"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: significado de esperança"
+   },
+   "interpretation": "Busca: significado de esperança",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "O que é uma metáfora?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Metáfora"
+   },
+   "interpretation": "Artigo: Metáfora",
+   "top3": [
+    "section:ta:translate/figs-metaphor#description",
+    "section:ta:translate/figs-metaphor#reason",
+    "section:ta:translate/figs-metaphor#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 4.3
+  },
+  {
+   "q": "Como traduzo uma pergunta retórica?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Como traduzo uma pergunta retórica?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Como traduzo uma pergunta retórica?"
+   },
+   "interpretation": "Busca: Como traduzo uma pergunta retórica?",
+   "top3": [
+    "section:ta:translate/figs-rquestion#strategies",
+    "section:ta:translate/figs-intro#definition",
+    "section:ta:translate/figs-rquestion#reason"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 23.2
+  },
+  {
+   "q": "artigo da Academia sobre a hipérbole",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-hyperbole"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Hipérbole"
+   },
+   "interpretation": "Artigo: Hipérbole",
+   "top3": [
+    "section:ta:translate/figs-hyperbole#description",
+    "section:ta:translate/figs-hyperbole#reason",
+    "section:ta:translate/figs-hyperbole#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.1
+  },
+  {
+   "q": "sugestões de tradução para a metonímia",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-metonymy"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Metonimia"
+   },
+   "interpretation": "Artigo: Metonimia",
+   "top3": [
+    "section:ta:translate/figs-metonymy#description",
+    "section:ta:translate/figs-metonymy#reason",
+    "section:ta:translate/figs-metonymy#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.8
+  },
+  {
+   "q": "O que é um símile?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-simile"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Símil"
+   },
+   "interpretation": "Artigo: Símil",
+   "top3": [
+    "section:ta:translate/figs-simile#description",
+    "section:ta:translate/figs-simile#reason",
+    "section:ta:translate/figs-simile#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.8
+  },
+  {
+   "q": "explique a voz ativa ou passiva",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:other/voice"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: Voz"
+   },
+   "interpretation": "Conceito: Voz",
+   "top3": [
+    "section:tw:other/voice#definition",
+    "section:tw:other/voice#translation-suggestions",
+    "section:tw:other/voice#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "como se traduzem os nomes próprios?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "como se traduzem os nomes próprios?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: como se traduzem os nomes próprios?"
+   },
+   "interpretation": "Busca: como se traduzem os nomes próprios?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "O que é uma expressão idiomática?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que é uma expressão idiomática?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: O que é uma expressão idiomática?"
+   },
+   "interpretation": "Busca: O que é uma expressão idiomática?",
+   "top3": [
+    "section:ta:translate/figs-idiom#strategies",
+    "note:rut/ab41",
+    "note:3jn/r8i4"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 18.9
+  },
+  {
+   "q": "dublê, o que é?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "dublê, o que é?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: dublê, o que é?"
+   },
+   "interpretation": "Busca: dublê, o que é?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "O que são substantivos abstratos?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "O que são substantivos abstratos?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: O que são substantivos abstratos?"
+   },
+   "interpretation": "Busca: O que são substantivos abstratos?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 4.8
+  },
+  {
+   "q": "nós inclusivo e exclusivo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "nós inclusivo e exclusivo"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: nós inclusivo e exclusivo"
+   },
+   "interpretation": "Busca: nós inclusivo e exclusivo",
+   "top3": [
+    "section:ta:translate/figs-pronouns#s2",
+    "section:ta:translate/figs-inclusive#s1",
+    "section:ta:translate/figs-exclusive#description"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 30.3
+  },
+  {
+   "q": "O que é a elipse?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-ellipsis"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Elipsis"
+   },
+   "interpretation": "Artigo: Elipsis",
+   "top3": [
+    "section:ta:translate/figs-ellipsis#description",
+    "section:ta:translate/figs-ellipsis#reason",
+    "section:ta:translate/figs-ellipsis#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "Como traduzir um eufemismo?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-euphemism"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Eufemismo"
+   },
+   "interpretation": "Artigo: Eufemismo",
+   "top3": [
+    "section:ta:translate/figs-euphemism#description",
+    "section:ta:translate/figs-euphemism#reason",
+    "section:ta:translate/figs-euphemism#examples"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.1
+  },
+  {
+   "q": "leia o artigo sobre metáfora",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Metáfora"
+   },
+   "interpretation": "Artigo: Metáfora",
+   "top3": [
+    "section:ta:translate/figs-metaphor#description",
+    "section:ta:translate/figs-metaphor#reason",
+    "section:ta:translate/figs-metaphor#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.3
+  },
+  {
+   "q": "Como foi traduzida graça?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2580"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G54850"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2587"
+      }
+     }
+    ],
+    "interpretation": "Qual destas palavras do original: H2580, G5485, H2587…?"
+   },
+   "interpretation": "Qual destas palavras do original: H2580, G5485, H2587…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.1
+  },
+  {
+   "q": "Como os textos traduzem a palavra aliança?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Como os textos traduzem a palavra aliança?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Como os textos traduzem a palavra aliança?"
+   },
+   "interpretation": "Busca: Como os textos traduzem a palavra aliança?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "Como foi traduzido G5485?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G5485"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traduções: G5485"
+   },
+   "interpretation": "Traduções: G5485",
+   "top3": [
+    "rendering:G5485/gracia",
+    "rendering:G5485/gracia",
+    "rendering:G5485/que dios siga favoreciendolos"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 83.6
+  },
+  {
+   "q": "compare como se traduziu redimir em cada livro",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00590"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G06290"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G18050"
+      }
+     }
+    ],
+    "interpretation": "Qual destas palavras do original: G0059, G0629, G1805…?"
+   },
+   "interpretation": "Qual destas palavras do original: G0059, G0629, G1805…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.2
+  },
+  {
+   "q": "De que maneiras se traduziu fé?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "De que maneiras se traduziu fé?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: De que maneiras se traduziu fé?"
+   },
+   "interpretation": "Busca: De que maneiras se traduziu fé?",
+   "top3": [
+    "section:tw:kt/faith#definition",
+    "note:tit/abc1",
+    "note:3jn/b4zh"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 13.5
+  },
+  {
+   "q": "traduções de H2617",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "H2617"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traduções: H2617"
+   },
+   "interpretation": "Traduções: H2617",
+   "top3": [
+    "rendering:H2617a/tu amas mucho a las personas",
+    "rendering:H2617a/al unico que seria siempre fiel a ellos",
+    "rendering:H2617a/amabilidad"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 10.9
+  },
+  {
+   "q": "Como traduziram santo no texto literal?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H1320"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H6942"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00370"
+      }
+     }
+    ],
+    "interpretation": "Qual destas palavras do original: H1320, H6942, G0037…?"
+   },
+   "interpretation": "Qual destas palavras do original: H1320, H6942, G0037…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.1
+  },
+  {
+   "q": "Que palavras usam para pecado?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G40120"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G02660"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G02680"
+      }
+     }
+    ],
+    "interpretation": "Qual destas palavras do original: G4012, G0266, G0268…?"
+   },
+   "interpretation": "Qual destas palavras do original: G4012, G0266, G0268…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.7
+  },
+  {
+   "q": "usos da palavra amor nas traduções",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00260"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H0160"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00250"
+      }
+     }
+    ],
+    "interpretation": "Qual destas palavras do original: G0026, H0160, G0025…?"
+   },
+   "interpretation": "Qual destas palavras do original: G0026, H0160, G0025…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1
+  },
+  {
+   "q": "como se traduz cordeiro?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "como se traduz cordeiro?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: como se traduz cordeiro?"
+   },
+   "interpretation": "Busca: como se traduz cordeiro?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 5.7
+  },
+  {
+   "q": "Como os tradutores verteram perdoar?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Como os tradutores verteram perdoar?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Como os tradutores verteram perdoar?"
+   },
+   "interpretation": "Busca: Como os tradutores verteram perdoar?",
+   "top3": [
+    "note:jon/z95v",
+    "note:rut/stw5",
+    "section:tw:other/astray#definition"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 23.4
+  },
+  {
+   "q": "compare as traduções de G26",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G26"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traduções: G26"
+   },
+   "interpretation": "Traduções: G26",
+   "top3": [
+    "rendering:G26/amar sinceramente a otros",
+    "rendering:G26/amor",
+    "rendering:G26/en relacion al amor"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 2.3
+  },
+  {
+   "q": "Como se traduziu abençoar em Rute?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H7327"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G45030"
+      }
+     }
+    ],
+    "interpretation": "Qual destas palavras do original: H7327, G4503?"
+   },
+   "interpretation": "Qual destas palavras do original: H7327, G4503?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 0.5
+  },
+  {
+   "q": "com que palavras se traduz espírito?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "com que palavras se traduz espírito?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: com que palavras se traduz espírito?"
+   },
+   "interpretation": "Busca: com que palavras se traduz espírito?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "Em que livros há metáforas?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: Metáfora"
+   },
+   "interpretation": "Livros: Metáfora",
+   "top3": [
+    "book:tit",
+    "book:jon",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.4
+  },
+  {
+   "q": "Quantas vezes aparece Abraão na Bíblia?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Quantas vezes aparece Abraão na Bíblia?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Quantas vezes aparece Abraão na Bíblia?"
+   },
+   "interpretation": "Busca: Quantas vezes aparece Abraão na Bíblia?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "Onde aparece G5485?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "strong": "G5485"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: G5485"
+   },
+   "interpretation": "Livros: G5485",
+   "top3": [
+    "book:rom",
+    "book:2co",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 2
+  },
+  {
+   "q": "Em que livros se fala da aliança?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Em que livros se fala da aliança?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Em que livros se fala da aliança?"
+   },
+   "interpretation": "Busca: Em que livros se fala da aliança?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.5
+  },
+  {
+   "q": "Em que livros há perguntas retóricas e quantas?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Em que livros há perguntas retóricas e quantas?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Em que livros há perguntas retóricas e quantas?"
+   },
+   "interpretation": "Busca: Em que livros há perguntas retóricas e quantas?",
+   "top3": [
+    "section:ta:translate/figs-rquestion#intro",
+    "section:ta:translate/figs-intro#intro",
+    "section:ta:translate/figs-rquestion#reason"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 24.7
+  },
+  {
+   "q": "onde se menciona Moisés?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/moses"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: Moisés"
+   },
+   "interpretation": "Livros: Moisés",
+   "top3": [
+    "book:exo",
+    "book:lev",
+    "book:jos"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.9
+  },
+  {
+   "q": "Quantas hipérboles há em Mateus?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-hyperbole"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artigo: Hipérbole"
+   },
+   "interpretation": "Artigo: Hipérbole",
+   "top3": [
+    "section:ta:translate/figs-hyperbole#description",
+    "section:ta:translate/figs-hyperbole#reason",
+    "section:ta:translate/figs-hyperbole#s1"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.6
+  },
+  {
+   "q": "livros onde aparece a palavra graça",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/grace"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: gracia"
+   },
+   "interpretation": "Livros: gracia",
+   "top3": [
+    "book:psa",
+    "book:rom",
+    "book:2co"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.9
+  },
+  {
+   "q": "Onde mais aparece Boaz?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/boaz"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: Booz"
+   },
+   "interpretation": "Livros: Booz",
+   "top3": [
+    "book:rut",
+    "book:mat",
+    "book:1ki"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.8
+  },
+  {
+   "q": "Em que partes da Bíblia aparece o Egito?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Em que partes da Bíblia aparece o Egito?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Em que partes da Bíblia aparece o Egito?"
+   },
+   "interpretation": "Busca: Em que partes da Bíblia aparece o Egito?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.6
+  },
+  {
+   "q": "em que livros se usam símiles?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-simile"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: Símil"
+   },
+   "interpretation": "Livros: Símil",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.8
+  },
+  {
+   "q": "Quantas vezes aparece redimir?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/redeem"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: redimir"
+   },
+   "interpretation": "Livros: redimir",
+   "top3": [
+    "book:lev",
+    "book:psa",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.7
+  },
+  {
+   "q": "Onde aparece H2617 no Antigo Testamento?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "strong": "H2617"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: H2617"
+   },
+   "interpretation": "Livros: H2617",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.7
+  },
+  {
+   "q": "que livros têm metonímias?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-metonymy"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Livros: Metonimia"
+   },
+   "interpretation": "Livros: Metonimia",
+   "top3": [
+    "book:rut",
+    "book:jon",
+    "book:tit"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 0.6
+  },
+  {
+   "q": "Em quantos livros aparece Jerusalém?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/jerusalem"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:jerusalem"
+      }
+     }
+    ],
+    "interpretation": "Livros: Jerusalén, ou Livros: de Jerusalén?"
+   },
+   "interpretation": "Livros: Jerusalén, ou Livros: de Jerusalén?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 0.5
+  },
+  {
+   "q": "Onde se usa a palavra arrepender-se?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Onde se usa a palavra arrepender-se?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: Onde se usa a palavra arrepender-se?"
+   },
+   "interpretation": "Busca: Onde se usa a palavra arrepender-se?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "Que pessoas há na Bíblia?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "person"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: person"
+   },
+   "interpretation": "Temas: person",
+   "top3": [
+    "topic:per:aaron",
+    "topic:per:abagtha",
+    "topic:per:abda"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 64.3
+  },
+  {
+   "q": "lista de lugares",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "place"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: place"
+   },
+   "interpretation": "Temas: place",
+   "top3": [
+    "topic:lug:abana",
+    "topic:lug:abdon",
+    "topic:lug:abel"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 9.7
+  },
+  {
+   "q": "Que eventos importantes há?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "event"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: event"
+   },
+   "interpretation": "Temas: event",
+   "top3": [
+    "topic:ev:2nd-rejection-at-nazareth",
+    "topic:ev:3rd-tour-of-galilee",
+    "topic:ev:7-years-of-famine"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "mostre os temas",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "topic"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: topic"
+   },
+   "interpretation": "Temas: topic",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.9
+  },
+  {
+   "q": "Que personagens aparecem em Rute?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "person"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Temas: person"
+   },
+   "interpretation": "Temas: person",
+   "top3": [
+    "topic:per:aaron",
+    "topic:per:abagtha",
+    "topic:per:abda"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 58.5
+  },
+  {
+   "q": "Que lugares são mencionados em Tito?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "tit"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: La carta de Pablo a Tito"
+   },
+   "interpretation": "Temas: La carta de Pablo a Tito",
+   "top3": [
+    "topic:lug:caphtor",
+    "topic:lug:macedonia",
+    "topic:lug:nicopolis"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "acontecimentos do Êxodo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "exo"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: El libro del Éxodo"
+   },
+   "interpretation": "Temas: El libro del Éxodo",
+   "top3": [
+    "topic:ev:birth-of-moses",
+    "topic:ev:exodus-from-egypt",
+    "topic:ev:lifetime-of-moses"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "temas principais de Romanos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "rom"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: La carta de Pablo a los Romanos"
+   },
+   "interpretation": "Temas: La carta de Pablo a los Romanos",
+   "top3": [
+    "topic:lug:achaia",
+    "topic:lug:asia",
+    "topic:lug:cenchreae"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.3
+  },
+  {
+   "q": "passagens sobre a viúva que deu duas moedinhas",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "passagens sobre a viúva que deu duas moedinhas"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: passagens sobre a viúva que deu duas moedinhas"
+   },
+   "interpretation": "Busca: passagens sobre a viúva que deu duas moedinhas",
+   "top3": [
+    "section:tw:other/tencommandments#bible-references",
+    "section:tw:other/face#bible-references",
+    "section:tw:kt/promisedland#bible-references"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 20.3
+  },
+  {
+   "q": "o versículo de não se preocupar com o amanhã",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "o versículo de não se preocupar com o amanhã"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: o versículo de não se preocupar com o amanhã"
+   },
+   "interpretation": "Busca: o versículo de não se preocupar com o amanhã",
+   "top3": [
+    "section:tw:other/alarm#translation-suggestions",
+    "section:tw:kt/compassion#definition",
+    "section:tw:kt/compassion#translation-suggestions"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 27
+  },
+  {
+   "q": "Onde diz que o amor é paciente?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Onde diz que o amor é paciente?"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: Onde diz que o amor é paciente?"
+   },
+   "interpretation": "Busca: Onde diz que o amor é paciente?",
+   "top3": [
+    "section:tw:kt/love#translation-suggestions"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 7.5
+  },
+  {
+   "q": "algo sobre a ovelha perdida",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "algo sobre a ovelha perdida"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: algo sobre a ovelha perdida"
+   },
+   "interpretation": "Busca: algo sobre a ovelha perdida",
+   "top3": [
+    "note:jon/z95v",
+    "section:tw:kt/crucify#definition",
+    "note:rut/stw5"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 21.5
+  },
+  {
+   "q": "o que a Bíblia diz dos estrangeiros?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "o que a Bíblia diz dos estrangeiros?"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: o que a Bíblia diz dos estrangeiros?"
+   },
+   "interpretation": "Busca: o que a Bíblia diz dos estrangeiros?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "o filho pródigo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "o filho pródigo"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: o filho pródigo"
+   },
+   "interpretation": "Busca: o filho pródigo",
+   "top3": [
+    "section:tw:other/feast#definition"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 5.8
+  },
+  {
+   "q": "versículos onde Jesus chora",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "versículos onde Jesus chora"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Busca: versículos onde Jesus chora"
+   },
+   "interpretation": "Busca: versículos onde Jesus chora",
+   "top3": [
+    "link:tit/nze4",
+    "link:tit/jgfj",
+    "link:tit/mgn9"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 110.2
+  },
+  {
+   "q": "João",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "João"
+     }
+    },
+    "via": "search",
+    "interpretation": "Busca: João"
+   },
+   "interpretation": "Busca: João",
+   "top3": [
+    "section:tw:names/jehoiada#definition"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.6
+  },
+  {
+   "q": "Jonas",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jon front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jonah"
+      }
+     }
+    ],
+    "interpretation": "Jonás, o livro, ou Conceito: Jonás?"
+   },
+   "interpretation": "Jonás, o livro, ou Conceito: Jonás?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.1
+  },
+  {
+   "q": "fale sobre Rute",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/ruth"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Conceito: Rut"
+   },
+   "interpretation": "Conceito: Rut",
+   "top3": [
+    "section:tw:names/ruth#facts",
+    "section:tw:names/ruth#bible-references",
+    "section:tw:names/ruth#word-data"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 1.6
+  }
+ ]
+}

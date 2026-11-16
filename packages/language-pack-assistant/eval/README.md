@@ -9,9 +9,9 @@ does not fit in memory (R30).
 ## Commands
 
 - `LP3_STAGING=1 bun eval/packs.ts <lang>`: refresh and install the packs of `es-419` or `en`; prints the report.
-- `LP3_STAGING=1 bun eval/run.ts --lang <es|pt|en> --set <tune|test>`: runs the assistant (`createAssistant` with the committed
+- `LP3_STAGING=1 bun eval/run.ts --lang <es|pt|en> --set <tune|test|test2>`: runs the assistant (`createAssistant` with the committed
   complements) and writes `eval/results/<lang>-<set>.json`: a `summary` row and, per question, the decision, its interpretation,
-  the ids of the top 3 pieces, the score and the card time in ms. `--set test` is refused unless `LP3_GATE=1` (the held-out sets are
+  the ids of the top 3 pieces, the score and the card time in ms. `--set test2` is refused unless `LP3_GATE=1` (the held-out sets are
   run once).
 - `bun eval/check-ids.ts` (with `--lang es-419|en`): checks that the ids the question sets expect exist in the packs. It prints
   failures only; it does not score.
