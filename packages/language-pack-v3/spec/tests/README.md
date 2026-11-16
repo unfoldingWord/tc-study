@@ -388,12 +388,13 @@ so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TA
 | `relations` | list of `{"from", "to", "type", "source", "confidence"}` in the order of the file; `from`, `to` the ids (a topic's or an external concept's), as in the `xmap` | the table is not in the file |
 | `strongs` | `{topic id: [Strong keys]}` as the file has it | the table is not in the file |
 | `ranges` | `{topic id: [[first, last], ...]}`, full verse ids, as the file has it | the table is not in the file |
+| `chunks` | `{book: [[first, last], ...]}`, full verse ids, as the file has it (the sections of the English ULT) | the table is not in the file |
 
 **`xtopics` part**: `occurrences` as `{id: [verse ids]}`, full ids.
 
 **`topics` core**: `names` as `{id: [[name, source, count, [books]], ...]}` in the order of the file, `books` as codes in canonical order; `local` as `{topic id: {"names": [...], "refs": [[first, last], ...], "related": [...]}}` (`local-topics` of `map.cddl`), with `refs` and `related` only when the entry has them and any other key of an entry left out, like every unknown key; `coverage` as above. **`topics` part**: `names` as `{topic id: [verse ids]}`, full ids; absent when the file lacks it.
 
-A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges` and `topics`: `names local coverage`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
+A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges chunks` and `topics`: `names local coverage`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
 
 ### `aligned`
 
@@ -455,6 +456,7 @@ types, these are `E_BODY` too:
   - `xtopics`, `topics` (headers as the `map`, `xmap` ones: `part` needed, `lang` for `topics`; a part with `res` not `[]`, a core of `xtopics` with `res` empty, a `book` that differs from `part`, a core table in a part and the reverse are `E_BODY`):
     - `xtopics` `topics`: ids not sorted or repeated; columns of different lengths; `kind` 0 or above 6; a `source` outside `h.res`; a `ref` outside `refs`; `refs` with a text twice, or one no id uses, or not in the order of first use; `title` or `ustrong` with a count other than the ids.
     - `xtopics` `relations`: as the `xmap` ones, with an end beyond the count of `topics.ids` plus `external`; `external` not sorted or repeated.
+    - `xtopics` `chunks`: an empty list for a book; a pair with `first > last`; sections that are not ascending or that overlap (a `first` at or before the `last` of the previous one); a verse id whose book is not the key; a key that is not a book code. A reader that does not know `chunks` skips it (an optional table of an unknown name).
     - `xtopics` `strongs`, `ranges`: a key not in `topics.ids`; an empty list (also an empty `ranges` list); Strong keys not sorted or repeated; a range that runs backwards (`first > last`) or whose verse id is not `LLCCCVVV` of a book 1..66. That is all a reader checks of a range: it does not check that the two ends are in the same book.
     - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; a row whose `count` differs from its `verses` or is 0; in a part, verse lists as above.
     - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.

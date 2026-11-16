@@ -186,6 +186,7 @@ function xtopicsOut(seg: Segment): Record<string, unknown> {
     relations: c.relations,
     strongs: c.strongs,
     ranges: c.ranges,
+    chunks: c.chunks,
   }
 }
 

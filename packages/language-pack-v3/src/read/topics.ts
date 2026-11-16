@@ -29,6 +29,7 @@ export const XTOPICS_TABLES: Record<string, number[]> = {
   strongs: [1],
   occurrences: [1],
   ranges: [1],
+  chunks: [1],
 }
 
 /** The tables the `topics` reader knows. */
@@ -38,7 +39,7 @@ export const TOPICS_TABLES: Record<string, number[]> = {
   coverage: [1],
 }
 
-const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges']
+const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks']
 const TOPICS_CORE_ONLY = ['local', 'coverage'] // "names" is in both: a map in the core, verse lists in a part
 
 type Bad = (what: string) => never
@@ -186,6 +187,31 @@ function readXCore(seg: Segment): XtopicsCore {
       )
     }
     core.ranges = out
+  }
+  if (hasOwn(t, 'chunks')) {
+    const out: Record<string, [number, number][]> = {}
+    for (const [book, v] of Object.entries(table(t.chunks, 'chunks', xbad))) {
+      if (!BOOKS.includes(book)) xbad(`chunks names ${JSON.stringify(book)}, which is not a book`)
+      const n = bookNumber(book)
+      if (!Array.isArray(v) || v.length === 0) xbad(`chunks[${JSON.stringify(book)}] is not a non-empty list`)
+      let last = 0
+      put(
+        out,
+        book,
+        v.map((pair) => {
+          if (!Array.isArray(pair) || pair.length !== 2 || !isVerseId(pair[0]) || !isVerseId(pair[1])) {
+            xbad(`chunks[${JSON.stringify(book)}] has a pair that is not two verse ids`)
+          }
+          const [a, b] = pair as [number, number]
+          if (Math.floor(a / 1_000_000) !== n || Math.floor(b / 1_000_000) !== n) xbad(`chunks[${JSON.stringify(book)}] has a verse of another book`)
+          if (a > b) xbad(`chunks[${JSON.stringify(book)}] has a section that runs backwards`)
+          if (a <= last) xbad(`chunks[${JSON.stringify(book)}] has sections that overlap or are not ascending`)
+          last = b
+          return [a, b] as [number, number]
+        }),
+      )
+    }
+    core.chunks = out
   }
   return core
 }

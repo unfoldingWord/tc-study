@@ -45,7 +45,8 @@ import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOfBook } from './catalog'
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
-import { extractOrig, origSegment } from './orig'
+import { extractText } from './bookTexts'
+import { extractOrig, OrigIndex, origSegment } from './orig'
 import { buildAligned, isBridgeText } from './aligned/build'
 import { alignedSegment } from './aligned/segment'
 import { buildMap } from './map/build'
@@ -58,6 +59,7 @@ import { sourceRows } from './bookHelps'
 import { outlineOf } from './topics/outline'
 import { topicsSegment, xtopicsSegment } from './topics/segment'
 import { buildTopics } from './topics/topics'
+import { chunksOfText, chunksTable } from './topics/chunks'
 import { buildXtopics, chapterLengths, type TwName, type XtopicsSources } from './topics/xtopics'
 import { parseObsRefs } from '../source/obsRefs'
 import { parseTheographic } from '../source/theographic'
@@ -465,6 +467,10 @@ const TWL_KIND = 'TSV Translation Words Links'
 const XMAP_SUBJECTS: ReadonlySet<string> = new Set([TN_KIND, TWL_KIND, 'Translation Words', 'Translation Academy'])
 const TITLE_ROW = /^helps-text:(tw|ta)-title:/
 
+/** The English ULT, the source of the section map (`chunks` of the xtopics core). */
+const ULT_LANG = 'en'
+const ULT_KEY = 'unfoldingWord/en/ult'
+
 /** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */
 const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines'> = {
   tipnr: ['STEPBible/STEPBible-Data/TIPNR', 'be4191f0'],
@@ -638,20 +644,65 @@ export async function buildCommon(o: {
     if (tn !== undefined) res.outlines = [tn.key, tagOf(tn.stamp)]
     const built = buildXtopics({ tipnr, events, obs, outlines, origs, res, twNames })
     report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
+    const resWithoutUlt = built.core.res
+    // The section map: the sections of the English ULT (its ts milestones), per book of the originals built
+    const ult = (await o.source.resources(ULT_LANG)).find((ref) => ref.key === ULT_KEY)
+    const chunkRows: RowKey[] = []
+    if (ult === undefined) report.push(`topics: chunks: the source has no ${ULT_KEY}: the xtopics have no section map`)
+    else {
+      const byBook = new Map<string, [number, number][]>()
+      const noBreaks: string[] = []
+      const noBook: string[] = []
+      let unplaced = 0
+      for (const orig of origs) {
+        if (!ult.books.includes(orig.book)) {
+          noBook.push(orig.book)
+          continue
+        }
+        const rows: Row[] = []
+        for (const layer of ['sot', 'quote']) {
+          for await (const row of o.source.rows({ lang: ULT_LANG, book: orig.book, resource: ult.key, layer })) {
+            rows.push(row)
+            chunkRows.push({ layer: row.layer, key: row.key })
+          }
+        }
+        const alignIssues: string[] = []
+        const text = extractText(rows, orig.book, ult.key, new OrigIndex(orig), alignIssues)
+        unplaced += alignIssues.length
+        const list = chunksOfText(text, orig.book, versesOf(orig))
+        if (list.length === 0) noBreaks.push(orig.book)
+        else byBook.set(orig.book, list)
+      }
+      if (noBook.length > 0) report.push(`topics: chunks: ${ULT_KEY} does not have ${noBook.join(', ')}: no sections for them`)
+      if (noBreaks.length > 0) report.push(`topics: chunks: ${noBreaks.join(', ')} have no ts milestone in ${ULT_KEY}: no sections for them`)
+      if (unplaced > 0) report.push(`topics: chunks: ${unplaced} issues reading the text of ${ULT_KEY} (alignment); the sections do not depend on them`)
+      const table = chunksTable(byBook)
+      if (Object.keys(table).length > 0) {
+        built.core.chunks = table
+        built.core.res = [...built.core.res, [ult.key, tagOf(ult.stamp)] as [string, string]].sort((a, b) => compareCodePoints(a[0], b[0]))
+        built.core.coverage.set(ult.key, { whole: [...byBook.keys()].sort((a, b) => bookNumber(a) - bookNumber(b)), partial: [] })
+      } else report.push(`topics: chunks: no book of ${ULT_KEY} has a ts milestone: the xtopics have no section map`)
+    }
     const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))
     const stamps = [
-      ...built.core.res.map(([key, release]) => ({ key, stamp: release })),
+      ...resWithoutUlt.map(([key, release]) => ({ key, stamp: release })),
       ...origs.map((orig) => ({ key: orig.key, stamp: orig.stamp })),
     ]
     const inputs = inputsOf(rows, stamps)
-    segments.push(await builtSegment(xtopicsSegment(built.core), inputs))
+    // The core also reads the rows of the ULT; the parts do not, so their inputs and bytes are those of a build without it
+    const coreInputs = built.core.chunks === undefined ? inputs : inputsOf([...rows, ...chunkRows], [...stamps, { key: ult!.key, stamp: tagOf(ult!.stamp) }])
+    segments.push(await builtSegment(xtopicsSegment(built.core), coreInputs))
     for (const part of built.parts) segments.push(await builtSegment(xtopicsSegment(part), inputs))
     const topicKeys = new Set(built.core.res.map(([key]) => key))
     for (const [role, info] of Object.entries(TOPIC_CREDITS)) {
       const [key, release] = res[role as keyof typeof TOPIC_CREDITS]
       if (!topicKeys.has(key)) continue
       extra.push({ key, title: info.title, subject: 'Topics', release, license: info.license, attribution: info.attribution, books: bookSet(built.core.coverage.get(key)?.whole ?? []) })
+    }
+    if (ult !== undefined && built.core.chunks !== undefined) {
+      if (!listed.some((ref) => ref.key === ult.key)) listed.push(ult)
+      used.add(ult.key)
     }
     // The tN the sections come from is a resource of the catalog (with mapLang it is already listed, for the map)
     if (tn !== undefined && topicKeys.has(tn.key)) {

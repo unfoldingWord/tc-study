@@ -29,6 +29,8 @@ xtopics-core-tables = {
                                ; ranges they span: first and last verse of each range, first <= last. A reader checks
                                ; that both are verse ids of a book 1..66 and that first <= last; it does not check that
                                ; both ends are in one book, or that the verses exist in any original
+  ? "chunks": { * book-code => [+ [verse-id, verse-id]] },  ; optional, v1; the sections of the English ULT (its 	s\* chunks), per book, in order: first and last verse of each, first <= last, no overlap, ascending.
+                               ; Every verse id is of the book of the key. A book whose ULT has no 	s\* has no key
 }
 
 topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)

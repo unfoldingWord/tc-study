@@ -35,6 +35,7 @@ const core: XtopicsCore = {
   ],
   strongs: { 'per:abraham': ['H0085', 'H0087'] },
   ranges: { 'obs:10': [[2_001_001, 2_001_010]] },
+  chunks: { gen: [[1_001_001, 1_001_005], [1_001_006, 1_001_031]], tit: [[56_001_001, 56_001_003]] },
 }
 const xpart: XtopicsPart = { part: 'gen', occurrences: new Map([['per:abraham', [1_011_026, 1_012_001, 1_012_004]]]) }
 
@@ -80,8 +81,17 @@ describe('xtopics round trips', () => {
     const { bytes } = await writeSegment(seg)
     expect(xtopicsView((await readSegment(bytes, { known: XTOPICS_TABLES })).seg)).toEqual(xpart)
   })
+  test('a reader that does not know chunks skips the table', async () => {
+    const { bytes } = await writeSegment(xtopicsSegment(core))
+    const known = { ...XTOPICS_TABLES }
+    delete known.chunks
+    const view = xtopicsView((await readSegment(bytes, { known })).seg) as XtopicsCore
+    const { chunks: _c, ...rest } = core
+    expect(view).toEqual(rest as XtopicsCore)
+  })
   test('a core with no optional table', () => {
-    const small: XtopicsCore = { ...core, relations: undefined, strongs: undefined, ranges: undefined }
+    const small: XtopicsCore = { ...core, relations: undefined, strongs: undefined, ranges: undefined, chunks: undefined }
+    delete small.chunks
     delete small.relations
     delete small.strongs
     delete small.ranges
@@ -161,6 +171,13 @@ describe('xtopicsView rejects', () => {
   test('strongs: an empty list', () => rejects((s) => (body(s, 'strongs')['per:abraham'] = [])))
   test('strongs: not sorted', () => rejects((s) => (body(s, 'strongs')['per:abraham'] = ['H2', 'H1'])))
   test('strongs: a repeat', () => rejects((s) => (body(s, 'strongs')['per:abraham'] = ['H1', 'H1'])))
+  test('chunks: an empty list', () => rejects((s) => (body(s, 'chunks').gen = [])))
+  test('chunks: backwards', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_005, 1_001_001]])))
+  test('chunks: overlapping', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_001, 1_001_005], [1_001_005, 1_001_009]])))
+  test('chunks: not ascending', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_006, 1_001_009], [1_001_001, 1_001_005]])))
+  test('chunks: a verse id of another book', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_001, 2_001_001]])))
+  test('chunks: a key that is not a book', () => rejects((s) => (body(s, 'chunks').zzz = [[1_001_001, 1_001_002]])))
+  test('chunks: a pair that is not two verse ids', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_001]])))
   test('ranges: a key not in topics', () => rejects((s) => (body(s, 'ranges')['per:zz'] = [[1_001_001, 1_001_002]])))
   test('ranges: an empty list', () => rejects((s) => (body(s, 'ranges')['obs:10'] = [])))
   test('ranges: backwards', () => rejects((s) => (body(s, 'ranges')['obs:10'] = [[2_001_010, 2_001_001]])))
@@ -231,6 +248,12 @@ describe('writers never emit what the view rejects', () => {
   test('strongs: empty list and repeated key throw', () => {
     expect(() => xtopicsSegment({ ...core, strongs: { 'per:abraham': [] } })).toThrow()
     expect(() => xtopicsSegment({ ...core, strongs: { 'per:abraham': ['H1', 'H1'] } })).toThrow()
+  })
+  test('chunks: empty, backwards, overlapping and of another book throw', () => {
+    expect(() => xtopicsSegment({ ...core, chunks: { gen: [] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, chunks: { gen: [[1_001_002, 1_001_001]] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, chunks: { gen: [[1_001_001, 1_001_003], [1_001_003, 1_001_004]] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, chunks: { gen: [[2_001_001, 2_001_002]] } })).toThrow()
   })
   test('ranges: empty, backwards and bad ids throw', () => {
     expect(() => xtopicsSegment({ ...core, ranges: { 'obs:10': [] } })).toThrow()

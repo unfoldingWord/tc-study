@@ -8,6 +8,7 @@ import { compareCodePoints, encodeUvarints } from '../../codec/columns'
 import type { Segment } from '../../codec/container'
 import { encodeBookSet, encodeCounts, encodeCoverage, encodeVerseLists } from '../../codec/counts'
 import { put } from '../../codec/values'
+import { chunksTable } from './chunks'
 import { TOPIC_KINDS, TOPIC_NAME_SOURCES, type TopicsCore, type TopicsPart, type XtopicsCore, type XtopicsPart } from '../../model'
 
 type Built = { tables: Record<string, [number, boolean]>; t: Record<string, CborValue> }
@@ -123,6 +124,12 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     }
     tables.ranges = [1, false]
     t.ranges = out
+  }
+  if (m.chunks !== undefined) {
+    const byBook = new Map(Object.entries(m.chunks))
+    for (const [book, list] of byBook) if (list.length === 0) throw new Error(`chunks: ${JSON.stringify(book)} has no section`)
+    tables.chunks = [1, false]
+    t.chunks = chunksTable(byBook)
   }
   return { tables, t }
 }

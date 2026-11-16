@@ -302,6 +302,7 @@ describe('tables a reader does not know (case 9)', () => {
     relations: [{ from: 'per:abraham', to: 'tw:names/abraham', type: 'same-as', source: 'STEPBible/TIPNR', confidence: 90 }],
     strongs: { 'per:abraham': ['H0085'] },
     ranges: { 'obs:10': [[2001001, 2001010]] },
+    chunks: { gen: [[1001001, 1001005], [1001006, 1001031]] },
   }
 
   test('xtopics core: coverage, topics, occurrences, relations, strongs, ranges', async () => {
@@ -312,9 +313,10 @@ describe('tables a reader does not know (case 9)', () => {
     expect(result.relations).toEqual(xtCore.relations)
     expect(result.strongs).toEqual({ 'per:abraham': ['H0085'] })
     expect(result.ranges).toEqual({ 'obs:10': [[2001001, 2001010]] })
-    const { relations: _r, strongs: _s, ranges: _g, ...small } = xtCore
+    expect(result.chunks).toEqual({ gen: [[1001001, 1001005], [1001006, 1001031]] })
+    const { relations: _r, strongs: _s, ranges: _g, chunks: _k, ...small } = xtCore
     const bare = await out((await writeSegment(xtopicsSegment(small))).bytes)
-    expect([bare.relations, bare.strongs, bare.ranges]).toEqual([undefined, undefined, undefined])
+    expect([bare.relations, bare.strongs, bare.ranges, bare.chunks]).toEqual([undefined, undefined, undefined, undefined])
   })
 
   test('xtopics part: occurrences as full verse ids', async () => {
