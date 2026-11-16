@@ -4,12 +4,15 @@
  *
  *   bun packages/resource-pipeline/cli/build-patch-v3.ts --lang hi --source aquifer --tn <dir> --tq <dir> --ta <dir> --ta-eng <dir>
  *     --en-ta-titles <file.json> --base-books <file.json> --common <dir> --out <dir>
- *     [--sign-key <pem>] [--revision <n>] [--previous <64 hex>] [--books tit,rut] [--built <RFC 3339>] [--publisher <name>]
+ *     [--sign-key <pem>] [--revision <n>] [--previous <64 hex>] [--published <url>] [--trusted <hex>] [--books tit,rut] [--built <RFC 3339>] [--publisher <name>]
  *
  * - `--tn`, `--tq`: what `fetch-aquifer.ts` wrote for UWTranslationNotes / UWTranslationQuestions (`json/NN.content.json`, `resource_metadata.json`,
  *   `manifest.json`); `--ta`, `--ta-eng`: the same for UWTranslationManual in the language and in English (every `json/*.content.json` is read).
  * - `--en-ta-titles`: what `fetch-en-ta-titles.ts` wrote. `--base-books`: `{ "tn": [books], "tq": [books] }`, the books Door43 production already
  *   has (`door43-books.ts` writes it). A table of a book goes in only if Door43 lacks it; a book with neither table is not built.
+ * - `--published`: the base URL of a packs Worker. Its published `{lang}-x-{source}` catalog is read (signature checked); if there is one the revision is its
+ *   revision + 1 (an explicit `--revision` must be greater) and `--previous` is its id; a 404 means the first revision. Without it the revision is 1.
+ * - `--trusted`: the raw Ed25519 public key (64 hex digits, comma-separated for several) trusted to sign what is downloaded, besides `language-pack-v3/keys/*.pub`.
  * - `--common`: a folder with `catalog-common.seg` and `segments/` of the published common catalog, or the base URL of a packs Worker (`https://...`; its
  *   `/v3/packs/common/catalog` and the `orig` segments it names are downloaded to a temporary folder, removed after the read). The patch requires the
  *   catalog (name, revision and id) and each book takes its `orig` from the `orig:{book}` segment.
@@ -22,6 +25,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   type AquiferArticle,
   type AquiferTaArticle,
@@ -34,10 +38,12 @@ import {
   type EnTaTitles,
   hex,
   KNOWN,
+  keyId,
   type PatchSource,
   readHeader,
   readSegment,
   signCatalog,
+  verifyCatalog,
 } from '@bt-synergy/language-pack-v3'
 import { readSigningKey } from '../src/language/signKey'
 
@@ -45,11 +51,11 @@ export class UsageError extends Error {}
 
 export const USAGE =
   'Usage: build-patch-v3 --lang <code> --source <name> --tn <dir> --tq <dir> --ta <dir> --ta-eng <dir> --en-ta-titles <file> --base-books <file> --common <dir> --out <dir>\n' +
-  '  [--sign-key <pem>] [--revision <n>] [--previous <64 hex digits>] [--books tit,rut] [--built <RFC 3339>] [--publisher <name>]'
+  '  [--sign-key <pem>] [--revision <n>] [--previous <64 hex digits>] [--published <url>] [--trusted <hex>] [--books tit,rut] [--built <RFC 3339>] [--publisher <name>]'
 
 type Io = { log: (line: string) => void; error: (line: string) => void }
 
-const VALUE_FLAGS = ['lang', 'source', 'tn', 'tq', 'ta', 'ta-eng', 'en-ta-titles', 'base-books', 'common', 'out', 'sign-key', 'revision', 'previous', 'books', 'built', 'publisher']
+const VALUE_FLAGS = ['lang', 'source', 'tn', 'tq', 'ta', 'ta-eng', 'en-ta-titles', 'base-books', 'common', 'out', 'sign-key', 'revision', 'previous', 'published', 'trusted', 'books', 'built', 'publisher']
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
 
 type Options = {
@@ -64,7 +70,10 @@ type Options = {
   common: string
   out: string
   signKey?: string
-  revision: number
+  /** `undefined` when not given. */
+  revision?: number
+  published?: string
+  trusted: string[]
   previous?: Uint8Array
   books?: string[]
   built: string
@@ -108,11 +117,15 @@ export function optionsFromArgs(argv: string[]): Options {
   if (!isUrl(common) && (!existsSync(join(common, 'catalog-common.seg')) || !statSync(join(common, 'catalog-common.seg')).isFile())) throw new UsageError(`--common: ${join(common, 'catalog-common.seg')} is not a file`)
   const signKey = flags.get('sign-key')
   if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
-  const revisionText = flags.get('revision') ?? '1'
-  const revision = Number(revisionText)
-  if (!/^[0-9]+$/.test(revisionText) || !Number.isSafeInteger(revision)) throw new UsageError(`--revision ${JSON.stringify(revisionText)} is not a whole number`)
+  const revisionText = flags.get('revision')
+  const revision = revisionText === undefined ? undefined : Number(revisionText)
+  if (revisionText !== undefined && (!/^[0-9]+$/.test(revisionText) || !Number.isSafeInteger(revision))) throw new UsageError(`--revision ${JSON.stringify(revisionText)} is not a whole number`)
   const previousText = flags.get('previous')
   if (previousText !== undefined && !/^[0-9a-f]{64}$/.test(previousText)) throw new UsageError(`--previous ${JSON.stringify(previousText)} is not an id (64 lowercase hex digits)`)
+  const published = flags.get('published')
+  if (published !== undefined && !isUrl(published)) throw new UsageError(`--published ${JSON.stringify(published)} is not a URL (https://...)`)
+  const trusted = flags.get('trusted') === undefined ? [] : flags.get('trusted')!.split(',')
+  for (const key of trusted) if (!/^[0-9a-f]{64}$/.test(key)) throw new UsageError(`--trusted ${JSON.stringify(key)} is not a public key (64 lowercase hex digits)`)
   let books: string[] | undefined
   if (flags.has('books')) {
     books = flags.get('books')!.split(',')
@@ -141,6 +154,8 @@ export function optionsFromArgs(argv: string[]): Options {
     out: need('out'),
     signKey,
     revision,
+    published,
+    trusted,
     previous: previousText === undefined ? undefined : Uint8Array.from(previousText.match(/../g)!, (pair) => parseInt(pair, 16)),
     books,
     built,
@@ -190,13 +205,51 @@ function readManual(dir: string): AquiferTaArticle[] {
   })
 }
 
+/** The root of a packs Worker from its base URL, which may end in `/v3/packs` or `/v3/packs/{name}`. */
+const rootOf = (base: string): string => base.replace(/\/+$/, '').replace(/\/v3\/packs(?:\/[^/]+)?$/, '')
+
+/** The public keys a download is checked against: `language-pack-v3/keys/*.pub` and the hex keys of `--trusted`, by key id. */
+export function trustedKeys(extra: readonly string[] = [], keysDir = fileURLToPath(new URL('../../language-pack-v3/keys', import.meta.url))): Record<string, Uint8Array> {
+  const out: Record<string, Uint8Array> = {}
+  const add = (text: string): void => {
+    const raw = Uint8Array.from(text.match(/../g) ?? [], (pair) => parseInt(pair, 16))
+    out[keyId(raw)] = raw
+  }
+  if (existsSync(keysDir)) {
+    for (const name of readdirSync(keysDir)) {
+      if (!name.endsWith('.pub')) continue
+      const text = readFileSync(join(keysDir, name), 'utf8').trim()
+      if (/^[0-9a-f]{64}$/.test(text)) add(text)
+    }
+  }
+  for (const key of extra) add(key)
+  return out
+}
+
+/**
+ * What a Worker has published of the catalog `name`: its revision and id (signature checked against `trusted`), or `undefined` on a 404 (nothing published yet).
+ * Any other failure throws.
+ */
+export async function readPublished(base: string, name: string, trusted: Record<string, Uint8Array>, fetcher: typeof fetch = fetch): Promise<{ revision: number; id: string } | undefined> {
+  const url = `${rootOf(base)}/v3/packs/${name}/catalog`
+  const response = await fetcher(url)
+  if (response.status === 404) return undefined
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  await verifyCatalog(bytes, trusted)
+  const read = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
+  const model = catalogView(read.seg)
+  if (model.about.catalog !== name) throw new Error(`${url} is the catalog ${JSON.stringify(model.about.catalog)}, and ${JSON.stringify(name)} is expected`)
+  return { revision: model.about.revision, id: read.id }
+}
+
 /**
  * Downloads the published common catalog from a packs Worker into a new temporary folder (`catalog-common.seg` and `segments/`): `{base}/v3/packs/common/catalog`,
  * then the `orig` segments it names, `{base}/v3/packs/seg/{id}` (the patch reads only those; the map and topics segments are not needed). `base` may end
- * in `/v3/packs/common` or `/v3/packs`. Each segment is checked against its id by `readCommon`'s reader. Returns the folder; the caller removes it.
+ * in `/v3/packs/common` or `/v3/packs`. The catalog's signature is checked against `trusted` (`verifyCatalog`) and each segment against its id. Returns the folder; the caller removes it.
  */
-export async function downloadCommon(base: string, fetcher: typeof fetch = fetch): Promise<string> {
-  const root = base.replace(/\/+$/, '').replace(/\/v3\/packs(?:\/common)?$/, '')
+export async function downloadCommon(base: string, trusted: Record<string, Uint8Array>, fetcher: typeof fetch = fetch): Promise<string> {
+  const root = rootOf(base)
   const get = async (url: string): Promise<Uint8Array> => {
     const response = await fetcher(url)
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
@@ -205,6 +258,7 @@ export async function downloadCommon(base: string, fetcher: typeof fetch = fetch
   const dir = await mkdtemp(join(tmpdir(), 'patch-common-'))
   try {
     const bytes = await get(`${root}/v3/packs/common/catalog`)
+    await verifyCatalog(bytes, trusted)
     await writeFile(join(dir, 'catalog-common.seg'), bytes)
     const { seg } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
     const model = catalogView(seg)
@@ -261,9 +315,23 @@ async function build(o: Options, io: Io): Promise<void> {
   const tq = readFetched(o.tq, 'UWTranslationQuestions', o.books)
   const titles = readJson<EnTaTitles>(o.enTaTitles, 'the TA titles')
   const { map: taMap, unmatched } = buildTaMap(readManual(o.ta), readManual(o.taEng), titles)
+  const trusted = trustedKeys(o.trusted)
+  const name = `${o.lang}-x-${o.source}`
+  let revision = o.revision ?? 1
+  let previous = o.previous
+  if (o.published !== undefined) {
+    const published = await readPublished(o.published, name, trusted)
+    if (published !== undefined) {
+      if (o.revision !== undefined && o.revision <= published.revision) throw new Error(`--revision ${o.revision} is not greater than the published revision ${published.revision} of ${name}`)
+      revision = o.revision ?? published.revision + 1
+      const id = Uint8Array.from(published.id.match(/../g)!, (pair) => parseInt(pair, 16))
+      if (previous !== undefined && hex(previous) !== published.id) throw new Error(`--previous is not the id of the published ${name} (${published.id})`)
+      previous = id
+    }
+  }
   let commonDir = o.common
   let temporary: string | undefined
-  if (isUrl(o.common)) commonDir = temporary = await downloadCommon(o.common)
+  if (isUrl(o.common)) commonDir = temporary = await downloadCommon(o.common, trusted)
   let common: Awaited<ReturnType<typeof readCommon>>
   try {
     common = await readCommon(commonDir)
@@ -281,7 +349,7 @@ async function build(o: Options, io: Io): Promise<void> {
     origs: common.origs,
     common: { revision: common.revision, id: common.id },
     books: o.books,
-    about: { revision: o.revision, built: o.built, publisher: o.publisher, previous: o.previous },
+    about: { revision, built: o.built, publisher: o.publisher, previous },
   })
 
   let catalogBytes = patch.catalog.bytes
@@ -292,7 +360,6 @@ async function build(o: Options, io: Io): Promise<void> {
     catalogBytes = await signCatalog(catalogBytes, key.pkcs8)
   }
 
-  const name = `${o.lang}-x-${o.source}`
   // Empty segments/ first, as build-v3 does, so a withdrawn book does not linger.
   await rm(join(o.out, 'segments'), { recursive: true, force: true })
   await mkdir(join(o.out, 'segments'), { recursive: true })
@@ -302,7 +369,7 @@ async function build(o: Options, io: Io): Promise<void> {
   const segmentBytes = patch.segments.reduce((sum, s) => sum + s.bytes.length, 0)
   const lines = [
     `built: ${o.built}`,
-    `catalog: ${name}, revision ${o.revision}, id ${patch.catalog.id}`,
+    `catalog: ${name}, revision ${revision}, id ${patch.catalog.id}`,
     `common: revision ${common.revision}, id ${common.id}`,
     `signed: ${keyId === undefined ? 'no' : `key ${keyId}`}`,
     `door43 has: tn ${base.tn!.join(',') || '-'}; tq ${base.tq!.join(',') || '-'}`,
@@ -321,7 +388,7 @@ async function build(o: Options, io: Io): Promise<void> {
     JSON.stringify({
       catalog: `catalog-${name}.seg`,
       id: patch.catalog.id,
-      revision: o.revision,
+      revision,
       signed: keyId !== undefined,
       books: patch.built,
       rows: patch.rows,

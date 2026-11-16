@@ -183,8 +183,8 @@ export async function buildPatch(o: PatchInput): Promise<PatchBuild> {
     if (source === undefined || built[kind].length === 0) continue
     const key = keys[kind]
     const attribution = plainNotice(source.metadata.adaptation_notice ?? '')
-    if (attribution === '') throw new Error(`${key}: adaptation_notice is empty, and the attribution of a patch is never left out`)
     const { license, rights } = licenseOf(source.metadata.license_info, key, adapterOf(source.metadata.adaptation_notice ?? '') ?? o.adapter ?? DEFAULT_ADAPTER)
+    if (attribution === '') throw new Error(`${key}: adaptation_notice is empty, and the attribution of a patch is never left out`)
     const resource: CatalogResource = {
       key,
       title: source.metadata.title ?? key,

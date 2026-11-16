@@ -14,10 +14,12 @@ import {
   type OrigModel,
   origSegment,
   readSegment,
+  signCatalog,
   verifyCatalog,
 } from '@bt-synergy/language-pack-v3'
 import fixture from '../../language-pack-v3/src/build/aquiferHelps.fixture.json'
 import { main, optionsFromArgs, readCommon, UsageError } from './build-patch-v3'
+import { readSigningKey } from '../src/language/signKey'
 import { door43Books, main as door43Main } from './door43-books'
 import { testKey } from './testKey'
 
@@ -237,38 +239,103 @@ describe('build-patch-v3', () => {
     expect(r.err.join('\n')).toContain('only CC-BY-SA-4.0')
   })
 
-  test('--common can be a packs Worker: the catalog and the orig segments are downloaded', async () => {
-    const { args, root } = await inputs()
-    const dir = join(root, 'common')
+  /** A fake packs Worker: the common catalog signed with `key` (or not), its segments, and optionally a published `hi-x-aquifer` catalog (`undefined`: 404). */
+  async function fakeWorker(dir: string, key: ReturnType<typeof testKey> | undefined, published?: Uint8Array) {
     const paths: string[] = []
+    const common = new Uint8Array(readFileSync(join(dir, 'catalog-common.seg')))
+    const body = key === undefined ? common : await signCatalog(common, (await readSigningKey(key.pem)).pkcs8)
     const server = Bun.serve({
       port: 0,
       fetch(request) {
         const path = new URL(request.url).pathname
         paths.push(path)
-        if (path === '/v3/packs/common/catalog') return new Response(readFileSync(join(dir, 'catalog-common.seg')))
+        if (path === '/v3/packs/common/catalog') return new Response(body)
+        if (path === '/v3/packs/hi-x-aquifer/catalog') return published === undefined ? new Response('no', { status: 404 }) : new Response(published)
         const m = /^\/v3\/packs\/seg\/([0-9a-f]{64})$/.exec(path)
         if (m !== null) return new Response(readFileSync(join(dir, 'segments', `${m[1]}.seg`)))
         return new Response('no', { status: 404 })
       },
     })
+    return { server, paths, url: `http://127.0.0.1:${server.port}` }
+  }
+  const withFlag = (args: string[], name: string, value: string): string[] => {
+    const copy = [...args]
+    copy[copy.indexOf(name) + 1] = value
+    return copy
+  }
+
+  test('--common can be a packs Worker: the catalog is verified and the orig segments are downloaded', async () => {
+    const { args, root } = await inputs()
+    const key = testKey()
+    const { server, paths, url } = await fakeWorker(join(root, 'common'), key)
     try {
       const [viaDir, viaUrl] = [temp(), temp()]
       expect((await run(args(viaDir))).code).toBe(0)
-      const withUrl = args(viaUrl)
-      withUrl[withUrl.indexOf('--common') + 1] = `http://127.0.0.1:${server.port}`
-      const r = await run(withUrl)
+      const r = await run(withFlag(args(viaUrl, ['--trusted', key.publicHex]), '--common', url))
       expect(r.err).toEqual([])
       expect(r.code).toBe(0)
       expect(paths[0]).toBe('/v3/packs/common/catalog')
       expect(paths.length).toBe(3)
       expect(read(join(viaUrl, 'catalog-hi-x-aquifer.seg'))).toEqual(read(join(viaDir, 'catalog-hi-x-aquifer.seg')))
       // a server that fails is a build error
-      withUrl[withUrl.indexOf('--common') + 1] = `http://127.0.0.1:${server.port}/nothing`
       server.stop(true)
-      expect((await run(withUrl)).code).toBe(2)
+      expect((await run(withFlag(args(temp(), ['--trusted', key.publicHex]), '--common', `${url}/nothing`))).code).toBe(2)
     } finally {
       server.stop(true)
+    }
+  })
+
+  test('a downloaded common catalog that is unsigned, or signed by a key nobody trusts, is a build error', async () => {
+    const { args, root } = await inputs()
+    const key = testKey()
+    for (const [signer, trusted] of [[undefined, key.publicHex], [key, testKey().publicHex]] as const) {
+      const { server, url } = await fakeWorker(join(root, 'common'), signer)
+      try {
+        const out = temp()
+        const r = await run(withFlag(args(out, ['--trusted', trusted]), '--common', url))
+        expect(r.code).toBe(2)
+        expect(readdirSync(out)).toEqual([])
+      } finally {
+        server.stop(true)
+      }
+    }
+  })
+
+  test('--published: the revision follows the published one, previous is its id, an explicit revision must be greater, a 404 is revision 1', async () => {
+    const { args } = await inputs()
+    const key = testKey()
+    const first = temp()
+    const firstRun = await run(args(first, ['--revision', '3', '--sign-key', key.pem]))
+    expect(firstRun.code).toBe(0)
+    const published = read(join(first, 'catalog-hi-x-aquifer.seg'))
+    const publishedId = JSON.parse(firstRun.out[firstRun.out.length - 1]).id as string
+    const { root } = await inputs()
+    const worker = await fakeWorker(join(root, 'common'), undefined, published)
+    const none = await fakeWorker(join(root, 'common'), undefined)
+    try {
+      const view = async (dir: string) => catalogView((await readSegment(read(join(dir, 'catalog-hi-x-aquifer.seg')), { known: KNOWN.catalog, expectedClass: 'catalog' })).seg)
+      const next = temp()
+      const r = await run(args(next, ['--published', worker.url, '--trusted', key.publicHex]))
+      expect(r.err).toEqual([])
+      const about = (await view(next)).about
+      expect(about.revision).toBe(4)
+      expect(hex(about.previous!)).toBe(publishedId)
+      const same = await run(args(temp(), ['--published', worker.url, '--trusted', key.publicHex, '--revision', '3']))
+      expect(same.code).toBe(2)
+      expect(same.err.join(' ')).toContain('not greater')
+      const higher = temp()
+      expect((await run(args(higher, ['--published', worker.url, '--trusted', key.publicHex, '--revision', '9']))).code).toBe(0)
+      expect((await view(higher)).about.revision).toBe(9)
+      const fresh = temp()
+      expect((await run(args(fresh, ['--published', none.url]))).code).toBe(0)
+      const freshAbout = (await view(fresh)).about
+      expect(freshAbout.revision).toBe(1)
+      expect(freshAbout.previous).toBeUndefined()
+      // a published catalog nobody trusts is not believed
+      expect((await run(args(temp(), ['--published', worker.url]))).code).toBe(2)
+    } finally {
+      worker.server.stop(true)
+      none.server.stop(true)
     }
   })
 
