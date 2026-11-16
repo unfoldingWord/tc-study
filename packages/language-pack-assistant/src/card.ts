@@ -141,6 +141,21 @@ async function searchWords(reader: PackReader, text: string, words: ((t: string)
   return out
 }
 
+type ArticleAnswer = Awaited<ReturnType<PackReader['article']>>
+
+/**
+ * Every section of an article (spec part 5): the section asked for, or else the default sections, first; then the others in the
+ * article's order. The client chooses the default sections; this only orders the answer of `article(id, 'all')`.
+ */
+export async function articleAll(reader: PackReader, id: string, section?: string): Promise<ArticleAnswer> {
+  const lead = await reader.article(id, section)
+  const all = await reader.article(id, 'all')
+  if (all.data === null) return lead.data === null ? lead : all
+  const first = new Set((lead.data?.sections ?? []).map((s) => s.sid))
+  const sections = [...all.data.sections.filter((s) => first.has(s.sid)), ...all.data.sections.filter((s) => !first.has(s.sid))]
+  return { ...all, data: { ...all.data, sections } }
+}
+
 /** Runs one call; an argument the reader refuses (an empty search) is an answer with no data, not an error. */
 async function query(reader: PackReader, call: Call, words?: (t: string) => string[]): Promise<Answer<unknown> | undefined> {
   const a = call.args
@@ -151,7 +166,7 @@ async function query(reader: PackReader, call: Call, words?: (t: string) => stri
       case 'context':
         return await reader.context(String(a.ref))
       case 'article':
-        return await reader.article(String(a.id), typeof a.section === 'string' ? a.section : undefined)
+        return await articleAll(reader, String(a.id), typeof a.section === 'string' ? a.section : undefined)
       case 'concept':
         return await reader.concept(String(a.id))
       case 'books':
@@ -194,28 +209,37 @@ async function verseAnswers(reader: PackReader, call: Call, limit: number): Prom
   return out
 }
 
-/** The pieces, missing units and coverage of a call. A concept reads its article (the default section) and the books it is used in. */
+/**
+ * The pieces, missing units and coverage of a call. A concept reads its article (every section, the default first) and the books it is
+ * used in; its pieces are the sections, then the concept, then where it is used (spec part 5).
+ */
 export async function piecesOf(reader: PackReader, call: Call, limit: number, words?: (t: string) => string[]): Promise<Pick<Card, 'pieces' | 'missing' | 'coverage'>> {
-  const pieces: Fragment[] = []
   const missing: Answer<unknown>['notInstalled'] = []
   let coverage: Answer<unknown>['coverage']
-  const take = async (c: Call, a: Answer<unknown> | undefined, first: boolean): Promise<void> => {
-    if (a === undefined) return
+  const take = async (c: Call, a: Answer<unknown> | undefined, first: boolean): Promise<Fragment[]> => {
+    if (a === undefined) return []
     await citeMaps(reader, c, a)
     const each = a.data !== null && first ? await verseAnswers(reader, c, limit) : undefined
-    pieces.push(...fragmentsOf(c, a, reader, each))
     for (const n of a.notInstalled) if (!missing.some((x) => x.unit === n.unit)) missing.push(n)
     if (first && a.coverage !== undefined) coverage = a.coverage
+    return fragmentsOf(c, a, reader, each)
   }
   const a = await query(reader, call, words)
-  await take(call, a, true)
+  let pieces = await take(call, a, true)
   if (call.query === 'concept') {
     // A concept reached by an alias names its article and its books by the concept's own id.
     const found = a?.data as { found?: boolean; id?: string } | null | undefined
     const id = found?.found === true && found.id !== undefined ? found.id : String(call.args.id)
     const article = id.startsWith('tw:') || id.startsWith('ta:')
-    const more: Call[] = article ? [{ query: 'article', args: { id } }, { query: 'books', args: { article: id } }] : [{ query: 'books', args: { concept: id } }]
-    for (const c of more) await take(c, await query(reader, c), false)
+    const sections: Fragment[] = []
+    if (article) {
+      const c: Call = { query: 'article', args: { id } }
+      sections.push(...(await take(c, await query(reader, c), false)))
+    }
+    const books = article ? { query: 'books' as const, args: { article: id } } : { query: 'books' as const, args: { concept: id } }
+    const used = await take(books, await query(reader, books), false)
+    const own = pieces.filter((p) => p.kind === 'concept')
+    pieces = [...sections, ...own, ...used, ...pieces.filter((p) => p.kind !== 'concept')]
   }
   return { pieces: pieces.slice(0, limit), missing, ...(coverage !== undefined ? { coverage } : {}) }
 }

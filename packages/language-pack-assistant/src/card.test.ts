@@ -26,21 +26,42 @@ test('a choose card has no pieces', async () => {
   expect(card.interpretation).toBe('¿…?')
 })
 
-test('a concept card: the concept, its definition within the first 3, then the books by count; every cite is a real cite', async () => {
+test('a concept card: the default section first, the other sections in article order, the concept, then the books by count; every cite is a real cite', async () => {
   const id = used
-  const { pieces } = await piecesOf(reader, { query: 'concept', args: { id } }, 8)
-  expect(pieces[0]!.id).toBe(`concept:${id}`)
-  const section = pieces.findIndex((p) => p.kind === 'section')
-  expect(section).toBeGreaterThan(0)
-  expect(section).toBeLessThan(3)
-  const article = await reader.article(id)
-  expect(pieces[section]!.cite).toEqual(article.cites[0]!)
-  const books = pieces.filter((p) => p.kind === 'book')
+  const { pieces } = await piecesOf(reader, { query: 'concept', args: { id } }, 50)
+  const lead = await reader.article(id)
+  const all = await reader.article(id, 'all')
+  const leadIds = lead.data!.sections.map((s) => `section:${id}#${s.sid}`)
+  const restIds = all.data!.sections.filter((s) => !lead.data!.sections.some((l) => l.sid === s.sid)).map((s) => `section:${id}#${s.sid}`)
+  expect(restIds.length).toBeGreaterThan(0)
+  const n = leadIds.length + restIds.length
+  expect(pieces.slice(0, n).map((p) => p.id)).toEqual([...leadIds, ...restIds])
+  expect(pieces[0]!.cite).toEqual(lead.cites[0]!)
+  for (const p of pieces.slice(0, n)) expect(all.cites).toContainEqual(p.cite)
+  expect(pieces[n]!.id).toBe(`concept:${id}`)
+  const books = pieces.slice(n + 1).filter((p) => p.kind === 'book')
   expect(books.length).toBeGreaterThan(0)
+  expect(pieces.slice(n + 1, n + 1 + books.length)).toEqual(books)
   for (const p of pieces) expect(p.link).toMatch(LINK)
   // The concept and book pieces cite the resources the maps name (the maps' answers carry no cites of their own).
   const m = await reader.maps()
-  expect(m.xmap!.core.res.some(([k, r]) => k === pieces[0]!.cite.res && r === pieces[0]!.cite.release)).toBe(true)
+  expect(m.xmap!.core.res.some(([k, r]) => k === pieces[n]!.cite.res && r === pieces[n]!.cite.release)).toBe(true)
+})
+
+test('an article card: the default section first, then every other section in article order', async () => {
+  const id = used
+  const { pieces } = await piecesOf(reader, { query: 'article', args: { id } }, 50)
+  const lead = (await reader.article(id)).data!.sections.map((s) => s.sid)
+  const all = (await reader.article(id, 'all')).data!.sections.map((s) => s.sid)
+  expect(pieces.map((p) => p.id)).toEqual([...lead, ...all.filter((s) => !lead.includes(s))].map((s) => `section:${id}#${s}`))
+})
+
+test('an article card for one section: that section first, then the others', async () => {
+  const id = used
+  const all = (await reader.article(id, 'all')).data!.sections.map((s) => s.sid)
+  const asked = all[all.length - 1]!
+  const { pieces } = await piecesOf(reader, { query: 'article', args: { id, section: asked } }, 50)
+  expect(pieces.map((p) => p.id)).toEqual([asked, ...all.filter((s) => s !== asked)].map((s) => `section:${id}#${s}`))
 })
 
 test('books: cells by count, none and zero left out', async () => {
