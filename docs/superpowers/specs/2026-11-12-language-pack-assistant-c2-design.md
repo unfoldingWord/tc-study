@@ -88,6 +88,7 @@ Measured per language on a held-out question set:
   - `link` is a typed link the app can open: `ref:`, `concepto:`, `articulo:<id>#<role>`, `pieza:<id>`, and for OBS
     `obs:NN:FF` (a frame: `frame:`, `obsnote:` and `obsquestion:` pieces) or `obs:NN` (a story: `story:` pieces).
     `book:obs` keeps `pieza:book:obs`.
+  - A section whose role is `unknown` links to `articulo:<id>#<sid>` (its section id), never to `#unknown`.
 
 ### 3. The lexicon (assistant)
 
