@@ -221,8 +221,21 @@ Piece 0 is the ellipsis, piece 1 is the original word 5, piece 2 is a word the o
 | `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; the argument of an event is the string `seps[arg]`, with **no** `- 1` (the number 0 is a string of `seps` too, and `"close"` has `""` as in a book) | never |
 | `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes (an empty map counts as a node with attributes, as in a book) |
 | `macula` | object | `macula` | the table is not in the file or not read |
+| `macula.v` | integer | the table's version in the header (`tables.macula[0]`): 1 or 2 | the table is not in the file or not read |
 | `macula.release` | text | `macula.release` | never |
-| `macula.trees`, `.referents` | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
+| `macula.trees`, `.referents` (v1) | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
+| `macula.trees` (v2) | list of `{lo, hi, tree}` | one per sentence, in the file's order: `lo` its lowest word position, `hi` = `lo + span`, `tree` the decoded `nodes` entry | the file lacks `trees` |
+| `macula.referents` (v2) | list of `{word, kind, piece, form, strong, ch, vs, ante?}` | one per row of `referents.cols`, in the file's order | the file lacks `referents` |
+
+**`macula` v2.** `tree` is `[label, ...children]`: `label` is the text of `trees.labels` (`"v"`, `"s*"`, `"*"`, `"&"`), a child
+is a tree again, a word is its position (an integer) and a piece of a word is `[position, text]` (`text` from `trees.pieces`).
+A leaf is never confused with a part: a part is a list whose first item is text, a piece is a list whose first item is an
+integer, a word is an integer. In a row, `word` is the referring word's position (the deltas of `cols.word` added up), `kind`
+is the text of `referents.kinds` (`"r"`, `"s"`, `"c"`, `"a"`, `"p"`, `"o"`), `piece` the text of `referents.pieces` (`""` when the
+whole word refers), `form` and `strong` the entity's two texts, `ch` and `vs` the numbers as the file has them, and
+`ante` the antecedent's position, that is `cols.ante - 1`, **absent** when `cols.ante` is 0 (an absent value is an absent
+key). Example: `{"word": 4, "kind": "r", "piece": "", "form": "יוֹנָה", "strong": "H3124", "ch": 1, "vs": 15, "ante": 60}`.
+The reader gives v1 and v2 the way each is stored; it does not turn one into the other.
 
 Example: `{"form": "Παῦλος", "lemma": "Παῦλος", "morph": "Gr,N,,,,,NMS,", "strong": "G39720"}`. The word at position `n` is
 `words[n]`. There is one word piece per word, in order, so `pieces` lists every word's form once.
@@ -429,7 +442,16 @@ types, these are `E_BODY` too:
   `missing` entry that names a piece that does not exist, has a position, or is listed twice (in either list); a `-1`
   position of a quote that is in neither list (every `-1` is in exactly one of `quoteKinds` and `quoteMissing`).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
-  are not as many as the words; `macula.release` that is not text.
+  are not as many as the words; `macula.release` that is not text. A `macula` table of a version other than 1 and 2 is
+  skipped (`container.md`), it is not `E_BODY`. For `macula` v2:
+  - `trees`: `lo`, `span` and `nodes` with different numbers of sentences; an index outside `trees.labels` or `trees.pieces`;
+    a tree that is cut short (the list ends before the children it announced), that has bytes left after its root, or that
+    has more than one root; a word or a piece whose position is outside `lo .. lo + span` or outside the book's words
+    (`0 .. n - 1`, `n` the number of rows of `words`); a node deeper than 64 levels (the root is level 1).
+  - `referents`: the columns of `cols` with unequal numbers of rows; an index outside `kinds`, `pieces` or `ents`; a word
+    position outside the book's words; `ch` or `vs` equal to 0; `ante` above the number of the book's words (it is a
+    position + 1, so the largest allowed is `n`).
+  - A uvarints or deltas column follows the rules of "Columns" above.
 - **`obs`.** A help row whose story is outside 1 to 50 or whose frame is outside 0 to 99; a story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
   table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is
   `flags`, or a `frame` column of another length than `n`.

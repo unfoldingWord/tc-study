@@ -14,7 +14,7 @@ orig-header = {
 orig-tables = {
   "words": orig-words,         ; required, v1
   "text": orig-text,           ; required, v1
-  ? "macula": macula,          ; optional, v1
+  ? "macula": macula-v1 / macula-v2,   ; optional; the version in h.tables says which
 }
 
 orig-words = {
@@ -42,10 +42,144 @@ orig-text = {
 ; Words inside footnotes count like any other word, in document order. The ketiv and qere marks are kept as
 ; published (as nodes, or as attributes in "other").
 
-macula = {
+; ---------------------------------------------------------------------------------------------------------------------
+; MACULA (Biblica, CC BY 4.0: Clear-Bible/macula-hebrew and macula-greek, the lowfat trees and the referent columns).
+; Two versions of the optional table. The version is the number in h.tables: [1, false] or [2, false]. A reader that
+; knows only v1 skips v2, and the other way round (container.md: an optional table of an unknown version is skipped), so
+; the original opens without MACULA. The builder writes v2 only; a reader of this specification reads both.
+; `release` and the license of the resource in the catalog are the same in both versions.
+
+macula-v1 = {
   "release": tstr,             ; the MACULA release the data comes from
   ? "trees": any,              ; v1: the value published today (clause trees per verse)
   ? "referents": any,          ; v1: the value published today (who each pronoun refers to)
 }
-; v1 keeps MACULA as it is published, under its own license. Phase 0 measured it at 193 KB for Psalms after
-; compression. A columnar layout is a later version of this table.
+; v1 keeps MACULA as it is published, under its own license, and stays as it is. It holds the data of Taller's files, one
+; per book (`src/domain/syntaxTree.ts`, `src/domain/referents.ts`, built by `scripts/build-trees.mts` and
+; `scripts/build-referents.mts`): Taller is the source of every code below. Phase 0 measured it at 193 KB for Psalms
+; after compression; for Genesis it is 564 925 of the 1 017 315 body bytes of `orig` (trees 307 686, referents 257 177),
+; as many small nested arrays. No reader uses the contents of v1: the output of a reader gives the value as it is
+; (tests/README.md, `macula.v` 1). The codes of v1, which v2 keeps in another layout:
+;
+;   referents  {"words": [[form, strong]], "verses": {"C:V": [[key, occurrence, [target, ...]], ...]}}
+;     A row of "verses" is a word of that verse that refers to others: `key` is its referentKey and `occurrence` its
+;     occurrence (both defined below). A target is [kind, piece, chapter, verse, word]:
+;       kind     "r" the word refers: a pronoun, or the suffix of a Hebrew word, stands for the target;
+;                "s" subject left unsaid: who a verb speaks of when its sentence does not name them and MACULA gives the
+;                    verb no frame (MACULA's subjref column);
+;                "c" causer: the place `AA` of the verb's frame;
+;                "a" agent: the place `A0`;
+;                "p" patient: the place `A1`;
+;                "o" any other place of the frame.
+;       piece    the suffix's text when only a piece of a Hebrew word refers; "" when the whole word does;
+;       chapter, verse   the verse of the target word, in the numbering of the app's texts; 0, 0 is the verse of the
+;                word that refers;
+;       word     a number in "words": [form, strong], the target as pointed text without the marks of the chant, and its
+;                Strong (`H3124`, `G2424`; "" when MACULA gives none).
+;     Source of the meanings. Frame places: macula-hebrew documentation, section 2.1, attribute Frame: "A0 indicates
+;     arguments exhibiting features of prototypical Agents. A1 ... prototypical Patients. AA indicates Agents of induced
+;     actions--cause A0 to act". Implied subject: the same section, attribute SubjRef ("the implied subject of a verb").
+;     Pronoun referent: the same section, the Ref attribute ("the nearest nominal antecedent of a pronoun"). The Greek
+;     manual does not describe these columns (it has no Frame, SubjRef or referent attribute in its text); the Greek
+;     table is read by Taller with the same rules. That "o" is "any other place of the frame", that "s" and "r" are left
+;     out when the frame already names the same word, and that a frame place filled by a pronoun gives what the pronoun
+;     stands for, are Taller's rules (`referentFiles`), not MACULA's.
+;
+;   trees     {"sentences": [tree, ...], "words": {"C:V": n}}
+;     A tree is [label, child, ...]. A child is a tree, a leaf (the number CCCVVVWWW: chapter, verse and word of the
+;     verse, from 1) or, when only a piece of a Hebrew word has the function, [CCCVVVWWW, text].
+;     A label is a role followed by `*` when the part is a clause: "s", "v*", "o*", "*". The bare "*" is a clause with
+;     no role. "&" is a word that joins (lowfat class `cj` or `conj` with no role): an "and" between two clauses or two
+;     nouns, a "because" before a clause. The roles are the `role` attribute of MACULA's lowfat trees (list below).
+;     The leaf ids are of the UHB or UGNT, fitted to the words of this book by their letters (Taller, `fitWords`).
+;
+; The key and the occurrence of a word (both versions).
+;   referentKey(text): the text in NFD; every mark removed (\p{M}); in lower case; the final sigma ς written σ; only the
+;     letters kept (\p{L}). The key of a Hebrew word is the key of the text of all its pieces together; for a word of
+;     "words" it is the key of its "form".
+;   occurrence: the place of a word, counted from 0, among the words of its verse that have that key, in book order.
+;   v1 finds the word that refers by its verse, key and occurrence; v2 writes its position.
+;
+; The codes of the roles (a label is one of these, or "&", with or without `*`). The names are those of the MACULA
+; documentation: Greek, "Documentation for the MACULA Greek Treebank for the Nestle 1904 Greek New Testament" (Tan and
+; Wu, 2022-03-31), section 2.4; Hebrew, the macula-hebrew treebank documentation, section 2.4. The manuals write the
+; labels in capitals (S, V, ADV); lowfat writes them in lower case. A role the manuals do not define is said so.
+;   s     Subject function: the agent of typically transitive verbs and the single argument of intransitive verbs.  [Greek S, Hebrew S]
+;   v     Verbal function: the action or event of a proposition; in a verbal clause, the head of the clause.         [Greek V, Hebrew V]
+;   vc    Verbal copula function: a linking verb ("to be") between the subject and a predicate. Greek manual only.    [Greek VC]
+;   o     Object function: the patient or goal of the action.                                                          [Greek O, Hebrew O]
+;   o2    Second object function: a second object (a person and a thing, or a direct object and its complement).     [Greek O2, Hebrew O2]
+;   io    Indirect object function: the intended recipient of the action. Greek manual only.                          [Greek IO]
+;   p     Predicate function: an attribution or identification about the subject of a verbless clause or of one with a
+;         copula.                                                                                                      [Greek P, Hebrew P]
+;   adv   Adverbial function: the when, where, how or why of a proposition.                                          [Greek ADV, Hebrew ADV]
+;   pp    Prepositional phrase function: a preposition with its object that says when, where, how or why. A role of the
+;         Hebrew manual only (in the Greek manual `pp` is a phrase category, and such phrases are ADV).               [Hebrew PP]
+;   aux   As used by MACULA lowfat; not defined in either manual. Kept as it comes.
+;   oc    Object complement function (an assertion about the object), in the Hebrew manual, which says it is "planned for
+;         the near future". Taller's list does not name it; the builder keeps every role as it comes
+;         (`[a-z][a-z0-9]{0,5}`, what Taller accepts).
+; `*` (clause): the manuals call a clause CL (in their examples and, for Greek, section 2.5). That lowfat writes it as `class="cl"` with the role beside
+; it, and that a clause with no role is labelled "*", is how Taller reads lowfat: as used by MACULA lowfat; not defined in
+; the manuals (they do not describe lowfat).
+; `&`: Taller's own label. The manuals describe conjunctions (`conj` in Greek, `cj` in Hebrew) as words that link
+; structures (Greek manual, section 3.9.1); giving them a label of their own is Taller's choice, not MACULA's.
+
+macula-v2 = {
+  "release": tstr,             ; the MACULA release the data comes from, as in v1
+  ? "trees": {
+    "labels": strtab,          ; every label ("*", "v", "s*", "&"...), most used first, ties by code point
+    "pieces": strtab,          ; the texts of Hebrew word pieces, most used first (ties by code point)
+    "lo": deltas,              ; per sentence: its lowest word position (svarint deltas, sentences in book order)
+    "span": uvarints,          ; per sentence: highest position minus lowest
+    "nodes": [* bstr],         ; per sentence: its tree in preorder, as uvarints (below)
+  },
+  ? "referents": {
+    "ents": [* [tstr, tstr]],  ; [form, strong]: the form as published, the Strong as a map key (ids.md, Strong keys)
+    "kinds": strtab,           ; "r", "s", "c", "a", "p", "o" (v1's codes), most used first, ties by code point
+    "pieces": strtab,          ; "" and the suffix texts, most used first, ties by code point
+    "cols": {                  ; one row per reference, rows by word position, then the source order
+      "word": uvarints,        ; delta of the referring word's position from the row before (first from 0)
+      "kind": uvarints, "piece": uvarints, "ent": uvarints,   ; numbers in "kinds", "pieces" and "ents"
+      "ch": uvarints, "vs": uvarints,   ; the antecedent's chapter and verse (never 0: resolved)
+      "ante": uvarints,        ; the antecedent's position + 1; 0 when the rule cannot fix it
+    },
+  },
+}
+; A tree in "nodes" is a list of uvarints t, read in preorder from the root.
+;   t % 3 == 0   a part with the label t / 3 (a number in "labels"), followed by one uvarint: its number of children;
+;   t % 3 == 1   a word, at the position lo + (t - 1) / 3;
+;   t % 3 == 2   a piece of the word at lo + (t - 2) / 3, followed by one uvarint: its number in "pieces".
+; `lo` and `span` are the sentence's own, in the same order as "nodes" (one number of each per sentence; three lists of the
+; same length). A sentence's positions are all in lo .. lo + span. The list is used up exactly by one root: a tree cut
+; short, with bytes left, or with a second root is E_BODY (tests/README.md). Positions are those of this segment's
+; "words" (ids.md, Positions in the original).
+;
+; Builder rules (a reader checks none of them; it checks only the E_BODY list of tests/README.md).
+;   - A row of "referents" is one reference of one word: the word at the position given by the running sum of "word",
+;     the kind, the piece ("" when the whole word refers) and the entity "ents[ent]" that MACULA names for it. A word with
+;     several references has several rows, in MACULA's order. Rows follow the book order of the referring word.
+;   - The referring word is found in this book by its verse, its referentKey and its occurrence, as defined above: the
+;     key is that of the word's "form" in "words"; the verse is the one the word is in (the `verse` events of "text"); the
+;     occurrence counts from 0 among the words of that verse with that key. A word that cannot be found is counted in the
+;     build report, per book, and its rows are left out. Nothing is guessed.
+;   - "ch" and "vs" are the antecedent's verse in the numbering the positions are counted in (the `verse` events of the
+;     book's "text"). The v1 pair 0, 0 ("the verse of the word that refers") is written as that verse, so 0 never occurs.
+;   - "ante" is fixed by this rule and no other (the controller's ruling R1; it is the rule that gave the percentages of the
+;     plan, 80 to 94 % of the references). The candidates are the words of the verse ch:vs whose Strong has the same
+;     number as the entity's. The number is the letter H or G and its digits: for Greek the first four digits, for Hebrew
+;     the number without leading zeros and without the letter suffix ("H7462b", "b:H4999" and "H4999" give H7462 and
+;     H4999; "G54850" and "G5485" give G5485). A Strong with no such number (the empty one) matches nothing.
+;       one candidate                       its position + 1;
+;       several candidates                  keep those whose referentKey contains, or is contained in, the referentKey of the
+;                                           entity's form (an empty key matches nothing); if exactly one is kept, its position + 1;
+;       none, or still several               0: the row is kept and the antecedent is left empty.
+;     The rows with 0 are counted in the build report, per book. A reader that gets 0 still has "ch", "vs" and the
+;     entity's form and Strong to show the antecedent.
+;   - "ents" holds each [form, strong] once, in the order of first use. The form is MACULA's text without the marks of the
+;     chant, as v1's "words"; the Strong is a map key as ids.md says: the Hebrew part after the last ":" with its letter
+;     suffix, the Greek in five digits; a Strong that is neither is "". The other tables ("labels", "pieces", "kinds") are
+;     sorted most used first, ties by code point, counting every use in the book.
+;   - What is left out: a tree leaf (a word or a piece) whose place cannot be found in this book's words, and a referring
+;     word whose place cannot be found. Both are counted in the build report, per book. An antecedent the rule cannot fix is
+;     left empty (0), not left out.
