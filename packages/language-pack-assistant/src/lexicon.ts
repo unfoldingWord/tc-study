@@ -70,6 +70,9 @@ function clsOf(id: string): 'tw' | 'name' | 'ta' | 'topic' {
   return r === 0 ? 'name' : r === 1 ? 'tw' : r === 2 ? 'ta' : 'topic'
 }
 
+/** The books of one chapter: a reference with one number names a verse of chapter 1. */
+export const ONE_CHAPTER = new Set(['oba', 'phm', '2jn', '3jn', 'jud'])
+
 type BookAlias = { toks: string[]; code: string; standalone: boolean; cued: boolean; digitsOnly: boolean }
 
 /** Book names that are also common nouns ("los numeros de la tabla"): alone they are no book. */
@@ -143,6 +146,22 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
     addBook(short, code, true)
     addBook(abbr, code, false)
   })
+  // A numbered book written short: its number and the start of the word after it ("1 Cor", "2 Tim.", "1Co"), when no other book
+  // with that number starts the same way. Two letters need numbers after them; three or more are the book alone too.
+  const starts = new Map<string, Set<string>>()
+  for (const [code, names] of fullNames) {
+    for (const name of [...names, core?.books[BOOKS.indexOf(code)]?.[2]]) {
+      const toks = words(fold(name ?? ''))
+      const glued = toks.length === 1 ? /^([123])(\p{L}+)$/u.exec(toks[0]!) : null
+      const [num, word] = glued ? [glued[1]!, glued[2]!] : toks.length === 2 && /^[123]$/.test(toks[0]!) ? [toks[0]!, toks[1]!] : []
+      if (num === undefined || word === undefined || !/^\p{L}+$/u.test(word)) continue
+      for (let n = 2; n < word.length; n++) {
+        const key = `${num} ${word.slice(0, n)}`
+        ;(starts.get(key) ?? starts.set(key, new Set()).get(key)!).add(code)
+      }
+    }
+  }
+  for (const [key, codes] of starts) if (codes.size === 1) addBook(key, [...codes][0]!, key.length >= 5)
   // A bare code ("deu") is no word of the language: it is a reference only when digits follow it ("deu 2", not pt "deu duas").
   BOOKS.forEach((code) => addBook(code, code, false, true))
   const booksByFirst = new Map<string, BookAlias[]>()
@@ -237,9 +256,10 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
   }
 
   /** Up to two numbers from `i`: digits, number words and a range; `end` is the token after the last one used. */
-  function numbersAfter(toks: string[], i: number): { nums: number[]; verseEnd?: number; end: number } {
+  function numbersAfter(toks: string[], i: number): { nums: number[]; verseEnd?: number; firstEnd?: number; end: number } {
     const nums: number[] = []
     let verseEnd: number | undefined
+    let firstEnd: number | undefined
     let end = i
     while (end < toks.length && nums.length < 2) {
       const t = toks[end]!
@@ -255,6 +275,7 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
       if (m) {
         nums.push(Number(m[1]))
         if (m[2] !== undefined && nums.length === 2) verseEnd = Number(m[2])
+        if (m[2] !== undefined && nums.length === 1) firstEnd = Number(m[2])
         end++
         continue
       }
@@ -263,7 +284,7 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
       nums.push(w.value)
       end += w.n
     }
-    return { nums, ...(verseEnd === undefined ? {} : { verseEnd }), end }
+    return { nums, ...(verseEnd === undefined ? {} : { verseEnd }), ...(firstEnd === undefined ? {} : { firstEnd }), end }
   }
 
   /** `phraseTokens`: the token indexes of the question's fixed phrases ("quien fue"); no concept name uses them. */
@@ -293,7 +314,15 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
         continue
       }
       const after = i + hit.toks.length
-      const { nums, verseEnd, end } = numbersAfter(toks, after)
+      const { nums, verseEnd, firstEnd, end } = numbersAfter(toks, after)
+      if (nums.length === 1 && ONE_CHAPTER.has(hit.code) && !(hit.digitsOnly && !/^\d/.test(toks[after]!))) {
+        // A one-chapter book with one number names a verse of chapter 1 ("3 Jn 4", "Judas 3-5").
+        const e = firstEnd !== undefined && firstEnd > nums[0]! ? { verseEnd: firstEnd } : {}
+        out.push({ kind: 'ref', book: hit.code, chapter: 1, verse: nums[0]!, ...e, start: i, end })
+        mark(i, end)
+        i = end
+        continue
+      }
       if (nums.length > 0 && !(hit.digitsOnly && !/^\d/.test(toks[after]!))) {
         out.push({
           kind: 'ref',

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { BOOKS, type MapSet } from '@bt-synergy/language-pack-v3'
 import { loadComplement, type NumbersComplement } from './complements'
 import { buildLexicon } from './lexicon'
+import { fixtureMaps } from './rules.fixture'
 
 const books: unknown[][] = BOOKS.map(() => ['', '', '', 'none'])
 const set = (code: string, n: [string, string, string]): void => {
@@ -103,4 +104,60 @@ test('an alignment name is dropped when another id has it, when it is a book nam
   expect(ents('moab')).toEqual([{ kind: 'concept', ids: ['lug:moab'], cls: 'topic', start: 0, end: 1 }])
   expect(ents('Sion')).toEqual([{ kind: 'concept', ids: ['lug:zion'], cls: 'topic', start: 0, end: 1 }])
   expect(ents('Maria')).toEqual([])
+})
+
+// Numbered books written short, and one-chapter books (Task 9c, fixes c and g). The names are the maps' own; the rule finds the short forms.
+const numbered = (lang: 'es-419' | 'en', b: Record<string, [string, string, string]>) => buildLexicon(fixtureMaps(lang, b, {}, {}), lang, undefined)
+const EN_NUM = numbered('en', {
+  '1co': ['1 Corinthians', '1 Corinthians', '1Co'],
+  '2co': ['2 Corinthians', '2 Corinthians', '2Co'],
+  '1ti': ['1 Timothy', '1 Timothy', '1Ti'],
+  '2ti': ['2 Timothy', '2 Timothy', '2Ti'],
+  '1th': ['1 Thessalonians', '1 Thessalonians', '1Th'],
+  '3jn': ['3 John', '3 John', '3Jn'],
+  jud: ['Jude', 'Jude', 'Jud'],
+  phm: ['Philemon', 'Philemon', 'Phm'],
+})
+const ES_NUM = numbered('es-419', {
+  '1jn': ['1 Juan', '1 Juan', '1Jn'],
+  '3jn': ['3 Juan', '3 Juan', '3Jn'],
+  '2ki': ['2 Reyes', '2 Reyes', '2Re'],
+  '1co': ['1 Corintios', '1 Corintios', '1Co'],
+  oba: ['Abdías', 'Abdías', 'Abd'],
+})
+const PT_NUM = buildLexicon(fixtureMaps('es-419', { '2ki': ['2 Reis', '2 Reis', '2Rs'], '1co': ['1 Coríntios', '1 Coríntios', '1Co'] }, {}, {}), 'pt-BR', undefined)
+const first = (l: ReturnType<typeof buildLexicon>, q: string) => l.entities(q).entities[0]
+
+test('a numbered book with a digit and an abbreviation, with or without a space or a dot', () => {
+  expect(first(EN_NUM, '1 Cor 13:4-7')).toMatchObject({ kind: 'ref', book: '1co', chapter: 13, verse: 4, verseEnd: 7 })
+  expect(first(EN_NUM, '1Co 2:3')).toMatchObject({ kind: 'ref', book: '1co', chapter: 2, verse: 3 })
+  expect(first(EN_NUM, '1Cor 2:3')).toMatchObject({ kind: 'ref', book: '1co', chapter: 2, verse: 3 })
+  expect(first(EN_NUM, '2 Tim. 3:16')).toMatchObject({ kind: 'ref', book: '2ti', chapter: 3, verse: 16 })
+  expect(first(EN_NUM, '2 Cor 5:17')).toMatchObject({ kind: 'ref', book: '2co', chapter: 5, verse: 17 })
+  expect(first(EN_NUM, '1 Thess 4:13')).toMatchObject({ kind: 'ref', book: '1th', chapter: 4, verse: 13 })
+  expect(EN_NUM.entities('topics in 1 Cor').entities.filter((e) => e.kind === 'book')).toEqual([{ kind: 'book', book: '1co', start: 2, end: 4 }])
+  expect(first(ES_NUM, '1 Juan 4:8')).toMatchObject({ kind: 'ref', book: '1jn', chapter: 4, verse: 8 })
+  expect(first(ES_NUM, '2 Reyes 5:1')).toMatchObject({ kind: 'ref', book: '2ki', chapter: 5, verse: 1 })
+  expect(first(ES_NUM, '2 Rey. 5:1')).toMatchObject({ kind: 'ref', book: '2ki', chapter: 5, verse: 1 })
+  expect(first(ES_NUM, '1 Cor 13:4')).toMatchObject({ kind: 'ref', book: '1co', chapter: 13, verse: 4 })
+  expect(first(PT_NUM, '2 Reis 5:1')).toMatchObject({ kind: 'ref', book: '2ki', chapter: 5, verse: 1 })
+  expect(first(PT_NUM, '1 Cor 13:4')).toMatchObject({ kind: 'ref', book: '1co', chapter: 13, verse: 4 })
+})
+
+test('a short form two numbered books share is no book', () => {
+  // "1 co" is the map's abbreviation of 1co; "2 co" of 2co; "1 c" is too short; "1 t" too.
+  expect(first(EN_NUM, '1 T 3:2')).toBeUndefined()
+  const shared = numbered('en', { '1co': ['1 Corinthians', '1 Corinthians', '1Co'], '1ch': ['1 Chronicles', '1 Chronicles', '1Ch'] })
+  expect(first(shared, '1 Cor 1:1')).toMatchObject({ book: '1co' })
+  expect(first(shared, '1 Chr 1:1')).toMatchObject({ book: '1ch' })
+})
+
+test('a one-chapter book with one number is a verse of chapter 1', () => {
+  expect(first(EN_NUM, '3 Jn 4')).toEqual({ kind: 'ref', book: '3jn', chapter: 1, verse: 4, start: 0, end: 3 })
+  expect(first(EN_NUM, 'Jude 3-5')).toMatchObject({ kind: 'ref', book: 'jud', chapter: 1, verse: 3, verseEnd: 5 })
+  expect(first(EN_NUM, 'Philemon 1:6')).toMatchObject({ kind: 'ref', book: 'phm', chapter: 1, verse: 6 })
+  expect(first(ES_NUM, '3 Juan 4')).toMatchObject({ kind: 'ref', book: '3jn', chapter: 1, verse: 4 })
+  expect(first(ES_NUM, 'Abdías 15')).toMatchObject({ kind: 'ref', book: 'oba', chapter: 1, verse: 15 })
+  expect(first(EN_NUM, '1 Cor 13')).toMatchObject({ kind: 'ref', book: '1co', chapter: 13 })
+  expect(first(EN_NUM, '1 Cor 13')).not.toHaveProperty('verse')
 })
