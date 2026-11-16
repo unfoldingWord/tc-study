@@ -102,4 +102,21 @@ describe('pickObs', () => {
     const p = pickObs([hit('unfoldingWord', 'en_ult', 'Aligned Bible')], 'unfoldingWord')
     expect(p).toEqual({ lines: ['none in the catalog', 'none in the catalog', 'none in the catalog', 'none in the catalog'] })
   })
+
+  test('the Bible owner has no stories but has helps: the helps follow the stories owner when it has them, else the Bible owner', () => {
+    const helps = [hit('BibleOwner', 'xx_obs-tn', TN), hit('Other', 'xx_obs-tn', TN, 'v1', '2027-01-01T00:00:00Z')]
+    const withStories = pickObs([hit('Other', 'xx_obs', S), ...helps], 'BibleOwner')
+    expect(keys(withStories)).toEqual(['Other/xx/obs', 'Other/xx/obs-tn', undefined, undefined])
+    const noStories = pickObs(helps, 'BibleOwner')
+    expect(keys(noStories)).toEqual([undefined, 'BibleOwner/xx/obs-tn', undefined, undefined])
+  })
+
+  test('releases are compared as dates, not as text', () => {
+    const p = pickObs(
+      [hit('aaa', 'xx_obs', S, 'v1', '2026-06-01T01:00:00+02:00'), hit('zzz', 'xx_obs', S, 'v2', '2026-06-01T00:30:00Z')],
+      undefined
+    )
+    // 01:00 at +02:00 is 23:00 the day before in UTC: zzz is later, though its text sorts lower.
+    expect(keys(p)[0]).toBe('zzz/xx/obs')
+  })
 })

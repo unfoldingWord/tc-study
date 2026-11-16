@@ -44,11 +44,17 @@ function candidateOf(hit: CatalogHit): Candidate | undefined {
   return { hit, owner: id.ownerStr, repo: id.repoName, tag: release.tag_name, published: release.published_at ?? '' }
 }
 
-const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+/** A release date as a number: a missing or unreadable one is the oldest. */
+const when = (published: string): number => {
+  const t = Date.parse(published)
+  return Number.isNaN(t) ? 0 : t
+}
+
+const cmp = (a: string | number, b: string | number) => (a < b ? -1 : a > b ? 1 : 0)
 
 /** Most recent release first; then owner, then repository, in code-point order. */
 function best(candidates: Candidate[]): Candidate | undefined {
-  return [...candidates].sort((a, b) => cmp(b.published, a.published) || cmp(a.owner, b.owner) || cmp(a.repo, b.repo))[0]
+  return [...candidates].sort((a, b) => cmp(when(b.published), when(a.published)) || cmp(a.owner, b.owner) || cmp(a.repo, b.repo))[0]
 }
 
 export function pickObs(hits: CatalogHit[], bibleOwner: string | undefined): ObsPick {
