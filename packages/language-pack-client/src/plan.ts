@@ -15,7 +15,7 @@ export type Step = {
   complete: boolean
 }
 
-const DEFAULT_UNITS = ['xmap', 'map', 'xtopics', 'topics']
+export const DEFAULT_UNITS = ['xmap', 'map', 'xtopics', 'topics', 'obs']
 
 type Found = { cat: VerifiedCatalog; unit: Unit }
 

@@ -15,6 +15,8 @@ import {
   KNOWN,
   mapView,
   type MapSet,
+  type ObsModel,
+  obsView,
   type OrigModel,
   type Role,
   origView,
@@ -30,6 +32,7 @@ import { type AcademyData, academyQuery } from './query/academy'
 import { type LookupData, lookupQuery } from './query/lookup'
 import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/maps'
 import { type PassageData, passageQuery } from './query/passage'
+import { type StoryData, type StoryRef, storiesQuery, storyQuery } from './query/stories'
 import { searchQuery } from './query/search'
 import { memoryIndex } from './search/memory'
 import type { Hit, SearchFilters, SearchIndex } from './search/types'
@@ -83,6 +86,8 @@ export interface PackReader {
   installed(unit: string): boolean
   book(book: string): Promise<BookModel | undefined>
   orig(book: string): Promise<OrigModel | undefined>
+  /** The Open Bible Stories of the language, or `undefined` when the `obs` unit is not installed. */
+  obs(): Promise<ObsModel | undefined>
   articles(group: string): Promise<ArticleModel[] | undefined>
   /** Every map unit: `xmap`, `map`, `xtopics`, `topics` and the `aligned` parts, read in parallel. */
   maps(): Promise<MapSet>
@@ -117,6 +122,10 @@ export interface PackReader {
   search(text: string, filters?: SearchFilters): Promise<Answer<Hit[]>>
   /** The tA articles the notes of a book cite, most cited first (`data: null` when the `map` is not installed). */
   academy(book: string): Promise<Answer<AcademyData | null>>
+  /** The stories whose ranges meet a passage ("gen 1" or any form `passage` takes), or all the stories without one. Needs the `xtopics`. */
+  stories(ref?: string): Promise<Answer<{ ref?: string; stories: StoryRef[] }>>
+  /** One story (1 to 50): title and ranges from the maps; frames and helps when the `obs` unit is installed. */
+  story(n: number): Promise<Answer<StoryData>>
 }
 
 export type ReaderInput = {
@@ -323,6 +332,11 @@ export function makeReader(o: ReaderInput): PackReader {
       const id = activeIds.get(unit)![0]
       if (model !== undefined && id !== undefined) await index.addBook(o.lang, model, id)
     }
+    if (reader.installed('obs')) {
+      const model = await reader.obs()
+      const id = activeIds.get('obs')?.[0]
+      if (model !== undefined && id !== undefined) await index.addObs(o.lang, model, id)
+    }
     return index
   }
   const lang = o.revisions?.lang ?? langCat?.revision
@@ -338,6 +352,7 @@ export function makeReader(o: ReaderInput): PackReader {
     listed: (unit) => listedUnits.has(unit),
     book: (book) => single(`book:${book}`, bookView),
     orig: (book) => single(`orig:${book}`, origView),
+    obs: () => single('obs', obsView),
     async articles(group) {
       return (await single(`art:${group}`, artView))?.articles
     },
@@ -374,9 +389,11 @@ export function makeReader(o: ReaderInput): PackReader {
         })
         index = await run
       }
-      return searchQuery(reader, index, [...listedUnits].filter((u) => u.startsWith('book:')), text, filters)
+      return searchQuery(reader, index, [...listedUnits].filter((u) => u.startsWith('book:') || u === 'obs'), text, filters)
     },
     academy: (book) => academyQuery(reader, book),
+    stories: (ref) => storiesQuery(reader, ref),
+    story: (n) => storyQuery(reader, n),
   }
   return reader
 }

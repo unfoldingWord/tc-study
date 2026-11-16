@@ -9,7 +9,7 @@ import { partsSource } from '../node/partsSource'
 import { CATALOG_TABLES, catalogView } from '../read/catalog'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
 import { zipSource } from '../source/zipSource'
-import { type BuiltSegment } from './catalog'
+import { type BuiltSegment, unitBytes } from './catalog'
 import { BUILDER, buildCommon, buildLanguage, inputsOf, licenseId } from './language'
 
 // The sample is real files (spec/tests/data/README.md): es-419 Titus of the format 2.0 parts, three common parts (tW, the Greek
@@ -406,8 +406,13 @@ describe('buildLanguage: a language with Open Bible Stories and a lexicon, and n
       ['lex:G0', undefined],
       ['lex:G2', undefined],
       ['map', undefined],
-      ['obs', undefined],
+      ['obs', ['map']],
     ])
+    // The unit sizes are the sum of the compressed sizes of the unit's segments.
+    const bytes = unitBytes(catalog)
+    expect(Object.keys(bytes).sort()).toEqual(['lex:G0', 'lex:G2', 'map', 'obs'])
+    for (const unit of catalog.units) expect(bytes[unit.id]).toBe(unit.segments.reduce((sum, i) => sum + catalog.segments[i].size, 0))
+    expect(bytes['obs']).toBe(built.segments.find((s) => s.seg.h.class === 'obs')!.bytes.length)
     // The map lists every resource of the language; the title is the key's last part when the source has none; the license is an SPDX id when it is a known text.
     expect(catalog.resources.map((r) => r.key)).toEqual([OBS, OBS_OTHER, LEX])
     expect(catalog.resources.filter((r) => r.key === OBS || r.key === LEX)).toEqual([
@@ -781,6 +786,35 @@ describe('buildLanguage: the topics unit', () => {
     names: [{ name: 'Titus', dStrong: 'G5103', refs: [{ verse: 56001004 }] }],
     relations: [],
   }
+
+  test('topics names obs:N with the language\'s title when the build has the stories, and the obs unit needs the map', async () => {
+    const OBS_KEY = 'unfoldingWord/es-419/obs'
+    const ref: ResourceRef = { key: OBS_KEY, stamp: 'v12#2026-01-01T00_00_00Z', kind: 'Open Bible Stories', books: [] }
+    const row: Row = {
+      layer: 'sot',
+      key: `obs:${OBS_KEY}:10`,
+      value: { content: { storyNumber: 10, title: '10. Las plagas', sourceReference: 'A Bible story from: Exodus 5-14', frames: [{ frameNumber: 1, imageUrl: 'u', text: 'Dios envió plagas.' }] }, timestamp: 1, resourceKey: OBS_KEY, storyId: '10' },
+    }
+    const base = await sample()
+    const source: RowSource = {
+      async resources(lang) {
+        const found = await base.resources(lang)
+        return lang === ORIGINALS ? found : [...found, ref]
+      },
+      async *rows(f) {
+        yield* base.rows(f)
+        if (f.lang === ES && f.book === undefined && (f.resource === undefined || f.resource === OBS_KEY) && (f.layer === undefined || f.layer === 'sot')) yield row
+      },
+    }
+    const xt = await xtopics()
+    xt.topics.set('obs:10', { kind: 'story', source: xt.res[0][0], ref: '10', title: '', ustrong: '' })
+    const built = await buildLanguage({ source, lang: ES, registry: registry(), about, topics: { xtopics: xt, records: [] } })
+    const core = built.segments.find((s) => s.seg.h.class === 'topics' && s.seg.h.part === 'core')!
+    expect(topicsView(core.seg).names['obs:10'].map((n) => n[0])).toEqual(['10. Las plagas'])
+    const catalog = await catalogOf(built.catalog)
+    expect(catalog.units.find((u) => u.id === 'obs')!.needs).toEqual(['map'])
+    expect(catalog.units.find((u) => u.id === 'topics')!.needs).toBeUndefined()
+  })
 
   test('lists the unit topics (no needs); per:titus has a name from the alignment; the map segments are the same bytes as without topics', async () => {
     const plain = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about })

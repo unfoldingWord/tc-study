@@ -33,6 +33,18 @@ const SEARCH_LIMIT = 500
 const TC_READY_FILTER = { topic: 'tc-ready' as const, stage: 'prod' as const, limit: SEARCH_LIMIT }
 const OBS_HELPS_FILTER = { stage: 'prod' as const, limit: SEARCH_LIMIT }
 
+/** The language's OBS stories at `stage=prod`, any owner, no topic: the pick of one owner is made over these hits. */
+export const OBS_STORIES_SUBJECT = 'Open Bible Stories'
+
+export async function searchObsStories(client: CatalogSearchClient, languageCode: string): Promise<CatalogEntry[]> {
+  const params: CatalogSearchParams = {
+    language: door43LanguageQueryCode(languageCode),
+    subject: OBS_STORIES_SUBJECT,
+    ...OBS_HELPS_FILTER,
+  }
+  return ((await client.searchCatalog(params)) ?? []) as CatalogEntry[]
+}
+
 function isObsScope(navigationScope: string): boolean {
   return navigationScope === 'obs'
 }

@@ -1,7 +1,7 @@
 /**
  * A tiny language for the parts tests, served by a fake Door43: ULT- and UST-like texts (the ULT with a front matter
- * book, FRT, outside the canon), TN (linking a TA article), TQ, TWL, TW, TA and two Open Bible Stories (no OBS helps)
- * of es-419 with Ruth and Jonah, the
+ * book, FRT, outside the canon), TN (linking a TA article), TQ, TWL, TW, TA and two Open Bible Stories with their notes
+ * and questions (TSV) of es-419 with Ruth and Jonah, the
  * Hebrew of both and the Greek of Titus, a Hebrew lexicon behind a fake HTTP; and today's whole build of it, through
  * prepareAndPack itself. Every repository has a `manifest.yaml`, and Door43's tree of each is the true one unless a
  * test says otherwise. The repositories, the catalog and the lexicon can be changed for a test (`fakeDoor43`'s
@@ -31,6 +31,9 @@ export const TQ = 'test_gl/es-419/tq'
 export const TA = 'test_gl/es-419/ta'
 export const UHL = 'test_gl/es-419/uhl'
 export const OBS = 'test_gl/es-419/obs'
+export const OBS_TN = 'test_gl/es-419/obs-tn'
+export const OBS_TQ = 'test_gl/es-419/obs-tq'
+export const OBS_TWL = 'test_gl/es-419/obs-twl'
 export const UHB = 'unfoldingWord/hbo/uhb'
 export const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 
@@ -82,6 +85,23 @@ const FILES: Record<string, Record<string, string>> = {
   'test_gl/es-419_obs': {
     'content/01.md': '# 1. La creación\n\n![OBS Image](https://cdn.door43.org/obs/jpg/360px/obs-en-01-01.jpg)\n\nAl principio Dios creó todo.\n\n_Una historia bíblica de: Génesis 1-2_\n',
     'content/02.md': '# 2. El pecado entra al mundo\n\n![OBS Image](https://cdn.door43.org/obs/jpg/360px/obs-en-02-01.jpg)\n\nAdán y su esposa vivían en el jardín.\n\n_Una historia bíblica de: Génesis 3_\n',
+  },
+  // A note on 1:2 (story 1, frame 2: the stories above have one frame each, as the loaders do not check it), linking a TA article.
+  'test_gl/es-419_obs-tn': {
+    'tn_OBS.tsv': `${TN_HEADER}1:2	ob12		rc://*/ta/man/translate/figs-metaphor	Al principio	1	Una nota de la historia 1
+2:1	ob34			Adán	1	Una nota de la historia 2
+`,
+  },
+  'test_gl/es-419_obs-tq': {
+    'tq_OBS.tsv': `${TQ_HEADER}1:2	ob56				¿Quién creó todo?	Dios.
+`,
+  },
+  // Two links on 1:2 and one on 2:1 (three links in all).
+  'test_gl/es-419_obs-twl': {
+    'twl_OBS.tsv': `${TWL_HEADER}1:2	ob78		Dios	1	rc://*/tw/dict/bible/kt/god
+1:2	ob79		creó	1	rc://*/tw/dict/bible/other/day
+2:1	ob80		Adán	1	rc://*/tw/dict/bible/names/naomi
+`,
   },
   'unfoldingWord/hbo_uhb': { '08-RUT.usfm': HEBREW('RUT'), '32-JON.usfm': HEBREW('JON') },
   'unfoldingWord/el-x-koine_ugnt': { '57-TIT.usfm': GREEK },
@@ -268,6 +288,9 @@ const baseRows = () => [
       { identifier: '01', path: './content/01.md' },
       { identifier: '02', path: './content/02.md' },
     ]),
+    row(OBS_TN, 'TSV OBS Translation Notes', 'obs-notes', [{ identifier: 'obs', path: './tn_OBS.tsv' }]),
+    row(OBS_TQ, 'TSV OBS Translation Questions', 'obs-questions', [{ identifier: 'obs', path: './tq_OBS.tsv' }]),
+    row(OBS_TWL, 'TSV OBS Translation Words Links', 'obs-words-links', [{ identifier: 'obs', path: './twl_OBS.tsv' }]),
     row(UHB, 'Hebrew Old Testament', 'scripture', [book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
     row(UGNT, 'Greek New Testament', 'scripture', [book('tit', '57-TIT.usfm')]),
   ]

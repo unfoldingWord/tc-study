@@ -14,7 +14,7 @@ import {
   type RowSource,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '../../language-pack-v3/src/node/partsSource'
-import type { Row, RowFilter } from '../../language-pack-v3/src/source/rows'
+import type { ResourceRef, Row, RowFilter } from '../../language-pack-v3/src/source/rows'
 import type { XtopicsCore } from '../../language-pack-v3/src/model'
 
 export type Sample = {
@@ -31,13 +31,16 @@ const about = { format: '3.0', publisher: 'unfoldingWord', origin: 'published', 
 const hex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
 
 /** A change to the rows of a source (the idea of `invalidation.test.ts` in language-pack-v3). */
-export type Tweak = { row?: (row: Row, f: RowFilter) => Row }
+export type Tweak = { row?: (row: Row, f: RowFilter) => Row; omit?: (row: Row, f: RowFilter) => boolean }
 
 function tweaked(inner: RowSource, t: Tweak): RowSource {
   return {
     resources: (lang) => inner.resources(lang),
     async *rows(f) {
-      for await (const row of inner.rows(f)) yield t.row === undefined ? row : t.row(row, f)
+      for await (const row of inner.rows(f)) {
+        if (t.omit?.(row, f) === true) continue
+        yield t.row === undefined ? row : t.row(row, f)
+      }
     },
   }
 }
@@ -67,6 +70,66 @@ export function retitleTw(): Tweak {
       const value = JSON.parse(JSON.stringify(row.value))
       value.content = `${String(value.content)} (otro)`
       return { ...row, value }
+    },
+  }
+}
+
+// Open Bible Stories of the es-419 sample: two stories with titles, and a note, a question and a word link on story 1. The rows have the
+// shape the loaders write (`obs:{res}:{NN}`, `tn:{res}:obs:{story}`, `tq:…`, `twl:{res}:obs`).
+const OBS_RES = 'es-419_gl/es-419/obs'
+const OBS_TN = 'es-419_gl/es-419/obs-tn'
+const OBS_TQ = 'es-419_gl/es-419/obs-tq'
+const OBS_TWL = 'es-419_gl/es-419/obs-twl'
+const obsRef = (key: string, kind: string): ResourceRef => ({ key, stamp: 'v1#2026-01-01T00_00_00Z', kind, books: [] })
+const OBS_REFS: ResourceRef[] = [
+  obsRef(OBS_RES, 'Open Bible Stories'),
+  obsRef(OBS_TN, 'TSV OBS Translation Notes'),
+  obsRef(OBS_TQ, 'TSV OBS Translation Questions'),
+  obsRef(OBS_TWL, 'TSV OBS Translation Words Links'),
+]
+const storyRow = (nn: string, content: Record<string, unknown>): Row => ({
+  layer: 'sot',
+  key: `obs:${OBS_RES}:${nn}`,
+  value: { content, timestamp: 1, resourceKey: OBS_RES, storyId: nn },
+})
+const OBS_ROWS: Row[] = [
+  storyRow('01', {
+    storyNumber: 1,
+    title: 'La creación',
+    sourceReference: 'Una historia de la Biblia: Génesis 1-2',
+    frames: [
+      { frameNumber: 1, imageUrl: 'https://cdn.door43.org/obs/jpg/360px/obs-es-419-01-01.jpg', text: 'Dios creó el mundo.' },
+      { frameNumber: 2, imageUrl: '', text: 'Dios creó al hombre y a la mujer.' },
+    ],
+  }),
+  storyRow('02', { storyNumber: 2, title: 'El pecado entra al mundo', sourceReference: 'Una historia de la Biblia: Génesis 3', frames: [{ frameNumber: 1, imageUrl: '', text: 'La serpiente engañó a la mujer.' }] }),
+  {
+    layer: 'sot',
+    key: `tn:${OBS_TN}:obs:1`,
+    value: { content: { notes: [{ reference: '1:2', id: 'n001', tags: '', supportReference: 'rc://*/ta/man/translate/figs-metaphor', quote: 'creó', occurrence: '1', note: 'Una metáfora.' }] }, metadata: {} },
+  },
+  { layer: 'sot', key: `tq:${OBS_TQ}:obs:1`, value: { content: { questions: [{ reference: '1:1', id: 'q001', tags: '', quote: '', occurrence: '0', question: '¿Quién creó el mundo?', response: 'Dios.' }] } } },
+  {
+    layer: 'sot',
+    key: `twl:${OBS_TWL}:obs`,
+    value: { bookCode: 'obs', links: [{ reference: '1:1', id: 'l001', tags: 'kt', origWords: 'Dios', occurrence: '1', articlePath: 'bible/kt/god', twLink: 'rc://*/tw/dict/bible/kt/god' }] },
+  },
+]
+const ownerOf = (key: string): string => (key.includes(OBS_TN) ? OBS_TN : key.includes(OBS_TQ) ? OBS_TQ : key.includes(OBS_TWL) ? OBS_TWL : OBS_RES)
+const OBS_OWNERS = new Set(OBS_REFS.map((r) => r.key))
+
+/** A source with the es-419 Open Bible Stories added to the rows of `inner`. */
+function withObs(inner: RowSource): RowSource {
+  return {
+    async resources(lang) {
+      return [...(await inner.resources(lang)), ...(lang === ES ? OBS_REFS : [])]
+    },
+    async *rows(f) {
+      if (f.resource === undefined || !OBS_OWNERS.has(f.resource)) yield* inner.rows(f)
+      if (f.lang !== ES && f.lang !== undefined) return
+      for (const row of OBS_ROWS) {
+        if ((f.resource === undefined || f.resource === ownerOf(row.key)) && (f.layer === undefined || f.layer === row.layer)) yield row
+      }
     },
   }
 }
@@ -111,7 +174,10 @@ export async function buildSample(o: { revision?: number; tweak?: Tweak; commonR
 
 async function make(): Promise<Built> {  const parts = join(DATA, 'parts')
   const originals = join(DATA, 'originals', 'list.json')
-  const source = (lang: string) => partsSource({ list: join(DATA, lang, 'list.json'), partsDir: parts, originals })
+  const source = async (lang: string) => {
+    const inner = await partsSource({ list: join(DATA, lang, 'list.json'), partsDir: parts, originals })
+    return lang === ES ? withObs(inner) : inner
+  }
   const read = (path: string) => readFileSync(join(DATA, 'topics', path), 'utf8')
   const obs = new Map<number, string>()
   let n = 0
@@ -121,6 +187,11 @@ async function make(): Promise<Built> {  const parts = join(DATA, 'parts')
     else if (n > 0) obs.set(n, `${obs.get(n)}${line}\n`)
   }
   const theo = (name: string) => read(`theographic-subset/${name}.json`)
+  // The test data has no table of chapter lengths, so a closing line with whole chapters (`Genesis 1-2`) gives no range. Stories 1
+  // and 10 get verses, and story 2 is added, so that a chapter lists two stories.
+  obs.set(1, '_A Bible story from: Genesis 1:1-2:25_\n')
+  obs.set(2, '_A Bible story from: Genesis 1:26-3:24_\n')
+  obs.set(10, '_A Bible story from: Exodus 5:1-10:29_\n')
   const tipnr = read('tipnr-subset.txt')
 
   const common = await buildCommon({

@@ -31,6 +31,7 @@ import { HELPS_QUOTE_VERSION } from '../helps/helpsQuoteCache'
 import { OBS_ROWS_VERSION } from '../loaders/ObsLoader'
 import { MARKDOWN_HAST_VERSION } from '../markdown/markdownToHast'
 import { NOTES_PREPARE_VERSION } from '../notes/notesPreparer'
+import { OBS_MARKDOWN_HELPS_VERSION } from '../obs/markdownObsHelps'
 import { OBS_NOTES_PREPARE_VERSION } from '../obs/obsNotesPreparer'
 import { OBS_PREPARE_VERSION } from '../obs/obsPreparer'
 import { OBS_QUESTIONS_PREPARE_VERSION } from '../obs/obsQuestionsPreparer'
@@ -149,6 +150,7 @@ export function partsCodeVersions(): Record<string, string | number> {
     TW_ROWS_VERSION,
     TA_ROWS_VERSION,
     OBS_ROWS_VERSION,
+    OBS_MARKDOWN_HELPS_VERSION,
     LEXICON_ROWS_VERSION,
     MACULA_ROWS_VERSION,
     // Prepared rows.

@@ -34,7 +34,7 @@ const web = createClient({ store: await indexedDbStore({ name: 'my-app-packs' })
 const disk = createClient({ store: fsStore('/var/lib/my-app/packs'), source, trust })
 
 await client.refresh('es-419')                     // catalogs, updates
-await client.install('es-419', { books: ['tit'] }) // units, with the common ones they need
+await client.install('es-419', { books: ['tit'] }) // units, with the common ones they need (`obs` downloads with the language by default, like the maps and topics; `defaults: false` skips them)
 const reader = await client.open('es-419')
 const answer = await reader.passage('tit 1:1')
 ```

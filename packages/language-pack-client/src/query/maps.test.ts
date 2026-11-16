@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { createClient } from '../client'
 import { ClientError } from '../errors'
-import { usageBooks } from './maps'
+import { conceptQuery, usageBooks } from './maps'
 import { httpSource } from '../source/http'
 import { memoryStore } from '../store/memory'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
@@ -13,14 +13,31 @@ const bytesOf = (h: string) => Uint8Array.from(h.match(/../g)!, (p) => parseInt(
 let server: FakeServer | undefined
 afterEach(() => server?.stop())
 
+let noTitle: Sample
+let noNotes: Sample
 beforeAll(async () => {
   sample = await buildSample()
+  noTitle = await buildSample({
+    revision: 2,
+    tweak: {
+      row: (row) => {
+        if (!row.key.startsWith('obs:es-419_gl/es-419/obs:02')) return row
+        const value = JSON.parse(JSON.stringify(row.value))
+        value.content.title = ''
+        return { ...row, value }
+      },
+    },
+  })
+  noNotes = await buildSample({ revision: 3, tweak: { omit: (row) => row.key.startsWith('tn:es-419_gl/es-419/obs-tn:') } })
   trust = { trustedKeys: { [sample.keys.keyId]: bytesOf(sample.keys.publicKey) } }
 }, 120_000)
 
-async function open(opts: { defaults?: boolean; books?: string[] }) {
+/** The default units before OBS joined them: for tests that need obs absent. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+
+async function open(opts: { defaults?: boolean; books?: string[]; units?: string[] }, content: Sample = sample) {
   server?.stop()
-  server = startFakeServer(sample, {})
+  server = startFakeServer(content, {})
   const client = createClient({ store: memoryStore(), source: httpSource({ base: server.url }), trust })
   await client.install('es-419', opts)
   return client.open('es-419')
@@ -68,6 +85,14 @@ describe('books', () => {
     const r = await open({ books: ['tit'] })
     expect((await r.books({ article: 'tw:kt/apostle' })).data!.books.tit!.state).toBe('count')
   })
+  test('an article or a tW concept with obs not installed lists obs in notInstalled', async () => {
+    const r = await open({ defaults: false, units: NO_OBS, books: ['tit'] })
+    for (const q of [{ article: 'ta:translate/figs-metaphor' }, { concept: 'tw:kt/god' }]) {
+      const a = await r.books(q)
+      expect(a.data!.obs).toMatchObject({ state: 'none', installed: false })
+      expect(a.notInstalled.find((n) => n.unit === 'obs')).toEqual({ unit: 'obs', bytes: r.size('obs') })
+    }
+  })
   test('a concept that is a topic flags installed per book', async () => {
     const r = await open({ books: ['tit'] })
     const a = await r.books({ concept: 'per:abraham' })
@@ -103,9 +128,10 @@ describe('concept', () => {
     expect(miss!.bytes).toBeGreaterThan(0)
     expect(a.revision.units.xmap).toBeGreaterThan(0)
   })
-  test('with the book installed nothing is missing', async () => {
-    const r = await open({ books: ['tit'] })
-    expect((await r.concept(METAPHOR)).notInstalled).toEqual([])
+  test('only obs is missing', async () => {
+    const r = await open({ defaults: false, units: NO_OBS, books: ['tit'] })
+    // The obs unit is not installed here: it is the only thing missing.
+    expect((await r.concept(METAPHOR)).notInstalled.map((n) => n.unit)).toEqual(['obs'])
   })
 })
 
@@ -191,5 +217,67 @@ describe('renderings', () => {
     await expect(r.renderings({ book: 'tit', word: -1 })).rejects.toMatchObject({ code: 'E_ARG'
  })
     await expect(r.renderings({} as never)).rejects.toMatchObject({ code: 'E_ARG' })
+  })
+})
+
+describe('OBS stories of a concept', () => {
+  test('tw:kt/god lists OBS frames', async () => {
+    const r = await open({ units: ['obs'], books: [] })
+    const a = await r.concept('tw:kt/god')
+    const obs = (a.data as { obs: { stories: { n: number; id: string; title: string; frames?: string[] }[] } }).obs
+    expect(obs.stories.map((x) => [x.n, x.id, x.title, x.frames])).toEqual([[1, 'obs:1', 'La creación', ['01:01']]])
+    expect(a.notInstalled.some((n) => n.unit === 'obs')).toBe(false)
+  })
+  test('ta:translate/figs-metaphor counts OBS notes', async () => {
+    const r = await open({ units: ['obs'], books: [] })
+    const a = await r.concept('ta:translate/figs-metaphor')
+    const obs = (a.data as { obs: { stories: { n: number; count?: number }[] } }).obs
+    expect(obs.stories.map((x) => [x.n, x.count])).toEqual([[1, 1]])
+  })
+  test('a story with no title shows Story N in the concept', async () => {
+    const r = await open({ units: ['obs'], books: [] }, noTitle)
+    const m = await r.maps()
+    const parts = new Map(m.xtopics!.parts)
+    parts.set('gen', { occurrences: new Map([['ev:creation-of-all-things', [1003001]]]) } as never)
+    const patched = { ...m, xtopics: { ...m.xtopics!, parts } }
+    const a = await conceptQuery({ ...r, maps: async () => patched } as never, 'ev:creation-of-all-things')
+    expect((a.data as { obs: { stories: { title: string }[] } }).obs.stories.map((s) => s.title)).toEqual(['Story 2'])
+  })
+  test('a per: topic lists the stories that overlap its verses, without the obs unit', async () => {
+    const r = await open({ books: [] })
+    // The sample's topics occur in Titus only, where no story is: give the creation event Genesis 1:5 and Exodus 7:1.
+    const m = await r.maps()
+    const parts = new Map(m.xtopics!.parts)
+    parts.set('gen', { occurrences: new Map([['ev:creation-of-all-things', [1001005, 2007001]]]) } as never)
+    const patched = { ...m, xtopics: { ...m.xtopics!, parts } }
+    const a = await conceptQuery({ ...r, maps: async () => patched } as never, 'ev:creation-of-all-things')
+    const obs = (a.data as { obs?: { stories: { n: number; id: string; title: string; refs: string[] }[] } }).obs
+    expect(obs!.stories.map((s) => [s.n, s.id, s.title])).toEqual([[1, 'obs:1', 'La creación'], [10, 'obs:10', obs!.stories[1]!.title]])
+    expect(obs!.stories[0]!.refs).toEqual(['gen 1:1-2:25'])
+    expect(a.notInstalled.some((n) => n.unit === 'obs')).toBe(false)
+    // A topic with no overlapping story has no obs field.
+    expect(((await r.concept('per:abraham')).data as { obs?: unknown }).obs).toBeUndefined()
+  })
+  test('obs not installed: concept obs is installed:false and notInstalled has obs', async () => {
+    const r = await open({ defaults: false, units: NO_OBS, books: [] })
+    const a = await r.concept('tw:kt/god')
+    expect((a.data as { obs: unknown }).obs).toEqual({ installed: false })
+    const n = a.notInstalled.find((x) => x.unit === 'obs')
+    expect(n!.bytes).toBeGreaterThan(0)
+  })
+  test('books({article}) has an obs cell with the count', async () => {
+    const r = await open({ units: ['obs'], books: ['tit'] })
+    expect((await r.books({ article: 'ta:translate/figs-metaphor' })).data!.obs).toEqual({ state: 'count', count: 1, installed: true })
+    expect((await r.books({ concept: 'tw:kt/god' })).data!.obs).toEqual({ state: 'count', count: 1, installed: true })
+    const off = await open({ defaults: false, units: NO_OBS, books: [] })
+    const cell = (await off.books({ article: 'ta:translate/figs-metaphor' })).data!.obs!
+    expect(cell).toMatchObject({ state: 'none', installed: false })
+    expect(cell.bytes).toBeGreaterThan(0)
+  })
+  test('a language without OBS notes: the obs cell of an article is none', async () => {
+    const r = await open({ units: ['obs'], books: [] }, noNotes)
+    expect((await r.books({ article: 'ta:translate/figs-metaphor' })).data!.obs).toEqual({ state: 'none', installed: true })
+    const c = (await r.concept('ta:translate/figs-metaphor')).data as { obs?: unknown }
+    expect(c.obs).toBeUndefined()
   })
 })

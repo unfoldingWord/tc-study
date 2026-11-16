@@ -90,6 +90,17 @@ describe('build-v3: es-419 Titus', () => {
     expect(result.out.some((line) => /^orig\s+tit\s/.test(line))).toBe(true)
   })
 
+  test('build-v3 writes units.json and prints a line per unit with its compressed size', async () => {
+    const units = JSON.parse(readFileSync(join(out, 'units.json'), 'utf8')) as Record<string, number>
+    const catalog = await catalogOf(join(out, 'catalog-es-419.seg'))
+    const common = await catalogOf(join(out, 'catalog-common.seg'))
+    const sizeOf = (c: typeof catalog, unit: { segments: number[] }) => unit.segments.reduce((sum, i) => sum + c.segments[i].size, 0)
+    expect(units['book:tit']).toBe(sizeOf(catalog, catalog.units.find((u) => u.id === 'book:tit')!))
+    expect(units['orig:tit']).toBe(sizeOf(common, common.units.find((u) => u.id === 'orig:tit')!))
+    expect(Object.keys(units).sort()).toEqual([...catalog.units, ...common.units].map((u) => u.id).sort())
+    for (const [id, bytes] of Object.entries(units)) expect(result.out).toContain(`unit ${id} ${(bytes / 1024).toFixed(1)} KB`)
+  })
+
   test('the language catalog has a book:tit unit that names a segment present in segments/', async () => {
     const catalog = await catalogOf(join(out, 'catalog-es-419.seg'))
     expect(catalog.about.catalog).toBe('es-419')

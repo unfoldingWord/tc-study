@@ -20,6 +20,7 @@ import {
   getWorkerDownloadConfigs,
   type LoaderFactoryKey,
 } from '../config/loaderConfig'
+import { withMarkdownObsHelps } from '../obs/markdownObsHelps'
 import { ObsLoader } from '../loaders/ObsLoader'
 import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 
@@ -28,6 +29,8 @@ export interface WorkerLoaderDeps {
   catalogAdapter: unknown
   door43Client: unknown
   debug?: boolean
+  /** Notes and questions loaders that also read old markdown OBS helps (`hi_obs-tn`); on for the OBS unit of a parts build. */
+  markdownObsHelps?: boolean
 }
 
 type LoaderConfig = {
@@ -36,6 +39,7 @@ type LoaderConfig = {
   door43Client: unknown
   debug: boolean
   enableMemoryCache?: boolean
+  zip?: boolean
 }
 
 type LoaderCtor = (deps: WorkerLoaderDeps) => ResourceLoader
@@ -59,9 +63,9 @@ const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
   words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),
   'words-links': (deps) => new TranslationWordsLinksLoader(toLoaderConfig(deps)),
   academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),
-  notes: (deps) => new TranslationNotesLoader(toLoaderConfig(deps)),
-  questions: (deps) => new TranslationQuestionsLoader(toLoaderConfig(deps)),
-  obs: (deps) => new ObsLoader(toLoaderConfig(deps)),
+  notes: (deps) => new (deps.markdownObsHelps ? withMarkdownObsHelps(TranslationNotesLoader, 'tn') : TranslationNotesLoader)(toLoaderConfig(deps)),
+  questions: (deps) => new (deps.markdownObsHelps ? withMarkdownObsHelps(TranslationQuestionsLoader, 'tq') : TranslationQuestionsLoader)(toLoaderConfig(deps)),
+  obs: (deps) => new ObsLoader({ ...toLoaderConfig(deps), zip: deps.markdownObsHelps === true }),
 }
 
 /**

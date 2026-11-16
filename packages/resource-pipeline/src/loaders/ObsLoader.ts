@@ -9,6 +9,8 @@ import {
   parseObsStoryMarkdown,
   type ParsedObsStory,
 } from '../obs/parseObsMarkdown'
+import JSZip from 'jszip'
+import { reportObsIssues } from '../obs/obsIssues'
 import { obsStoryCacheKey, resolveObsStoryIds } from '../obs/obsStoryIds'
 
 /** Bump when the story rows this loader writes (`parseObsStoryMarkdown`'s output, as stored) change: it is in every part fingerprint. */
@@ -68,32 +70,57 @@ type ObsCatalogAdapter = {
 }
 
 type ObsDoor43Client = {
-  findRepository: (
+  findRepository?: (
     owner: string,
     repoName: string,
     stage: string
   ) => Promise<{ release?: { tag_name?: string }; default_branch?: string } | null>
-  fetchTextContent: (
-    owner: string,
-    repoName: string,
-    path: string,
-    ref: string
-  ) => Promise<string>
+  fetchTextContent?: (owner: string, repoName: string, path: string, ref: string) => Promise<string>
+  downloadZipball: (owner: string, repo: string, ref?: string) => Promise<ArrayBuffer | Uint8Array>
   config?: { baseUrl?: string }
 }
+
+/** The ref `releaseZip` downloads: the release tag, else the default branch, else master (read from the catalog row). */
+function zipRef(metadata: ResourceMetadata): string {
+  return metadata.release?.tag_name || (metadata as { default_branch?: string }).default_branch || 'master'
+}
+
+/** A repo-relative path as the zip names it: no `.` segments, `a/..` collapsed, no leading `./` or `/`. */
+function repoPath(path: string): string {
+  const out: string[] = []
+  for (const seg of path.split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') out.pop()
+    else out.push(seg)
+  }
+  return out.join('/')
+}
+
+/** A story whose file is not in the zip. */
+class ObsStoryAbsentError extends Error {}
+
+type ObsZip = { ref: string; archive: JSZip; top: string }
 
 export class ObsLoader implements ResourceLoader {
   private cacheAdapter: ObsCacheAdapter
   private catalogAdapter: ObsCatalogAdapter
   private door43Client: ObsDoor43Client
   private debug: boolean
+  /** Story ids the last `downloadResource` skipped (directory-derived ids whose file is not in the zip). */
+  lastSkipped: string[] = []
+  /** True in the packs build: stories come from one kept release zip. Off (the app): one request per story, as before. */
+  private useZip: boolean
+  private zips = new Map<string, Promise<ObsZip>>()
 
   constructor(config: {
     cacheAdapter: unknown
     catalogAdapter: unknown
     door43Client: unknown
     debug?: boolean
+    /** The packs build reads every story from the release zip (and fails the build on a failed story). */
+    zip?: boolean
   }) {
+    this.useZip = config.zip ?? false
     this.cacheAdapter = config.cacheAdapter as ObsCacheAdapter
     this.catalogAdapter = config.catalogAdapter as ObsCatalogAdapter
     this.door43Client = config.door43Client as ObsDoor43Client
@@ -134,7 +161,8 @@ export class ObsLoader implements ResourceLoader {
     }
 
     const metadata = await this.getMetadata(resourceKey)
-    const storyPath = getStoryPath(metadata, padded)
+    const rawPath = getStoryPath(metadata, padded)
+    const storyPath = rawPath ? repoPath(rawPath) : null
     if (!storyPath) {
       throw new Error(`Story "${padded}" not found in OBS ingredients for ${resourceKey}`)
     }
@@ -146,13 +174,24 @@ export class ObsLoader implements ResourceLoader {
     const [owner, language, resourceId] = parts
     const repoName = `${language}_${resourceId}`
 
-    const repo = await this.door43Client.findRepository(owner, repoName, 'prod')
-    if (!repo) {
-      throw new Error(`Repository not found for ${owner}/${repoName}`)
+    let ref: string
+    let md: string
+    if (this.useZip) {
+      const zip = await this.zipOf(resourceKey, metadata)
+      ref = zip.ref
+      const entry = zip.archive.files[`${zip.top}/${storyPath}`]
+      if (!entry || entry.dir) {
+        throw new ObsStoryAbsentError(`Story file ${storyPath} is not in the ${owner}/${repoName} zip at ${ref}`)
+      }
+      md = await entry.async('string')
+    } else {
+      const repo = await this.door43Client.findRepository!(owner, repoName, 'prod')
+      if (!repo) {
+        throw new Error(`Repository not found for ${owner}/${repoName}`)
+      }
+      ref = repo.release?.tag_name || repo.default_branch || 'master'
+      md = await this.door43Client.fetchTextContent!(owner, repoName, rawPath!, ref)
     }
-
-    const ref = repo.release?.tag_name || repo.default_branch || 'master'
-    const md = await this.door43Client.fetchTextContent(owner, repoName, storyPath, ref)
     const parsed = parseObsStoryMarkdown(storyNum, md)
 
     const baseUrl = this.door43Client?.config?.baseUrl || 'https://git.door43.org'
@@ -187,6 +226,32 @@ export class ObsLoader implements ResourceLoader {
     }
 
     return parsed
+  }
+
+  /** The release zip, downloaded once per resource and kept (the promise is memoised, a failure is not). */
+  private zipOf(resourceKey: string, metadata: ResourceMetadata): Promise<ObsZip> {
+    const memoKey = `${resourceKey}@${zipRef(metadata)}`
+    let pending = this.zips.get(memoKey)
+    if (!pending) {
+      const [owner, language, resourceId] = resourceKey.split('/')
+      const repoName = `${language}_${resourceId}`
+      const ref = zipRef(metadata)
+      pending = (async () => {
+        const bytes = await this.door43Client.downloadZipball(owner, repoName, ref)
+        const archive = await JSZip.loadAsync(bytes)
+        const tops = new Set(
+          Object.keys(archive.files).map((n) => (n.includes('/') ? n.slice(0, n.indexOf('/')) : ''))
+        )
+        const [top] = tops
+        if (tops.size !== 1 || !top) {
+          throw new Error(`The ${owner}/${repoName} zip at ${ref} does not have one top folder`)
+        }
+        return { ref, archive, top }
+      })()
+      this.zips.set(memoKey, pending)
+      pending.catch(() => this.zips.delete(memoKey))
+    }
+    return pending
   }
 
   /**
@@ -230,6 +295,11 @@ export class ObsLoader implements ResourceLoader {
     }
 
     let loaded = total - remaining.length
+    // Ids listed explicitly (a numeric ingredient identifier) must be in the zip; ids guessed from a directory
+    // ingredient (01..50) are skipped when their file is absent.
+    const explicit = (ingredients as { identifier?: string }[]).some((i) => i.identifier != null && /^\d+$/.test(String(i.identifier)))
+    const failures: string[] = []
+    this.lastSkipped = []
     for (const storyId of remaining) {
       try {
         await this.loadContent(resourceKey, storyId)
@@ -242,6 +312,24 @@ export class ObsLoader implements ResourceLoader {
         })
       } catch (err) {
         loaded++
+        if (!this.useZip) {
+          // The app: a story that fails is warned about and left out, as before.
+          onProgress?.({
+            loaded,
+            total,
+            percentage: Math.round((loaded / total) * 100),
+            message: `Failed: ${storyId}`,
+          })
+          if (this.debug) {
+            console.warn(`[ObsLoader] Failed to prefetch story ${storyId} for ${resourceKey}:`, err)
+          }
+          continue
+        }
+        if (!explicit && err instanceof ObsStoryAbsentError) {
+          this.lastSkipped.push(storyId)
+          continue
+        }
+        failures.push(`${storyId}: ${err instanceof Error ? err.message : String(err)}`)
         onProgress?.({
           loaded,
           total,
@@ -252,6 +340,12 @@ export class ObsLoader implements ResourceLoader {
           console.warn(`[ObsLoader] Failed to prefetch story ${storyId} for ${resourceKey}:`, err)
         }
       }
+    }
+    if (this.lastSkipped.length > 0) {
+      reportObsIssues([`${resourceKey}: ${this.lastSkipped.length} stories are not in the release zip and were skipped (${this.lastSkipped.join(', ')})`])
+    }
+    if (failures.length > 0) {
+      throw new Error(`${failures.length} OBS stories of ${resourceKey} failed: ${failures.join('; ')}`)
     }
   }
 }

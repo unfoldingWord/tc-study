@@ -4,11 +4,11 @@ import { schemas as exported } from '../index'
 import { SEARCH_FILTER_KEYS } from '../search/types'
 import schemas from './schemas.json'
 
-const NAMES = ['article', 'books', 'concept', 'context', 'lookup', 'passage', 'renderings', 'search', 'topics', 'academy']
+const NAMES = ['article', 'books', 'concept', 'context', 'lookup', 'passage', 'renderings', 'search', 'topics', 'academy', 'stories', 'story']
 type Entry = { label: { es: string }; description: string; input: { type: string; properties: Record<string, unknown>; required: string[] } }
 
 describe('schemas.json', () => {
-  test('exactly the ten query names, exported by the package', () => {
+  test('exactly the twelve query names, exported by the package', () => {
     expect(Object.keys(schemas).sort()).toEqual([...NAMES].sort())
     expect(exported).toBe(schemas)
   })

@@ -368,7 +368,9 @@ export async function buildLanguage(o: {
     const keys = obs.res.map(([key]) => key)
     const rows: RowKey[] = []
     for (const resource of keys) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
-    await add(obsSegment(obs), inputsOf(rows, stampsOf(keys)), keys)
+    // The stories are shown with the titles and book names of the map: the unit needs it.
+    const built = await add(obsSegment(obs), inputsOf(rows, stampsOf(keys)), keys)
+    needs.set(built.id, ['map'])
   }
 
   // The language map: the notes counted by concept, the names of books and concepts, the coverage of every resource

@@ -15,10 +15,12 @@ import {
   originalLanguageResourceKey,
   type OriginalLanguageSpec,
 } from '../scripture/originalLanguageSpecs'
+import { literalTextOf } from '../language/literalText'
 import { catalogHitRelease, door43ResourceForHit } from './catalogHits'
 import { ensureOriginalLanguageInCatalog } from './originalLanguageCatalog'
+import { obsKindOfSubject, pickObs, type ObsPick } from './obsPick'
 import { catalogIdentity } from './readCatalogIdentity'
-import { searchCatalogHitsForTarget, type CatalogSearchClient } from './readCatalogSearch'
+import { searchCatalogHitsForTarget, searchObsStories, type CatalogSearchClient } from './readCatalogSearch'
 import { createResourceMetadata, type Door43Resource, type MetadataCreationOptions } from './ResourceMetadataFactory'
 
 export interface DiscoveredResource {
@@ -41,6 +43,8 @@ export interface LanguageDiscovery {
   /** Original-language keys now in the catalog (added now or already there). */
   originals: string[]
   skipped: SkippedHit[]
+  /** The OBS owners picked for this language (`obsPick.ts`); every other OBS hit was dropped. */
+  obs: ObsPick
 }
 
 /** The OBS helps subjects that are OBS's own (`TSV OBS Translation Notes`…), not the TW and TA OBS also links to. */
@@ -77,16 +81,35 @@ export async function discoverLanguage(options: {
       navigationScope: 'obs',
       helpsSubjects: obsOwnHelpsSubjects(resourceTypeRegistry.subjectsForHelpsCatalogLoad('obs')),
     })),
+    { hydrateTarget: 'text' as const, catalogResults: await searchObsStories(door43Client, language) },
   ]
+
+  // One owner per language for OBS: every OBS hit goes through the pick, and only the picked rows continue.
+  const entries = pages.flatMap((page) => page.catalogResults)
+  const bibleRows = entries.flatMap((entry) => {
+    const id = catalogIdentity(entry, language)
+    return id ? [{ language: id.langStr, subject: id.subject, resourceId: id.resourceId, owner: id.ownerStr }] : []
+  })
+  const obs = pickObs(
+    entries.filter((entry) => obsKindOfSubject(catalogIdentity(entry, language)?.subject ?? '')),
+    (literalTextOf(bibleRows, language) as { owner: string } | undefined)?.owner
+  )
+  const pickedKeys = new Set(
+    [obs.stories, obs.notes, obs.questions, obs.links].flatMap((hit) => {
+      const id = hit ? catalogIdentity(hit, language) : null
+      return id ? [id.resourceKey] : []
+    })
+  )
 
   const resources: DiscoveredResource[] = []
   const skipped: SkippedHit[] = []
   const seen = new Set<string>()
 
-  for (const entry of pages.flatMap((page) => page.catalogResults)) {
+  for (const entry of entries) {
     const id = catalogIdentity(entry, language)
     if (!id || seen.has(id.resourceKey)) continue
     seen.add(id.resourceKey)
+    if (obsKindOfSubject(id.subject) && !pickedKeys.has(id.resourceKey)) continue
 
     const type = resourceTypeRegistry.getTypeForSubject(id.subject)
     if (!type) {
@@ -138,5 +161,5 @@ export async function discoverLanguage(options: {
     }
   }
 
-  return { language, resources, originals: presentOriginals, skipped }
+  return { language, resources, originals: presentOriginals, skipped, obs }
 }

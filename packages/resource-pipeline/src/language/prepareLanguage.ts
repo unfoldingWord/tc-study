@@ -73,6 +73,7 @@ export async function prepareLanguage(options: {
         resources: found.resources.map((resourceKey) => ({ resourceKey }) as LanguageDiscovery['resources'][number]),
         originals: found.originals,
         skipped: [],
+        obs: { lines: [] },
       }))
     : await discoverLanguage({ language, door43Client, catalogManager, resourceTypeRegistry })
 
