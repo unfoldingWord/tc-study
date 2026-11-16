@@ -737,7 +737,8 @@ describe('A4: a fresh reader reads what a query needs', () => {
   })
 })
 
-/** The default units before OBS joined them: these tests count segments of the Titus install without obs. */const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
+/** The default units before OBS joined them: these tests count segments of the Titus install without obs. */
+const NO_OBS = ['xmap', 'map', 'xtopics', 'topics']
 describe('install several segments at a time', () => {
   /** The segment ids of the Titus install, once each in plan order: xmap(2) map(2) xtopics(2) topics art:tw:kt orig:tit book:tit. */
   let order: string[]
