@@ -72,9 +72,18 @@ describe('chunksOfText: rules', () => {
   ]
   test('two ms:ts at the same verse give one break', () => {
     const events: Event[] = [[0, 'open', 'ms:ts'], ...base.slice(0, 3), [2, 'open', 'ms:ts'], [2, 'open', 'ms:ts'], ...base.slice(3)]
-    // sorted by position: the two milestones sit before verse 3's event
-    const ordered = [events[0], events[1], events[2], events[3], events[4], events[5], ...events.slice(6)]
-    expect(chunksOfText(synthetic(ordered), 'rut', list)).toEqual([[V(1, 1), V(1, 2)], [V(1, 3), V(2, 2)]])
+    expect(events.filter((e) => e[1] === 'open' && e[2] === 'ms:ts').length).toBe(3)
+    expect(chunksOfText(synthetic(events), 'rut', list)).toEqual([[V(1, 1), V(1, 2)], [V(1, 3), V(2, 2)]])
+  })
+  test('a ts before the first verse is the start of the first chunk', () => {
+    const events: Event[] = [[0, 'chapter', '1'], [0, 'open', 'ms:ts'], ...base.slice(1)]
+    expect(chunksOfText(synthetic(events), 'rut', list)).toEqual([[V(1, 1), V(2, 2)]])
+  })
+  test('a ts after the last verse is no break: the book has no entry', () => {
+    const events: Event[] = [...base, [6, 'open', 'ms:ts']]
+    expect(chunksOfText(synthetic(events), 'rut', list)).toEqual([])
+    const withBreak: Event[] = [...base.slice(0, 5), [4, 'open', 'ms:ts'], ...base.slice(5), [6, 'open', 'ms:ts']]
+    expect(chunksOfText(synthetic(withBreak), 'rut', list)).toEqual([[V(1, 1), V(1, 4)], [V(2, 1), V(2, 2)]])
   })
   test('a chunk ends at the end of the chapter and starts the next', () => {
     const events: Event[] = [...base.slice(0, 5), [4, 'open', 'ms:ts'], ...base.slice(5)]

@@ -653,6 +653,7 @@ export async function buildCommon(o: {
       const byBook = new Map<string, [number, number][]>()
       const noBreaks: string[] = []
       const noBook: string[] = []
+      const noVerses: string[] = []
       let unplaced = 0
       for (const orig of origs) {
         if (!ult.books.includes(orig.book)) {
@@ -669,11 +670,14 @@ export async function buildCommon(o: {
         const alignIssues: string[] = []
         const text = extractText(rows, orig.book, ult.key, new OrigIndex(orig), alignIssues)
         unplaced += alignIssues.length
-        const list = chunksOfText(text, orig.book, versesOf(orig))
-        if (list.length === 0) noBreaks.push(orig.book)
+        const origVerses = versesOf(orig)
+        const list = chunksOfText(text, orig.book, origVerses)
+        if (!origVerses.some((v) => v % 1000 !== 0 && Math.floor((v % 1_000_000) / 1000) > 0)) noVerses.push(orig.book)
+        else if (list.length === 0) noBreaks.push(orig.book)
         else byBook.set(orig.book, list)
       }
       if (noBook.length > 0) report.push(`topics: chunks: ${ULT_KEY} does not have ${noBook.join(', ')}: no sections for them`)
+      if (noVerses.length > 0) report.push(`topics: chunks: the original of ${noVerses.join(', ')} has no verses: no sections for them`)
       if (noBreaks.length > 0) report.push(`topics: chunks: ${noBreaks.join(', ')} have no ts milestone in ${ULT_KEY}: no sections for them`)
       if (unplaced > 0) report.push(`topics: chunks: ${unplaced} issues reading the text of ${ULT_KEY} (alignment); the sections do not depend on them`)
       const table = chunksTable(byBook)
@@ -681,7 +685,7 @@ export async function buildCommon(o: {
         built.core.chunks = table
         built.core.res = [...built.core.res, [ult.key, tagOf(ult.stamp)] as [string, string]].sort((a, b) => compareCodePoints(a[0], b[0]))
         built.core.coverage.set(ult.key, { whole: [...byBook.keys()].sort((a, b) => bookNumber(a) - bookNumber(b)), partial: [] })
-      } else report.push(`topics: chunks: no book of ${ULT_KEY} has a ts milestone: the xtopics have no section map`)
+      } else if (noBook.length + noVerses.length + noBreaks.length === 0) report.push(`topics: chunks: no book of the originals was built: the xtopics have no section map`)
     }
     const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))

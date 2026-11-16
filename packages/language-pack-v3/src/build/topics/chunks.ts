@@ -14,7 +14,7 @@ import { leadingNumber } from '../orig'
  * first verse of the book. It ends at the verse before the start of the next, in the list `verses` (the ids of the verses of the
  * original of the book, as `versesOf` gives them: it knows where a chapter ends); the last ends at the last verse of the list.
  * Verse 0 and the introductions are in no section, a verse bridge counts as its first number, and two milestones with no verse
- * between them make one break. A text without `ms:ts` gives `[]`: the breaks are never invented. A start the list does not
+ * between them make one break. A text without a `ms:ts` that a verse follows (none, or only after the last verse) gives `[]`: the breaks are never invented. A start the list does not
  * have moves to the next verse it has; one with none after it is dropped.
  */
 export function chunksOfText(text: TextModel, book: string, verses: readonly number[]): [number, number][] {
@@ -27,7 +27,6 @@ export function chunksOfText(text: TextModel, book: string, verses: readonly num
   const starts = new Set<number>()
   for (const [, kind, arg] of text.events) {
     if (kind === 'open' && arg === 'ms:ts') {
-      hasBreak = true
       pending = true
     } else if (kind === 'chapter') {
       chapter = leadingNumber(arg, 'chapter')
@@ -36,7 +35,10 @@ export function chunksOfText(text: TextModel, book: string, verses: readonly num
       if (verse === 0) continue
       const id = verseId(book, chapter, verse)
       first ??= id
-      if (pending) starts.add(id)
+      if (pending) {
+        starts.add(id)
+        hasBreak = true
+      }
       pending = false
     }
   }
