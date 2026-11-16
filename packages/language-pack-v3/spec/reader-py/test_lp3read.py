@@ -2624,7 +2624,7 @@ def test_map_cli_prints_the_canonical_text(tmp_path):
 TIPNR_RES = ["STEPBible/TIPNR", "be4191f"]
 THEO_RES = ["robertrouse/theographic", "744355c"]
 TN_RES = ["unfoldingWord/en/tn", "v91"]
-XT_TABLES = ("coverage", "topics", "relations", "strongs", "occurrences", "ranges")
+XT_TABLES = ("coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks")
 
 
 def xtopics_core(skip: tuple = ()):
@@ -2644,6 +2644,7 @@ def xtopics_core(skip: tuple = ()):
         "strongs": {"per:abraham": ["H0085", "H0087"]},
         "occurrences": counts("verses", {"per:abraham": [(1, 3, 3), (56, 1, 1)], "per:isaac": [(1, 1, 1)]}),
         "ranges": {"sec:tit/1": [[56001001, 56001016]], "ev:plagues": [[2007014, 2012036], [2012037, 2012037]]},
+        "chunks": {"gen": [[1001001, 1001005]], "tit": [[56001001, 56001003], [56001004, 56001016]]},
     }
     for name in skip:
         h["tables"][name] = [2, False]
@@ -2669,6 +2670,7 @@ def xtopics_core(skip: tuple = ()):
                        "confidence": 90}],
         "strongs": {"per:abraham": ["H0085", "H0087"]},
         "ranges": {"sec:tit/1": [[56001001, 56001016]], "ev:plagues": [[2007014, 2012036], [2012037, 2012037]]},
+        "chunks": {"gen": [[1001001, 1001005]], "tit": [[56001001, 56001003], [56001004, 56001016]]},
     }
     for name in skip:
         del expected[name]
@@ -2725,7 +2727,7 @@ def test_topics_classes_read(fixture):
     ok(b, expected)
 
 
-@pytest.mark.parametrize("skip", [("relations",), ("strongs",), ("ranges",), ("relations", "strongs", "ranges")])
+@pytest.mark.parametrize("skip", [("relations",), ("strongs",), ("ranges",), ("chunks",), ("relations", "strongs", "ranges", "chunks")])
 def test_xtopics_core_unknown_optional_tables_are_skipped(skip):
     b, expected, _ = xtopics_core(skip)
     ok(b, expected)
@@ -2733,7 +2735,7 @@ def test_xtopics_core_unknown_optional_tables_are_skipped(skip):
 
 def test_xtopics_core_without_optional_tables_and_empty():
     _, expected, (h, t) = xtopics_core()
-    for name in ("relations", "strongs", "ranges"):
+    for name in ("relations", "strongs", "ranges", "chunks"):
         del h["tables"][name]
         del t[name]
         expected.pop(name)
@@ -2836,6 +2838,15 @@ XTOPICS_CORE_MUTATIONS = {
     "ranges book 0": lambda h, t: t["ranges"].update({"sec:tit/1": [[1001, 1002]]}),
     "ranges book 67": lambda h, t: t["ranges"].update({"sec:tit/1": [[67001001, 67001002]]}),
     "ranges pair of three": lambda h, t: t["ranges"].update({"sec:tit/1": [[56001001, 56001002, 56001003]]}),
+    "chunks empty list for a book": lambda h, t: t["chunks"].update({"tit": []}),
+    "chunks first after last": lambda h, t: t["chunks"].update({"tit": [[56001016, 56001001]]}),
+    "chunks not ascending": lambda h, t: t["chunks"].update({"tit": [[56001004, 56001016], [56001001, 56001003]]}),
+    "chunks overlap": lambda h, t: t["chunks"].update({"tit": [[56001001, 56001004], [56001004, 56001016]]}),
+    "chunks verse of another book": lambda h, t: t["chunks"].update({"tit": [[56001001, 57001002]]}),
+    "chunks first of another book": lambda h, t: t["chunks"].update({"tit": [[1001001, 56001002]]}),
+    "chunks key not a book code": lambda h, t: t["chunks"].update({"xyz": [[56001001, 56001002]]}),
+    "chunks pair of three": lambda h, t: t["chunks"].update({"tit": [[56001001, 56001002, 56001003]]}),
+    "chunks not a map": lambda h, t: t.update(chunks=[]),
     "occurrences unit occurrences": lambda h, t: t["occurrences"].update(unit="occurrences"),
     "occurrences key not a topic": lambda h, t: t.update(occurrences=counts("verses", {"per:zed": [(1, 1, 1)]})),
     "occurrences count differs from verses": lambda h, t: t.update(
@@ -2867,6 +2878,7 @@ XTOPICS_PART_MUTATIONS = {
     "required occurrences missing": lambda h, t: _drop(h, t, "occurrences"),
     "a core table in a part": lambda h, t: (h["tables"].update(coverage=[1, False]), t.update(coverage={}), None)[2],
     "topics in a part": lambda h, t: (h["tables"].update(topics=[1, False]), t.update(topics={}), None)[2],
+    "chunks in a part": lambda h, t: (h["tables"].update(chunks=[1, False]), t.update(chunks={}), None)[2],
     "ranges in a part": lambda h, t: (h["tables"].update(ranges=[1, False]), t.update(ranges={}), None)[2],
     "occurrences in the shape of a core": lambda h, t: t.update(occurrences=counts("verses", {"a": [(56, 1, 1)]})),
     "keys unsorted": lambda h, t: t["occurrences"].update(keys=["sec:tit/1", "per:abraham"]),
@@ -2991,3 +3003,9 @@ def test_xtopics_unknown_required_table_is_e_table():
     h["tables"]["future"] = [1, True]
     t["future"] = 1
     err(build(h, t).data, "E_TABLE")
+
+
+def test_xtopics_chunks_single_verse_and_adjacent_sections():
+    _, _, (h, t) = xtopics_core()
+    t["chunks"] = {"tit": [[56001001, 56001001], [56001002, 56001002]]}
+    assert read_file(build(h, t).data)["chunks"] == {"tit": [[56001001, 56001001], [56001002, 56001002]]}
