@@ -63,19 +63,32 @@ export function titleKey(title: string): string {
 }
 
 /**
+ * The three en_ta articles titled "Word Order" are told apart by hand, keyed by the `reference_id` of the English Aquifer article. Evidence
+ * (`ta-eng.json`, Manual at 1c3178f): the English article 33295 (ref 26709, "Word Order") links "Koiné Greek" to 33296 (ref 26710) and "Biblical
+ * Hebrew" to 33297 (ref 26711); 26709 is the general article, so it is `figs-order`, 26710 the Greek one and 26711 the Hebrew one.
+ */
+export const TITLE_OVERRIDES: Readonly<Record<string, string>> = {
+  '26709': 'ta:translate/figs-order',
+  '26710': 'ta:translate/figs-ordergrk',
+  '26711': 'ta:translate/figs-orderheb',
+}
+
+/**
  * The map from the `content_id` of each Hindi Manual article to its `ta:{manual}/{slug}` id (the slug in lower case, `ids.md`). An
  * article is matched through its English twin (the same `reference_id`) and the title of that twin in `enTaTitles`; one with no twin, no
- * Door43 title or an ambiguous title is listed in `unmatched` with the reason, and is not in the map.
+ * Door43 title or an ambiguous title (the three "Word Order" articles are settled by {@link TITLE_OVERRIDES}) is listed in `unmatched` with the reason, and is not in the map.
  */
 export function buildTaMap(langTa: TaArticle[], engTa: TaArticle[], enTaTitles: EnTaTitles): { map: Map<string, string>; unmatched: TaUnmatched[] } {
   const english = new Map<string, TaArticle>()
   for (const article of engTa) if (article.reference_id !== undefined) english.set(String(article.reference_id), article)
   const byTitle = new Map<string, string>()
-  for (const [title, id] of Object.entries(enTaTitles.titles)) {
-    const key = titleKey(title)
-    if (!byTitle.has(key)) byTitle.set(key, id.toLowerCase())
-  }
   const ambiguous = new Set(Object.keys(enTaTitles.ambiguous ?? {}).map(titleKey))
+  for (const [title, id] of Object.entries(enTaTitles.titles)) {
+    // Two titles that compare equal (case, spaces, decoration) are one shared title, whatever `ambiguous` says: never matched.
+    const key = titleKey(title)
+    if (byTitle.has(key)) ambiguous.add(key)
+    else byTitle.set(key, id.toLowerCase())
+  }
 
   const map = new Map<string, string>()
   const unmatched: TaUnmatched[] = []
@@ -85,6 +98,11 @@ export function buildTaMap(langTa: TaArticle[], engTa: TaArticle[], enTaTitles: 
     const twin = article.reference_id === undefined ? undefined : english.get(String(article.reference_id))
     if (twin === undefined || twin.title === undefined) {
       unmatched.push({ contentId, title, reason: 'no-english-article' })
+      continue
+    }
+    const override = TITLE_OVERRIDES[String(twin.reference_id)]
+    if (override !== undefined) {
+      map.set(contentId, override)
       continue
     }
     const key = titleKey(twin.title)
@@ -103,14 +121,19 @@ type Node = { tag: string; attrs: string; children: Node[] } | string
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', ndash: '–', mdash: '—', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”' }
 
-/** Decodes the named entities above and the numeric ones (`&#39;`, `&#x27;`); any other `&…;` stays as written. */
+/** Decodes the named entities above and the numeric ones (`&#39;`, `&#x27;`); any other `&…;` stays as written. NUL and the C0 controls (and DEL) except tab and newline are dropped. */
 export function decodeEntities(text: string): string {
   return text.replace(/&(?:#([0-9]+)|#[xX]([0-9a-fA-F]+)|([a-zA-Z]+));/g, (all, dec, hex, name) => {
     if (name !== undefined) return ENTITIES[name] ?? all
     const code = dec !== undefined ? Number(dec) : parseInt(hex, 16)
-    return code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : all
+    // NUL and the C0 controls other than tab and newline (and DEL) are dropped; a surrogate or a code past U+10FFFF stays as written.
+    if (code === 0 || (code < 0x20 && code !== 9 && code !== 10) || code === 0x7f) return ''
+    return code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : all
   })
 }
+
+/** Elements whose content is not text a reader should get: they and everything under them are dropped. */
+const DROPPED = new Set(['script', 'style', 'iframe', 'object', 'embed', 'noscript'])
 
 const VOID = new Set(['br', 'hr', 'img', 'input', 'meta', 'link'])
 
@@ -152,8 +175,11 @@ const attr = (node: { attrs: string }, name: string): string | undefined => {
 function textOf(node: Node): string {
   if (typeof node === 'string') return decodeEntities(node)
   if (node.tag === 'br') return ' '
+  if (DROPPED.has(node.tag)) return ''
   return node.children.map(textOf).join('')
 }
+
+const SAFE_HREF = /^(https?:|mailto:)/i
 
 const clean = (text: string): string => text.replace(/\\n/g, '\n')
 
@@ -177,12 +203,15 @@ function inline(nodes: Node[], link: LinkResolver | undefined): string {
       out += wrap('**', inline(node.children, link))
     } else if (node.tag === 'em' || node.tag === 'i') {
       out += wrap('*', inline(node.children, link))
+    } else if (DROPPED.has(node.tag)) {
+      continue
     } else if (node.tag === 'br') {
       out += '\n'
     } else if (node.tag === 'a') {
       const text = inline(node.children, link).trim()
       const href = attr(node, 'href')
-      out += href === undefined || text === '' ? text : `[${text}](${href})`
+      // Only http(s) and mailto links are kept; `javascript:`, `data:` and the like leave the text alone.
+      out += href === undefined || text === '' || !SAFE_HREF.test(href.trim()) ? text : `[${text}](${href.trim()})`
     } else if (node.tag === 'data' && attr(node, 'class') === 'resource-ref' && link !== undefined) {
       out += link({ code: attr(node, 'data-resource-code') ?? '', contentId: attr(node, 'data-content-id') ?? '', label: inline(node.children, undefined).trim() })
     } else if (BLOCKS.has(node.tag)) {
@@ -237,6 +266,10 @@ function blocks(nodes: Node[], link: LinkResolver | undefined, indent: string): 
  * `<a>` and `<br>` are kept; headings `<h1>`–`<h6>` become `#` lines (the introductions have them); any other tag becomes its text. The
  * entities are decoded and a literal `\n` (TSV's escape, which the Hindi notes still carry) is a line break. `link` gives the text of a
  * Manual link (`<data class="resource-ref">`); without it a link is its label.
+ *
+ * Safety: a link keeps its `href` only for `http:`, `https:` and `mailto:`; `script`, `style`, `iframe`, `object`, `embed` and `noscript` are dropped
+ * with their content; NUL and control characters (entities included) are dropped. Headings become `#` on purpose (the introductions have them).
+ * The output is still markdown from a third party: the client must not render raw HTML from note markdown (Door43 notes have the same exposure).
  */
 export function htmlToMarkdown(html: string, link?: LinkResolver): string {
   return blocks(parseHtml(html), link, '').join('\n\n')

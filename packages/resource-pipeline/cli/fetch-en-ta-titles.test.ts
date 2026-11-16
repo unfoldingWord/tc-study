@@ -28,7 +28,6 @@ test('reads the title.md of every article of the tag, lower-cases the slug and l
   expect(out.titles).toEqual({
     'Acceptable Style': 'ta:checking/acceptable',
     'Active or Passive': 'ta:translate/figs-activepassive',
-    'Word Order': 'ta:translate/figs-order',
   })
   expect(out.ambiguous).toEqual({ 'Word Order': ['ta:translate/figs-order', 'ta:translate/figs-orderheb'] })
 })

@@ -20,12 +20,33 @@ describe('buildTaMap', () => {
     const { map, unmatched } = buildTaMap(fixture.hinTa, fixture.engTa, fixture.enTaTitles)
     expect(map.get('727303')).toBe('ta:translate/figs-abstractnouns')
     expect(map.get('727304')).toBe('ta:translate/figs-activepassive')
-    // "Word Order" names three articles in en_ta: none is guessed
-    expect(unmatched.map((u) => [u.contentId, u.reason])).toEqual([
-      ['727338', 'ambiguous-title'],
-      ['799943', 'no-english-article'],
+    expect(unmatched.map((u) => [u.contentId, u.reason])).toEqual([['799943', 'no-english-article']])
+    expect(map.size).toBe(3)
+  })
+
+  test('the three "Word Order" articles are settled by the pinned override table, by the English reference_id', () => {
+    // en_ta has three articles with that title, so the title alone cannot say which is which.
+    expect(fixture.enTaTitles.titles).not.toHaveProperty('Word Order')
+    const eng = [26709, 26710, 26711].map((ref, i) => ({ content_id: 33295 + i, reference_id: ref, title: 'Word Order' }))
+    const hin = [26709, 26710, 26711].map((ref, i) => ({ content_id: 900 + i, reference_id: ref, title: 'शब्द क्रम' }))
+    const { map, unmatched } = buildTaMap(hin, eng, { titles: {} })
+    expect(unmatched).toEqual([])
+    expect([...map]).toEqual([
+      ['900', 'ta:translate/figs-order'],
+      ['901', 'ta:translate/figs-ordergrk'],
+      ['902', 'ta:translate/figs-orderheb'],
     ])
-    expect(map.size).toBe(2)
+    expect(taMap().get('727338')).toBe('ta:translate/figs-order')
+  })
+
+  test('a shared title is never matched, even when the caller gives no ambiguous list', () => {
+    const { map, unmatched } = buildTaMap(
+      [{ content_id: 1, reference_id: 10, title: 'x' }],
+      [{ content_id: 2, reference_id: 10, title: 'Same Title' }],
+      { titles: { 'Same Title': 'ta:translate/a', 'same  title': 'ta:translate/b' } },
+    )
+    expect(map.size).toBe(0)
+    expect(unmatched[0].reason).toBe('ambiguous-title')
   })
 
   test('titles compare with NFC, case, spaces and the unfoldingWord® decoration left out', () => {
@@ -55,6 +76,19 @@ describe('htmlToMarkdown', () => {
 
   test('a literal \\n is a line break and headings are #', () => {
     expect(htmlToMarkdown('<h2>T</h2><p>A:\\n\\nB &quot;q&quot; &#39;s&#39;</p>')).toBe('## T\n\nA:\n\nB "q" \'s\'')
+  })
+
+  test('an href is kept only for http, https and mailto', () => {
+    expect(htmlToMarkdown('<p><a href="javascript:alert(1)">x</a> <a href=" JaVaScRiPt:y">y</a> <a href="data:text/html,z">z</a> <a href="https://a/b">ok</a> <a href="mailto:m@x">m</a></p>')).toBe('x y z [ok](https://a/b) [m](mailto:m@x)')
+  })
+
+  test('NUL and control characters are dropped, tab and newline stay', () => {
+    expect(htmlToMarkdown('<p>a&#0;b&#x1;c&#8;d&#127;e&#9;f&#10;g</p>')).toBe('abcde\tf\ng')
+  })
+
+  test('script, style, iframe, object, embed and noscript are dropped with their content', () => {
+    const html = '<p>a<script>alert(1)</script>b<style>p{}</style><iframe src="x">in</iframe><object>o<embed>e</object><noscript>n</noscript>c</p>'
+    expect(htmlToMarkdown(html)).toBe('abc')
   })
 
   test('a Manual link goes through the resolver', () => {

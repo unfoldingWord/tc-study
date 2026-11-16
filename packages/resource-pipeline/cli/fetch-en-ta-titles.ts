@@ -5,7 +5,7 @@
  *
  * Reads the git tree of the tag (`?recursive=1`, paged), then each `{manual}/{slug}/title.md` from raw, and writes
  * `{ repo, tag, titles: { "<title>": "ta:<manual>/<slug>" }, ambiguous: { "<title>": ["ta:…", …] } }`. The slug is lowercase (`spec/ids.md`).
- * A title two articles share keeps the first id (in path order) in `titles` and lists all of them in `ambiguous`. The default tag is `v91`, the
+ * A title two articles share is left out of `titles`; all its ids are in `ambiguous`. The default tag is `v91`, the
  * release the Aquifer UWTranslationManual was cut from (Nov 2026); `v91` is also the latest release at that date. Exit 0 when written, 1 on a
  * failed download, 2 for bad arguments.
  */
@@ -56,9 +56,10 @@ export async function fetchEnTaTitles(tag: string, fetcher: typeof fetch = fetch
   for (const [title, id] of found) {
     if (title === '') continue
     all.set(title, [...(all.get(title) ?? []), id])
-    if (!(title in titles)) titles[title] = id
   }
   const ambiguous = Object.fromEntries([...all].filter(([, ids]) => ids.length > 1))
+  // A title two articles share is only in `ambiguous`, never in `titles`, so no reader can match it by accident.
+  for (const [title, ids] of all) if (ids.length === 1) titles[title] = ids[0]
   return { repo: REPO, tag, titles, ambiguous }
 }
 
