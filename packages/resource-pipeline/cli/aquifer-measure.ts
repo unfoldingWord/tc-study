@@ -13,8 +13,7 @@
  *   `--base-books`) counts as answered, because Door43 always wins.
  * - Gap cells: 66 books x {tN, tQ}, each `door43`, `aquifer` or empty, before (Door43 only) and after (the patch fills what Door43 lacks).
  * - TA links: notes with a `concept`, inline `[[ta:...]]` links, and the links left as text (`report.txt` of the patch: "ta links left as text: N inline links").
- * - Empty answers: `--refs` (a file with one reference per line or a JSON list, or a comma list), or 30 spread evenly over the patched books'
- *   verses. A reference is empty when it has no notes and no questions. "Before" is the books of `--base-books`; with `--base` the base reader's own
+ * - Empty answers: `--refs` (a file with one reference per line or a JSON list, or a comma list), or 30 spread over all 66 books (common `orig:` verses). A reference is empty when it has no notes and no questions. "Before" is the books of `--base-books`; with `--base` the base reader's own
  *   answer is reported too.
  * - The sample of notes is deterministic by `--seed`.
  *
@@ -36,9 +35,7 @@ import {
   origView,
   readSegment,
 } from '@bt-synergy/language-pack-v3'
-// The client has no symlink in this package's node_modules (it is not a dependency): reached by path, as `src/language/*` reaches `cli/`.
-import { openFromSegments, patchedReader, type PackReader } from '../../language-pack-client/src/index'
-import { verifyCatalogFile } from '../../language-pack-client/src/verify'
+import { openFromSegments, type PackReader, patchedReader, verifyCatalogFile } from '@bt-synergy/language-pack-client'
 
 export class UsageError extends Error {}
 
@@ -264,7 +261,9 @@ export function invertTitles(titles: EnTaTitles): Map<string, string[]> {
 
 /** The first 30 (or `n`) references spread evenly over the books, an even share each, and evenly inside a book. */
 export function spreadRefs(verses: Map<string, string[]>, n = 30): string[] {
-  const books = [...verses.keys()].filter((b) => verses.get(b)!.length > 0).sort((a, b) => BOOKS.indexOf(a) - BOOKS.indexOf(b))
+  const all = [...verses.keys()].filter((b) => verses.get(b)!.length > 0).sort((a, b) => BOOKS.indexOf(a) - BOOKS.indexOf(b))
+  // More books than references: one reference in each of `n` books spread over the canon (never only the first `n`).
+  const books = all.length <= n ? all : Array.from({ length: n }, (_, k) => all[Math.floor(((k + 0.5) * all.length) / n)])
   const out: string[] = []
   books.forEach((book, i) => {
     const list = verses.get(book)!
@@ -335,8 +334,8 @@ export async function measure(o: Options): Promise<{ markdown: string; summary: 
 
   const patchBooks = { tn: new Set<string>(), tq: new Set<string>() }
   for (const [book, model] of patch.books) {
-    if (model.notes !== undefined) patchBooks.tn.add(book)
-    if (model.questions !== undefined) patchBooks.tq.add(book)
+    if ((model.notes?.rows.length ?? 0) > 0) patchBooks.tn.add(book)
+    if ((model.questions?.rows.length ?? 0) > 0) patchBooks.tq.add(book)
   }
   const gaps = gapCells(baseBooks, patchBooks)
   const noteRows = BOOKS.flatMap((b) => patch.books.get(b)?.notes?.rows ?? [])
@@ -348,7 +347,7 @@ export async function measure(o: Options): Promise<{ markdown: string; summary: 
   let refs: string[]
   if (o.refs !== undefined) refs = readRefs(o.refs)
   else {
-    const verses = await commonVerses(o.common, patched)
+    const verses = await commonVerses(o.common, [...BOOKS])
     // A book the common catalog lacks falls back to the references of its rows that are one verse of one chapter.
     for (const book of patched) {
       if (verses.has(book)) continue
@@ -380,10 +379,12 @@ export async function measure(o: Options): Promise<{ markdown: string; summary: 
   L.push(`- Links left as text (report.txt): ${links.leftAsText ?? 'unknown (no report.txt, or no such line)'}`)
   L.push(`- Associated Manual articles with no ta: id (no concept): ${links.conceptArticlesWithoutId ?? 'unknown'}`)
   L.push(`- Link hit rate: ${pct(links.linkHitRate)}`)
-  L.push('', `## Empty answers (${refs.length} references)`, '')
+  const merged = baseOpened !== undefined
+  L.push('', `## Empty answers (${refs.length} references${o.refs === undefined ? ', spread over all 66 books from the common orig verses' : ', from --refs'})`, '')
+  if (!merged) L.push('Lower bound: there is no `--base`, so a book Door43 has a table of counts as answered, whatever the verse.', '')
   L.push(`- Before, by the Door43 books (no tN and no tQ of the book): ${empty.emptyBefore}`)
   if (empty.emptyBeforeMeasured !== null) L.push(`- Before, measured on the base reader: ${empty.emptyBeforeMeasured}`)
-  L.push(`- After (${baseOpened === undefined ? 'patch reader alone; Door43 books count as answered' : 'base and patch merged'}): ${empty.emptyAfter}`)
+  L.push(`- After (${merged ? 'base and patch merged' : 'lower bound, patch reader alone; Door43 books count as answered'}): ${empty.emptyAfter}`)
   if (empty.stillEmpty.length > 0) L.push(`- Still empty: ${empty.stillEmpty.join(', ')}`)
   L.push('', `## ${sample.length} notes to check by hand (seed ${o.seed})`, '')
   L.push('Check that each concept and each link names the article the note is about.', '')
@@ -401,7 +402,7 @@ export async function measure(o: Options): Promise<{ markdown: string; summary: 
     books: { tn: [...patchBooks.tn].length, tq: [...patchBooks.tq].length },
     gap: { before: t.before, after: t.after },
     ta: links,
-    empty: { refs: refs.length, before: empty.emptyBefore, beforeMeasured: empty.emptyBeforeMeasured, after: empty.emptyAfter },
+    empty: { mode: merged ? 'merged' : 'book-level', refs: refs.length, before: empty.emptyBefore, beforeMeasured: empty.emptyBeforeMeasured, after: empty.emptyAfter },
     sample: sample.length,
     seed: o.seed,
   }

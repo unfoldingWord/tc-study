@@ -188,6 +188,7 @@ describe('aquifer-measure', () => {
     expect(r.err).toEqual([])
     expect(r.code).toBe(0)
     // before by books: tit and gen are empty (2); measured on the base reader: tit, phm 1:2 and gen (3)
+    expect(r.summary.empty.mode).toBe('merged')
     expect(r.summary.empty.refs).toBe(4)
     expect(r.summary.empty.before).toBe(2)
     expect(r.summary.empty.beforeMeasured).toBe(3)
@@ -198,12 +199,29 @@ describe('aquifer-measure', () => {
     const w = await world()
     const r = await run(w.args(['--refs', 'tit 1:1,gen 1:1']))
     expect(r.code).toBe(0)
-    expect(r.summary.empty).toEqual({ refs: 2, before: 2, beforeMeasured: null, after: 1 })
+    expect(r.summary.empty).toEqual({ mode: 'book-level', refs: 2, before: 2, beforeMeasured: null, after: 1 })
   })
 
   test('a bad option is a usage error, a folder with no catalog a read error', async () => {
     const w = await world()
     expect((await run(w.args(['--lang', 'HI']))).code).toBe(1)
     expect((await run(['--base-books', join(w.root, 'base-books.json'), '--patch', w.root, '--common', w.common, '--out-md', join(w.root, 'o.md')])).code).toBe(2)
+  })
+})
+
+describe('review fixes', () => {
+  test('with more books than references the sample covers the canon, not the first books', () => {
+    const v = new Map(['gen', 'exo', 'lev', 'mat', 'mrk', 'luk', 'jhn', 'rev'].map((b) => [b, ['1:1', '1:2', '1:3']]))
+    const refs = spreadRefs(v, 4)
+    expect(refs).toHaveLength(4)
+    expect(refs.some((r) => r.startsWith('rev') || r.startsWith('jhn'))).toBe(true)
+  })
+
+  test('a table with no rows does not fill a cell, and the markdown says lower bound without a base', async () => {
+    const g = gapCells({ tn: [], tq: [] }, { tn: new Set(), tq: new Set() })
+    expect(g.totals.after.tn.aquifer).toBe(0)
+    const w = await world()
+    expect((await run(w.args([]))).code).toBe(0)
+    expect(readFileSync(join(w.root, 'out.md'), 'utf8')).toContain('Lower bound')
   })
 })
