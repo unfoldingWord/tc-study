@@ -1,0 +1,209 @@
+{
+ "_source": {
+  "notes": "BibleAquifer/UWTranslationNotes@603546cd949d694d42d2b85dc0e37fdacb20407f hin/json/56.content.json",
+  "questions": "BibleAquifer/UWTranslationQuestions@f8cc284556dbf4b1bfbd5d8c7bdd7d41ee8775e9 hin/json/56.content.json",
+  "manual": "BibleAquifer/UWTranslationManual@1c3178fab5a7135f3366436a3e7982b31d9cc603 hin and eng /json/001.content.json (id, reference_id, title only)",
+  "enTa": "unfoldingWord/en_ta@v91 title.md (entries for these articles only)"
+ },
+ "notes": [
+  {
+   "content_id": "792810",
+   "reference_id": 209519,
+   "version": "1.0.4",
+   "title": "तीतुस - अध्याय 2 परिचय",
+   "index_reference": "56002000",
+   "language": "hin",
+   "review_level": "None",
+   "content": "<h1>तीतुस 2 सामान्य टिप्पणियाँ </h1><p>पौलुस तीतुस को परमेश्वर के वचन का प्रचार करने का कारण बताते रहते हैं, और समझाते हैं कि वृद्ध पुरुषों, <span>बूढ़ी स्त्रियों</span>, जवान पुरुषों, और गुलामों या दासों को विश्वासियों के रूप में कैसे जीवन व्यतीत करना चाहिए।</p><h2>इस अध्याय की विशेष अवधारणाएँ</h2><h3>लिंग आधारित जिम्मेदारियाँ</h3><p>विद्वानों के बीच इस विषय को इसके ऐतिहासिक और सांस्कृतिक संदर्भ में समझने को लेकर मतभेद हैं। कुछ विद्वान मानते हैं कि पुरुष और स्त्रियाँ सभी मामलों में पूरी तरह से समान हैं। अन्य विद्वान मानते हैं कि परमेश्वर ने पुरुषों और स्त्रियों को विवाह और कलीसिया में विशिष्ट रूप से अलग भूमिकाओं में सेवा करने के लिए बनाया है। अनुवादकों को सावधान रहना चाहिए कि इस मुद्दे पर उनकी समझ इस गद्यांश के अनुवाद को प्रभावित न करे।</p><h3>दासत्व</h3><p>पौलुस इस अध्याय में यह नहीं लिखते कि दासत्व अच्छा है या बुरा; पौलुस दासों को यह सिखाते हैं कि वे अपने स्वामियों की विश्वासयोग्यता से सेवा करें। वह सभी विश्वासियों को यह सिखाते हैं कि वे हर परिस्थिति में धार्मिकता और सही तरीके से जीवन व्यतीत करें।</p>",
+   "associations": {
+    "passage": [
+     {
+      "start_ref": "56002001",
+      "start_ref_usfm": "TIT 2:1",
+      "end_ref": "56002001",
+      "end_ref_usfm": "TIT 2:1"
+     }
+    ],
+    "resource": []
+   }
+  },
+  {
+   "content_id": "400853",
+   "reference_id": 115526,
+   "version": "1.0.4",
+   "title": "तीतुस 1:1 (#1)",
+   "index_reference": "56001001",
+   "language": "hin",
+   "review_level": "None",
+   "content": "<p><strong><span style='direction: ltr;'>κατὰ πίστιν ἐκλεκτῶν Θεοῦ, καὶ ἐπίγνωσιν ἀληθείας</span></strong></p><p><strong>&quot;के&quot;</strong> - <strong>&quot;विश्वास करने&quot;</strong> - <strong>&quot;लिए&quot;</strong></p><p><strong><em>विश्वास को मजबूत करने के लिए</em></strong></p>",
+   "associations": {
+    "passage": [
+     {
+      "start_ref": "56001001",
+      "start_ref_usfm": "TIT 1:1",
+      "end_ref": "56001001",
+      "end_ref_usfm": "TIT 1:1"
+     }
+    ],
+    "resource": [
+     {
+      "reference_id": 26671,
+      "content_id": 727303,
+      "resource_code": "UWTranslationNotes",
+      "label": "भाववाचक संज्ञा",
+      "language": "hin"
+     }
+    ]
+   }
+  },
+  {
+   "content_id": "798628",
+   "reference_id": 115527,
+   "version": "1.0.4",
+   "title": "तीतुस 1:1 (#2)",
+   "index_reference": "56001001",
+   "language": "hin",
+   "review_level": "None",
+   "content": "<p><strong><span style='direction: ltr;'>ἐκλεκτῶν Θεοῦ</span></strong></p><p><strong>&quot;परमेश्वर के चुने हुए लोगों के&quot;</strong></p><p>यदि आपकी भाषा इस निष्क्रिय रूप का उपयोग नहीं करती है, तो आप इस विचार को सक्रिय रूप में या अपनी भाषा में किसी अन्य तरीके से जो स्वाभाविक हो, व्यक्त कर सकते हैं। वैकल्पिक अनुवाद: &quot;परमेश्वर जिन लोगों को चुनता है, उनके विश्वास&quot;</p><p>देखें: <data class=\"resource-ref\" data-content-id=\"727304\" data-resource-code=\"UWTranslationManual\" data-language=\"hin\">सक्रिय या निष्क्रिय</data></p>",
+   "associations": {
+    "passage": [
+     {
+      "start_ref": "56001001",
+      "start_ref_usfm": "TIT 1:1",
+      "end_ref": "56001001",
+      "end_ref_usfm": "TIT 1:1"
+     }
+    ],
+    "resource": [
+     {
+      "reference_id": "26672",
+      "content_id": "727304",
+      "resource_code": "UWTranslationManual",
+      "label": "सक्रिय या निष्क्रिय",
+      "language": "hin"
+     }
+    ]
+   }
+  },
+  {
+   "content_id": "401023",
+   "reference_id": 191089,
+   "version": "1.0.4",
+   "title": "तीतुस 1:6 (#1)",
+   "index_reference": "56001006",
+   "language": "hin",
+   "review_level": "None",
+   "content": "<p><strong>&quot;&quot;</strong></p><p>Connecting Statement:\\n\\nतीतुस को क्रेते द्वीप के प्रत्येक नगर में प्राचीनों को नियुक्त करने के लिए कहने के बाद, पौलूस प्राचीनों के लिए आवश्यकताओं को बताता है।</p>",
+   "associations": {
+    "passage": [
+     {
+      "start_ref": "56001006",
+      "start_ref_usfm": "TIT 1:6",
+      "end_ref": "56001006",
+      "end_ref_usfm": "TIT 1:6"
+     }
+    ],
+    "resource": []
+   }
+  }
+ ],
+ "questions": [
+  {
+   "content_id": "811116",
+   "reference_id": 133842,
+   "version": "1.0.4",
+   "title": "तीतुस 1:2",
+   "index_reference": "56001002",
+   "language": "hin",
+   "review_level": "Professional",
+   "content": "<p><strong>परमेश्वर ने अपने चुने हुए लोगों से </strong><span><strong>अनन्त </strong></span><strong>जीवन का वादा कब किया?</strong></p><p><span>परमेश्वर ने </span>अपने चुने हुओं से <span>सनातन से</span> <span>प्रतिज्ञा की है</span>।</p>",
+   "associations": {
+    "passage": [
+     {
+      "start_ref": "56001002",
+      "start_ref_usfm": "TIT 1:2",
+      "end_ref": "56001002",
+      "end_ref_usfm": "TIT 1:2"
+     }
+    ],
+    "resource": []
+   }
+  },
+  {
+   "content_id": "811115",
+   "reference_id": 133841,
+   "version": "1.0.4",
+   "title": "तीतुस 1:1",
+   "index_reference": "56001001",
+   "language": "hin",
+   "review_level": "Professional",
+   "content": "<p><strong>पौलुस का परमेश्वर की सेवा में उद्देश्य क्या था?</strong></p><p>उनका उद्देश्य परमेश्वर के चुने हुए लोगों के विश्वास को <span>स्थापित </span>करना और <span>सच्चाई का ज्ञान </span>को स्थापित करना था।</p>",
+   "associations": {
+    "passage": [
+     {
+      "start_ref": "56001001",
+      "start_ref_usfm": "TIT 1:1",
+      "end_ref": "56001001",
+      "end_ref_usfm": "TIT 1:1"
+     }
+    ],
+    "resource": []
+   }
+  }
+ ],
+ "hinTa": [
+  {
+   "content_id": "727303",
+   "reference_id": 26671,
+   "title": "भाववाचक संज्ञा"
+  },
+  {
+   "content_id": "727304",
+   "reference_id": 26672,
+   "title": "कर्तृवाच्य एवं कर्मवाच्य"
+  },
+  {
+   "content_id": "799943",
+   "reference_id": 26722,
+   "title": "पुनरावृत्ति"
+  },
+  {
+   "content_id": "727338",
+   "reference_id": 26709,
+   "title": "शब्द क्रम"
+  }
+ ],
+ "engTa": [
+  {
+   "content_id": "33257",
+   "reference_id": 26671,
+   "title": "Abstract Nouns"
+  },
+  {
+   "content_id": "33258",
+   "reference_id": 26672,
+   "title": "Active or Passive"
+  },
+  {
+   "content_id": "33295",
+   "reference_id": 26709,
+   "title": "Word Order"
+  }
+ ],
+ "enTaTitles": {
+  "repo": "unfoldingWord/en_ta",
+  "tag": "v91",
+  "titles": {
+   "Abstract Nouns": "ta:translate/figs-abstractnouns",
+   "Active or Passive": "ta:translate/figs-activepassive",
+   "Word Order": "ta:translate/figs-order"
+  },
+  "ambiguous": {
+   "Word Order": [
+    "ta:translate/figs-order",
+    "ta:translate/figs-ordergrk",
+    "ta:translate/figs-orderheb"
+   ]
+  }
+ }
+}
