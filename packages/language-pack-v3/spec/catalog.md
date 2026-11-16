@@ -137,6 +137,27 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 - **Going back.** A reader MUST NOT replace an installed catalog with a lower revision of the same publisher and
   catalog, unless the person confirms it. An old SD card must not undo an update without asking.
 
+## Patch catalogs
+
+A patch catalog fills the gaps of a language from a second source (for Hindi, the notes and questions Aquifer publishes
+where Door43 has none). It is a language catalog like any other, marked by its name, and the base always wins.
+
+- **Name.** `{lang}-x-{source}`, for example `hi-x-aquifer`: a BCP 47 tag with a private-use subtag, so it passes the
+  same tag check as any language and is served, listed and read as one (`serving.md`). `about.catalog`, the header `lang`
+  and the `lang` of its segments are that tag.
+- **Units.** Its units are `book:<book>` segments with `texts: []` (`book.cddl` already allows a language with notes and
+  no text of a book) that carry only `notes` and/or `questions`. A book unit needs `orig:<book>` and `map`, and **no
+  `art:` group**: its `ta:` concepts resolve in the base language, which the app opens beside the patch. It `requires` the
+  published common catalog like any language catalog. A patch has a book only where the base lacks that table.
+- **Provenance.** It lives on the `resources` entries, the only provenance slot of format 3 (the `res` of a segment
+  header points to it). A resource entry may carry two optional fields, which a Door43 resource does not:
+  - `source`: the aggregator the data came from (`"aquifer"`);
+  - `review`: the review level of the source's articles, one of `"none"`, `"community"`, `"professional"` or `"mixed"`
+    (when the articles differ). A reader refuses any other value (`E_BODY`, like a bad `about.direction`).
+  An app takes its notice from `review` and its credit from `attribution`, `rights` and `license`.
+- **Signed** like every published catalog (above), with the same publisher key. `about.publisher` is the one who
+  publishes the pack; the source and the original publisher are on the resource entry.
+
 ## Complements
 
 Complements are files a reader is not obliged to read: question classifiers, vectors, number words, models. They

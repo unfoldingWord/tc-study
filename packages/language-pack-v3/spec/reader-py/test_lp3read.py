@@ -1279,7 +1279,8 @@ def catalog_fixture(lang="es-419", with_sig=True, rev=4, tables_extra=None):
                        "license": "CC-BY-SA-4.0", "rights": "unfoldingWord", "attribution": "GLT by uW",
                        "books": bytes(titus)},
                       {"key": "es-419_gl/es-419/tn", "title": "tN", "subject": "TSV Translation Notes",
-                       "release": "v7", "license": "CC-BY-SA-4.0", "books": bytes(9)}],
+                       "release": "v7", "license": "CC-BY-SA-4.0", "source": "aquifer", "review": "none",
+                       "books": bytes(9)}],
         "segments": [{"id": sha("s0"), "class": "book", "book": "tit", "size": 37713, "ulen": 70123,
                       "inputs": sha("i0")},
                      {"id": sha("s1"), "class": "art", "group": "tw:kt", "size": 100, "ulen": 200,
@@ -1304,7 +1305,8 @@ def catalog_fixture(lang="es-419", with_sig=True, rev=4, tables_extra=None):
                        "license": "CC-BY-SA-4.0", "rights": "unfoldingWord", "attribution": "GLT by uW",
                        "books": "000000000000800000"},
                       {"key": "es-419_gl/es-419/tn", "title": "tN", "subject": "TSV Translation Notes",
-                       "release": "v7", "license": "CC-BY-SA-4.0", "books": "000000000000000000"}],
+                       "release": "v7", "license": "CC-BY-SA-4.0", "source": "aquifer", "review": "none",
+                       "books": "000000000000000000"}],
         "segments": [{"id": sha("s0").hex(), "class": "book", "book": "tit", "size": 37713, "ulen": 70123,
                       "inputs": sha("i0").hex()},
                      {"id": sha("s1").hex(), "class": "art", "group": "tw:kt", "size": 100, "ulen": 200,
@@ -1358,9 +1360,13 @@ def test_catalog_minimal_optional_keys_absent():
     for r in t["resources"]:
         r.pop("rights", None)
         r.pop("attribution", None)
+        r.pop("source", None)
+        r.pop("review", None)
     for r in expected["resources"]:
         r.pop("rights", None)
         r.pop("attribution", None)
+        r.pop("source", None)
+        r.pop("review", None)
     expected["h"] = header_h(h)
     ok(build(h, t), expected)
 
@@ -1372,6 +1378,9 @@ CATALOG_MUTATIONS = {
     "previous of 31 bytes": lambda h, t: t["about"].update(previous=bytes(31)),
     "segment id of 33 bytes": lambda h, t: t["segments"][0].update(id=bytes(33)),
     "inputs of 8 bytes": lambda h, t: t["segments"][0].update(inputs=bytes(8)),
+    "review outside none, community, professional and mixed": lambda h, t: t["resources"][1].update(review="perfect"),
+    "review that is not text": lambda h, t: t["resources"][1].update(review=1),
+    "source that is not text": lambda h, t: t["resources"][1].update(source=1),
     "books of 8 bytes": lambda h, t: t["resources"][0].update(books=bytes(8)),
     "books of 18 bytes": lambda h, t: t["resources"][0].update(books=bytes(18)),
     "requires id of 31 bytes": lambda h, t: t["requires"][0].__setitem__(2, bytes(31)),

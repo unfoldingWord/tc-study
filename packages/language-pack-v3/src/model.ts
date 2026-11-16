@@ -240,6 +240,9 @@ export type About = {
 }
 
 /** A resource a catalog lists (`catalog.cddl`, `resource`). `books` is the 9-byte book set (`ids.ts`, `bookSet`): all zeros for a resource without books. */
+export const REVIEW_LEVELS = ['none', 'community', 'professional', 'mixed'] as const
+export type ReviewLevel = (typeof REVIEW_LEVELS)[number]
+
 export type CatalogResource = {
   key: string
   title: string
@@ -248,6 +251,10 @@ export type CatalogResource = {
   license: string
   rights?: string
   attribution?: string
+  /** The aggregator the data came from (`"aquifer"`): a patch catalog's resource (`catalog.md`, "Patch catalogs"). */
+  source?: string
+  /** The `review_level` of the source's articles; `"mixed"` when they differ. */
+  review?: ReviewLevel
   books: Uint8Array
 }
 

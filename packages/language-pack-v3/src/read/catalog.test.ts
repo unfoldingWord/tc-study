@@ -30,7 +30,7 @@ const stubs = [
 
 const catalog = await buildCatalog({
   about,
-  resources: [{ key: 'es-419_gl/es-419/tn', title: 'tN', subject: 'TSV Translation Notes', release: 'v66', license: 'CC-BY-SA-4.0', rights: 'unfoldingWord', attribution: 'unfoldingWord', books: bookSet(['tit', 'rut']) }],
+  resources: [{ key: 'es-419_gl/es-419/tn', title: 'tN', subject: 'TSV Translation Notes', release: 'v66', license: 'CC-BY-SA-4.0', rights: 'unfoldingWord', attribution: 'unfoldingWord', source: 'aquifer', review: 'none', books: bookSet(['tit', 'rut']) }],
   segments: stubs,
   requires: [['common', 3, fingerprint(9)]],
   complements: [{ kind: 'vectors', lang: 'es-419', id: idBytes(8), size: 100, media: 'application/octet-stream', version: '2', for: 'queries-1', license: 'MIT' }],
@@ -46,6 +46,8 @@ describe('catalogView', () => {
     expect(view.lang).toBe('es-419')
     expect(view.about).toEqual(about)
     expect(view.resources).toHaveLength(1)
+    expect(view.resources[0].source).toBe('aquifer')
+    expect(view.resources[0].review).toBe('none')
     expect(view.resources[0].books).toEqual(bookSet(['tit', 'rut']))
     expect(view.segments.map((e) => e.class)).toEqual(['map', 'map', 'book', 'art'])
     expect(view.units).toEqual([
@@ -55,6 +57,18 @@ describe('catalogView', () => {
     ])
     expect(view.requires).toEqual([['common', 3, idBytes(9)]])
     expect(view.complements).toEqual([{ kind: 'vectors', lang: 'es-419', id: idBytes(8), size: 100, media: 'application/octet-stream', version: '2', for: 'queries-1', license: 'MIT' }])
+  })
+
+  test('review takes each of its four values, and a resource without source and review has neither', () => {
+    for (const review of ['none', 'community', 'professional', 'mixed']) {
+      const seg = fresh()
+      tables(seg).resources[0].review = review
+      expect(catalogView(seg).resources[0].review).toBe(review)
+    }
+    const seg = fresh()
+    delete tables(seg).resources[0].source
+    delete tables(seg).resources[0].review
+    expect('source' in catalogView(seg).resources[0] || 'review' in catalogView(seg).resources[0]).toBe(false)
   })
 
   test('gives copies: changing the model does not change the segment it came from', () => {
@@ -170,6 +184,9 @@ describe('catalogView', () => {
     ['a resource without license', (s) => void delete tables(s).resources[0].license],
     ['rights that are not text', (s) => void (tables(s).resources[0].rights = 1)],
     ['an attribution that is not text', (s) => void (tables(s).resources[0].attribution = [])],
+    ['a source that is not text', (s) => void (tables(s).resources[0].source = 1)],
+    ['a review that is not one of the four', (s) => void (tables(s).resources[0].review = 'perfect')],
+    ['a review that is not text', (s) => void (tables(s).resources[0].review = 1)],
     ['books of 8 bytes', (s) => void (tables(s).resources[0].books = new Uint8Array(8))],
     ['books of 10 bytes', (s) => void (tables(s).resources[0].books = new Uint8Array(10))],
     ['books that is a list', (s) => void (tables(s).resources[0].books = [0, 0, 0, 0, 0, 0, 0, 0, 0])],

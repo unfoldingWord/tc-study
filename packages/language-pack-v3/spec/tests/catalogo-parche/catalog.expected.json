@@ -1,0 +1,82 @@
+{
+  "about": {
+    "builder": "language-pack-v3 0.1.0",
+    "built": "2026-11-01T10:00:00Z",
+    "catalog": "hi-x-aquifer",
+    "format": "3.0",
+    "origin": "published",
+    "publisher": "unfoldingWord",
+    "revision": 1
+  },
+  "h": {
+    "class": "catalog",
+    "lang": "hi-x-aquifer",
+    "tables": {
+      "about": [
+        1,
+        true
+      ],
+      "requires": [
+        1,
+        false
+      ],
+      "resources": [
+        1,
+        true
+      ],
+      "segments": [
+        1,
+        true
+      ],
+      "units": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "29247fae66e5610bf5e3dca9ad392efff1773195763daceb820704cadc61a96d",
+  "requires": [
+    [
+      "common",
+      1,
+      "6666666666666666666666666666666666666666666666666666666666666666"
+    ]
+  ],
+  "resources": [
+    {
+      "attribution": "Adapted from unfoldingWord Translation Notes by Mission Mutual",
+      "books": "000000000000800000",
+      "key": "aquifer/hi/tn",
+      "license": "CC-BY-SA-4.0",
+      "release": "UWTranslationNotes@0123456",
+      "review": "none",
+      "rights": "(c) 2022 unfoldingWord; adapted by Mission Mutual",
+      "source": "aquifer",
+      "subject": "TSV Translation Notes",
+      "title": "Translation Notes"
+    }
+  ],
+  "segments": [
+    {
+      "book": "tit",
+      "class": "book",
+      "id": "4f5464e351cb200f1d1f48a73c3766a8d9e95eeba88baf5cff46a7f947cfdc37",
+      "inputs": "5555555555555555555555555555555555555555555555555555555555555555",
+      "size": 544,
+      "ulen": 370
+    }
+  ],
+  "units": [
+    {
+      "id": "book:tit",
+      "needs": [
+        "map",
+        "orig:tit"
+      ],
+      "segments": [
+        0
+      ]
+    }
+  ]
+}
