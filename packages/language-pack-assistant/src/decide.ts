@@ -9,7 +9,8 @@ import type { Decision } from './decision'
 import { interpret } from './interpret'
 import type { Lexicon } from './lexicon'
 import type { Phrases } from './phrases'
-import { MAX_OPTIONS, outcomeFor, readQuestion, ruleOutcome, type Outcome, type RuleCtx, view } from './rules'
+import { MAX_OPTIONS, outcomeFor, readQuestion, type Reading, ruleOutcome, type Outcome, type RuleCtx, view } from './rules'
+import { contentWords } from './words'
 
 /**
  * The classifier's answer is taken alone when its best probability leads the second by at least this much; below it, the two best
@@ -20,6 +21,24 @@ import { MAX_OPTIONS, outcomeFor, readQuestion, ruleOutcome, type Outcome, type 
  * tune questions (pt 3, en 1), so the plateau is kept at C0's value.
  */
 export const DEFAULT_MARGIN = 0.3
+
+/**
+ * R37 f: a question with a name and more than this many other content words, and no concept, books or renderings phrase, describes
+ * something to find ("Jonah and the big fish"): it goes to search, not to the classifier. Tune sets (`eval/tune.ts --words`,
+ * 2026-11-15): flat for N = 1..4 and equal to no rule (es 76/100, pt 49/100, en 55/60), so the smallest N is kept.
+ */
+export const DEFAULT_DESCRIPTION_WORDS = 1
+
+const NAME = /^(tw:names\/|per:|lug:)/
+
+/** Whether a question undecided by the rules is a free description around a name (R37 f). */
+export function describesWithName(question: string, reading: Reading, tag: string, n: number): boolean {
+  if (reading.kinds.has('concept') || reading.kinds.has('books') || reading.kinds.has('renderings')) return false
+  const names = reading.entities.filter((e) => e.kind === 'concept' && e.ids.some((id) => NAME.test(id)))
+  if (names.length === 0) return false
+  const inName = new Set(names.flatMap((e) => reading.tokens.slice(e.start, e.end)))
+  return contentWords(question, tag).filter((w) => !inName.has(w)).length > n
+}
 
 export type DecideCtx = {
   lexicon: Lexicon
@@ -35,6 +54,8 @@ export type DecideCtx = {
   names?: (id: string) => string | undefined
   /** The xmap kind of a concept id: a `tw:names/*` place is shown as a place, not a person. */
   kinds?: (id: string) => string | undefined
+  /** R37 f's N; `DEFAULT_DESCRIPTION_WORDS` when absent. */
+  descriptionWords?: number
 }
 
 /** Which step decided: a rule, the classifier alone, a choice of the classifier's two best, or search as the fallback. */
@@ -50,6 +71,7 @@ export function decideStep(question: string, ctx: DecideCtx): { decision: Decisi
   const search: Decision = { kind: 'call', call: { query: 'search', args: { text: question } }, via: 'search', interpretation: '' }
   const r = ruleOutcome(question, reading, ctx)
   if (r !== undefined) return { decision: asDecision(r, 'rule'), step: 'rule' }
+  if (describesWithName(question, reading, ctx.tag ?? '', ctx.descriptionWords ?? DEFAULT_DESCRIPTION_WORDS)) return { decision: search, step: 'search' }
   const model = ctx.classifier?.for === QUERIES_VERSION ? ctx.classifier : undefined
   if (model === undefined) return { decision: search, step: 'search' }
 

@@ -49,6 +49,7 @@ async function contextFor(reader: PackReader, tag: string, items: Item[]): Promi
     listed: (code) => reader.listed(`book:${code}`),
     lastVerse: (code, chapter) => last.get(`${code} ${chapter}`),
     strongsOf: await strongsIndexOf(reader),
+    tag,
   }
 }
 
@@ -80,6 +81,8 @@ if (process.argv[1]?.endsWith('tune.ts')) {
     return i < 0 ? undefined : process.argv[i + 1]
   }
   const margins = (arg('--margins') ?? String(DEFAULT_MARGIN)).split(',').map(Number)
+  // R37 f: `--words 1,2,3,4` sweeps the description N at the first margin.
+  const wordsList = arg('--words')?.split(',').map(Number)
   const missFile = arg('--misses')
   const misses: string[] = []
   let reader: PackReader | undefined
@@ -95,6 +98,7 @@ if (process.argv[1]?.endsWith('tune.ts')) {
       readerLang = lang
     }
     const ctx = await contextFor(reader!, tag, items)
+    for (const w of wordsList ?? []) console.log(`${set} words ${w}: ` + line(set, margins[0]!, tally(items, { ...ctx, margin: margins[0]!, descriptionWords: w })))
     for (const m of margins) {
       const sink: string[] = []
       console.log(line(set, m, tally(items, { ...ctx, margin: m }, sink)))

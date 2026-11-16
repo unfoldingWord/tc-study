@@ -2,7 +2,8 @@
  * The runner: the assistant (`createAssistant` with the committed complements) over a question set, with the staging packs and the
  * SQL index (R30). Writes `eval/results/<lang>-<set>.json` (every question, its decision, interpretation, top 3 piece ids and score)
  * and prints a summary row. Node and Bun only.
- *   `LP3_STAGING=1 bun eval/run.ts --lang <es|pt|en> --set <tune|test>`
+ *   `LP3_STAGING=1 bun eval/run.ts --lang <es|pt|en> --set <tune|test> [--out <name>]`
+ * `--out run2` writes `eval/results/<lang>-<set>-run2.json` (the second gate run keeps the first run's files).
  * `--set test` is refused unless `LP3_GATE=1`: the test sets are held out and are run once (R35). Card time is warm (R34): the
  * assistant is created and one question is asked before the timing starts.
  */
@@ -103,6 +104,8 @@ if (process.argv[1]?.endsWith('run.ts')) {
   }
   const summary = summarize(lang, set, out)
   mkdirSync(join(ROOT, 'eval/results'), { recursive: true })
-  writeFileSync(join(ROOT, 'eval/results', `${lang}-${set}.json`), JSON.stringify({ summary, questions: out }, null, 1) + '\n')
+  const out2 = arg('--out')
+  if (out2 !== undefined && !/^[a-z0-9]+$/.test(out2)) throw new Error('--out must be letters and digits')
+  writeFileSync(join(ROOT, 'eval/results', `${lang}-${set}${out2 !== undefined ? `-${out2}` : ''}.json`), JSON.stringify({ summary, questions: out }, null, 1) + '\n')
   console.log(JSON.stringify(summary))
 }

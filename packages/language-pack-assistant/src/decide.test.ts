@@ -85,3 +85,17 @@ test('with a tag and names, decide fills the interpretation (R4)', () => {
   const names = (id: string): string | undefined => (id === 'tit' ? 'Tito' : undefined)
   expect(decide('Tito 2:11', { ...base, tag: 'es', names }).interpretation).toBe('Pasaje: Tito 2:11')
 })
+
+test('R37 f: a name inside a free description goes to search, not to the classifier', () => {
+  const raw = JSON.parse(new TextDecoder().decode(file('es.classifier.json'))) as ClassifierComplement
+  const ctx: DecideCtx = { ...base, classifier: raw, tag: 'es-419', descriptionWords: 2 }
+  // A name and three other content words, no concept phrase: search.
+  expect(decideStep('Moisés y la zarza ardiente grande', ctx)).toMatchObject({ step: 'search', decision: { call: { query: 'search' } } })
+  // Two other content words is not more than N = 2: the chain goes on as before.
+  expect(decideStep('Moisés zarza ardiente', ctx).step).not.toBe('search')
+  expect(decideStep('Moisés zarza ardiente', { ...ctx, descriptionWords: 1 }).step).toBe('search')
+  // A concept phrase keeps the rule: "quién fue" asks what the name is.
+  expect(decideStep('quién fue Moisés el que vio la zarza ardiente', ctx)).toMatchObject({ step: 'rule', decision: { call: { query: 'concept' } } })
+  // No name: unchanged.
+  expect(decideStep('la gracia y la fe de los creyentes', ctx).step).toBe(decideStep('la gracia y la fe de los creyentes', { ...ctx, descriptionWords: 99 }).step)
+})
