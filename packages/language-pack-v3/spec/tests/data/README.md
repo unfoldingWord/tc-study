@@ -23,6 +23,7 @@ The resources of the lists, with the release each row was made from (`resources[
 | `es-419_gl/es-419/tw` | `v37#2024-07-17T20_12_37Z` | Translation Words |
 | `es-419_gl/es-419/twl` | `v18#2024-07-17T20_13_06Z` | TSV Translation Words Links |
 | `es-419_gl/es-419/ugl` | `60a78e039b#2026-10-27T11_47_33Z` | Greek Lexicon |
+| `unfoldingWord/en/ult` | `v91#2026-09-26T15_45_57Z` | Aligned Bible |
 | `unfoldingWord/en/ta` | `v91#2026-09-26T15_47_36Z` | Translation Academy |
 | `unfoldingWord/en/tn` | `v91#2026-09-26T15_47_18Z` | TSV Translation Notes |
 | `unfoldingWord/en/tw` | `v91#2026-09-26T15_47_38Z` | Translation Words |
@@ -70,6 +71,8 @@ Each one is a part file of the phase 0 sample, under its own name (the sha256 of
 | `parts/b1a415d26290f7d3b3f743f7eb15dafd201d40c47ed83774ab6492dc80c78628.part.gz` | 13 504 | `b1a415d26290f7d3b3f743f7eb15dafd201d40c47ed83774ab6492dc80c78628` | English twl book tit |
 | `parts/b6303b3e01bb8465c42facb2e37325dd68147ad2c6ffdd48826d18f0584ff1a5.part.gz` | 13 198 | `b6303b3e01bb8465c42facb2e37325dd68147ad2c6ffdd48826d18f0584ff1a5` | English tw titles |
 | `parts/c24b5b852baaeb94d6a112841fd3c3f09e3058b0e44a5a86e67333158edf54a8.part.gz` | 4 237 | `c24b5b852baaeb94d6a112841fd3c3f09e3058b0e44a5a86e67333158edf54a8` | English ta titles |
+| `parts/01fd48292114007203a282a373cfd88d7b2f46dc7acfeee279d8ed2868473c95.part.gz` | 160 806 | `01fd48292114007203a282a373cfd88d7b2f46dc7acfeee279d8ed2868473c95` | English ult book rut (the section map of `xtopics`) |
+| `parts/78c049b9df157e7c89c4e3eaf27715607141e77e0a0e3d28e378e4820f6f85ed.part.gz` | 69 404 | `78c049b9df157e7c89c4e3eaf27715607141e77e0a0e3d28e378e4820f6f85ed` | English ult book tit |
 
 `es-419 tw kt:0` is the tW part that holds `kt/grace` (the row `es-419_gl/es-419/tw/bible/kt/grace` and its two
 prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.json` to `content/999.json` (981 rows).

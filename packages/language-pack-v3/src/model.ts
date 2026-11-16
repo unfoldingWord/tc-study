@@ -378,6 +378,8 @@ export type XtopicsCore = {
   relations?: TopicRelation[]
   strongs?: Record<string, string[]>
   ranges?: Record<string, [first: number, last: number][]>
+  /** The sections of the English ULT per book (its ts chunks): first and last verse of each, ascending, no overlap. */
+  chunks?: Record<string, [first: number, last: number][]>
 }
 
 /** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */

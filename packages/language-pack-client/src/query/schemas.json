@@ -1,4 +1,15 @@
 {
+  "sections": {
+    "label": { "es": "Secciones: los rangos de versículos en que el ULT en inglés divide un libro" },
+    "description": "The sections of a book in the English ULT, each with its first and last verse, in order.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "book": { "type": "string", "description": "A book code such as \"tit\"." } },
+      "required": ["book"],
+      "additionalProperties": false
+    }
+  },
   "passage": {
     "label": { "es": "Pasaje: el texto de un versículo o rango con sus notas, preguntas y enlaces de palabras" },
     "description": "The texts of a verse range with the notes, questions and word links in range.",

@@ -744,6 +744,60 @@ describe('buildCommon: the xtopics unit', () => {
     expect(again.catalog.id).toBe(withTopics.catalog.id)
   })
 
+  test('the section map: chunks for Titus from the en ULT; nothing else changes; without the ULT there is no table', async () => {
+    const ULT = 'unfoldingWord/en/ult'
+    const noUlt = async (): Promise<RowSource> => {
+      const src = await english()
+      return { rows: (f) => src.rows(f), resources: async (lang) => (await src.resources(lang)).filter((r) => r.key !== ULT) }
+    }
+    const withUlt = await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })
+    const without = await buildCommon({ source: await noUlt(), about, mapLang: 'en', topics: topics() })
+    const coreOf = (b: { segments: BuiltSegment[] }) => b.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!
+    const view = xtopicsView(coreOf(withUlt).seg) as XtopicsCore
+    expect(Object.keys(view.chunks ?? {})).toEqual(['tit'])
+    expect(view.chunks!.tit[0]).toEqual([56001001, 56001003])
+    expect(view.chunks!.tit.length).toBe(23)
+    expect(view.res.some(([key]) => key === ULT)).toBe(true)
+    expect(view.coverage.get(ULT)?.whole).toEqual(['tit'])
+    expect((coreOf(withUlt).seg.h.tables as Record<string, unknown>).chunks).toEqual([1, false])
+    const catalog = await catalogOf(withUlt.catalog)
+    expect(catalog.resources.map((r) => r.key)).toContain(ULT)
+    // the other segments: the same bytes as a build without the ULT
+    const rest = (b: { segments: BuiltSegment[] }) => b.segments.filter((s) => !(s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')).map((s) => [s.id, s.inputs, hex(s.bytes)])
+    expect(rest(withUlt)).toEqual(rest(without))
+    expect(rest(withUlt).length).toBeGreaterThan(3)
+    // without the ULT: no table, one line
+    const bare = xtopicsView(coreOf(without).seg) as XtopicsCore
+    expect(bare.chunks).toBeUndefined()
+    expect(bare.res.some(([key]) => key === ULT)).toBe(false)
+    expect(without.report.filter((l) => l.includes('chunks'))).toEqual([`topics: chunks: the source has no ${ULT}: the xtopics have no section map`])
+    // the core of a build without the ULT is the one the table-less model gives
+    expect(hex(coreOf(without).bytes)).not.toBe(hex(coreOf(withUlt).bytes))
+  })
+
+  test('a ULT book with no ts milestone has no key in the section map, and one report line', async () => {
+    const ULT = 'unfoldingWord/en/ult'
+    const strip = (node: unknown): unknown =>
+      Array.isArray(node)
+        ? node.filter((n) => !(n !== null && typeof n === 'object' && (n as { marker?: string }).marker === 'ts')).map(strip)
+        : node !== null && typeof node === 'object'
+          ? Object.fromEntries(Object.entries(node).map(([k, v]) => [k, strip(v)]))
+          : node
+    const src = await english()
+    const source: RowSource = {
+      resources: (lang) => src.resources(lang),
+      rows: async function* (f) {
+        for await (const row of src.rows(f)) yield f.resource === ULT && row.layer === 'sot' ? { ...row, value: strip(row.value) } : row
+      },
+    }
+    const built = await buildCommon({ source, about, mapLang: 'en', topics: topics() })
+    const core = built.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!
+    const view = xtopicsView(core.seg) as XtopicsCore
+    expect(view.chunks).toBeUndefined()
+    expect(view.res.some(([key]) => key === ULT)).toBe(false)
+    expect(built.report.filter((l) => l.includes('chunks'))).toEqual([`topics: chunks: tit have no ts milestone in ${ULT}: no sections for them`])
+  })
+
   test('the resources of the topic sources carry their credit lines', async () => {
     const catalog = await catalogOf((await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })).catalog)
     const credit = (key: string) => (catalog.resources.find((r) => r.key === key) as { attribution?: string } | undefined)?.attribution ?? ''

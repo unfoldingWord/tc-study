@@ -62,7 +62,7 @@ KNOWN_TABLES = {
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
-    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges"},
+    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks"},
     "topics": {"names", "local", "coverage"},
     "aligned": {"keys", "strongs", "data"},
 }
@@ -1302,7 +1302,7 @@ BOOK_SOURCES = ("text", "list", "none")
 # Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
 CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
              "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"},
-             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges"},
+             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks"},
              "topics": {"coverage", "local"}}
 
 
@@ -1612,6 +1612,19 @@ def _decode_xtopics_core(p: Segment) -> dict:
         if any(k not in topics for k in g):
             _bad()
         out["ranges"] = {k: [list(x) for x in v] for k, v in g.items()}
+    if p.has("chunks"):
+        c = _str_map(p.t["chunks"], lambda v: type(v) is list and len(v) > 0 and all(
+            type(x) is list and len(x) == 2 and _verse_id_ok(x[0]) and _verse_id_ok(x[1]) and x[0] <= x[1]
+            for x in v))
+        for book, v in c.items():
+            number = BOOK_NUMBER.get(book)
+            if number is None:
+                _bad()
+            if any(x[0] // 1000000 != number or x[1] // 1000000 != number for x in v):
+                _bad()
+            if any(b[0] <= a[1] for a, b in zip(v, v[1:])):
+                _bad()
+        out["chunks"] = {k: [list(x) for x in v] for k, v in c.items()}
     return out
 
 
