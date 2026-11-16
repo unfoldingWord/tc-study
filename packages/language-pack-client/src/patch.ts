@@ -12,7 +12,7 @@ import type { BookModel, CatalogResource, HelpRow, HelpTable } from '@bt-synergy
 import { type Answer, missingUnit, type PatchMark } from './query/envelope'
 import { type ContextData, contextQuery } from './query/article'
 import { type PassageData, parsePassage, passageQuery } from './query/passage'
-import type { PackReader } from './reader'
+import type { PackReader, ReaderProblem } from './reader'
 
 const KINDS = ['notes', 'questions', 'links'] as const
 
@@ -37,7 +37,8 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
   for (const p of patches) {
     for (const r of p.resources?.() ?? []) if (!marks.has(r.key)) marks.set(r.key, markOf(p.lang, r))
   }
-  const markFor = (patch: PackReader, res: string): PatchMark => marks.get(res) ?? { patch: patch.lang, license: '', release: '' }
+  /** Tables of a patch whose `res` has no resource entry: left out of the answers (no mark without a license) and listed in `problems`. */
+  const noEntry: ReaderProblem[] = []
 
   async function book(name: string): Promise<BookModel | undefined> {
     const unit = `book:${name}`
@@ -47,7 +48,8 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
       const theirs = p.installed(unit) ? await p.book(name) : undefined
       if (theirs === undefined) continue
       if (out === undefined) {
-        // The base has no such book: the patch's rows, each marked. It has no texts, so the answer is notes only.
+        // The base has no such book: the patch's rows, each marked. It has no texts, so the answer is notes only. The unit stays the
+        // patch's (`lang` is the patch's, e.g. `hi-x-aquifer`), not the base's.
         out = { ...theirs, notes: mark(p, theirs.notes), questions: mark(p, theirs.questions), links: mark(p, theirs.links) }
         for (const k of KINDS) if (out[k] === undefined) delete out[k]
         continue
@@ -64,7 +66,11 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
   }
   function mark(p: PackReader, table: HelpTable | undefined): HelpTable | undefined {
     if (table === undefined) return undefined
-    const m = markFor(p, table.res)
+    const m = marks.get(table.res)
+    if (m === undefined) {
+      if (!noEntry.some((x) => x.id === table.res)) noEntry.push({ id: table.res, code: 'E_PATCH_RES' })
+      return undefined
+    }
     return { res: table.res, rows: table.rows.map((row): HelpRow => ({ ...row, patch: m }) as HelpRow) }
   }
 
@@ -72,7 +78,7 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
   const merged: PackReader = {
     ...base,
     get problems() {
-      return [...base.problems, ...patches.flatMap((p) => p.problems)]
+      return [...base.problems, ...patches.flatMap((p) => p.problems), ...noEntry]
     },
     installed: (unit) => base.installed(unit) || (unit.startsWith('book:') && patches.some((p) => p.installed(unit))),
     listed: (unit) => base.listed(unit) || (unit.startsWith('book:') && patches.some((p) => p.listed(unit))),

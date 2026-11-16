@@ -116,11 +116,13 @@ const a = await reader.passage('tit 1:1') // reader.context(...) the same
 
 - **Order of preference** (the app's rule, `plan-aquifer.md`): the Door43 language first, then the patch, then English. The reader does the first two: the base always wins. For a book the base has, a table (`notes`, `questions`, `links`) the base has stays the base's, even if the patch has the book; the patch fills only a table the base lacks. For a book the base has not installed, the answer is the patch rows alone (no text; the base unit is in `notInstalled` when the catalog lists it). English is a second `open`, as before. With several patches the first has priority; a patch that is not installed is left out; without `patches` nothing changes.
 - **Marks.** Every row (`data.notes[i].patch`) and cite (`cites[i].patch`) that came from a patch carries `{ patch, source, review, license, rights, attribution, release }`, taken from the patch's resource entry. A row with no `patch` is the base's.
-- **The notice is the app's job**, by `patch.review` (texts from `plan-aquifer.md`; the app translates them):
-  - `none` (not known): "desconocida": "Traducción de Aquifer; puede haber sido hecha con ayuda de IA. No es parte del paquete oficial de este idioma."
-  - `community`: "revisión de la comunidad": "Traducción de Aquifer hecha con ayuda de IA y revisada por personas; no es parte del paquete oficial de este idioma."
-  - `professional`: "revisión editorial de Aquifer": "Notas de unfoldingWord traducidas al hindi, vía Aquifer."
-  - `mixed`: the weakest of the above that applies; when in doubt, show the "desconocida" text.
+- **The notice is the app's job**, by `patch.review` only (decision of `aquifer-fase0.md` §6; the app translates the texts):
+  - `none`: "Forma de traducción desconocida. Contenido de Aquifer; no es parte del paquete oficial de este idioma."
+  - `community`: "Revisión de la comunidad. Contenido de Aquifer; no es parte del paquete oficial de este idioma."
+  - `professional`: "Revisión editorial de Aquifer. Contenido de Aquifer; no es parte del paquete oficial de este idioma."
+  - `mixed`: the same as `none`.
+
+  Never show any of these as human translation or as AI translation: Aquifer does not say how its adaptations were made.
 - **Attribution.** Show `patch.attribution` and `patch.license` (CC-BY-SA-4.0) with the answer and in "About", with `patch.rights`. Reports should carry the `patch` mark of what was shown.
 - What stays the base's: articles, maps, coverage and search (`coverage` counts the base's sources, not the patch's rows).
 
