@@ -38,6 +38,7 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
     for (const r of p.resources?.() ?? []) if (!marks.has(r.key)) marks.set(r.key, markOf(p.lang, r))
   }
   /** Tables of a patch whose `res` has no resource entry: left out of the answers (no mark without a license) and listed in `problems`. */
+  // `E_PATCH_RES` appears in `problems` only after a query has touched that book.
   const noEntry: ReaderProblem[] = []
 
   async function book(name: string): Promise<BookModel | undefined> {
@@ -58,7 +59,9 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
       for (const kind of KINDS) {
         const table = theirs[kind]
         if (out[kind] !== undefined || table === undefined) continue
-        out[kind] = mark(p, table)
+        const marked = mark(p, table)
+        if (marked === undefined) continue
+        out[kind] = marked
         for (const entry of theirs.res) if (entry[0] === table.res && !out.res.some((r) => r[0] === entry[0])) out.res.push(entry)
       }
     }

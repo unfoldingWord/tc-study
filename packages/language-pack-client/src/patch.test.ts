@@ -46,6 +46,7 @@ const sec = (sid: string, role: 'description') => ({ sid, level: 1, role, lang: 
 
 let base: PackReader
 let patch: PackReader
+let bareSource: PackReader
 
 beforeAll(async () => {
   // The base language: Titus with notes only (no questions, no links), a tA group, and Ruth listed but not available.
@@ -84,6 +85,9 @@ beforeAll(async () => {
   }))
   const p = await fixture(PATCH, [{ unit: 'book:tit', seg: bookSegment(aq('tit', ['notes', 'questions'], TIT)), book: 'tit' }, { unit: 'book:rut', seg: bookSegment(aq('rut', ['notes'], RUT)), book: 'rut' }], resources)
   patch = openFromSegments({ lang: PATCH, catalogs: [p.catalog], get: p.get })
+  // The same books under a catalog that lists no resource entry at all.
+  const bare = { ...p.catalog, catalog: { ...p.catalog.catalog, resources: [] } } as VerifiedCatalog
+  bareSource = openFromSegments({ lang: PATCH, catalogs: [bare], get: p.get })
 })
 
 const mark = (res: 'tn' | 'tq', review: string) => ({
@@ -133,6 +137,26 @@ describe('patchedReader', () => {
     expect(c.revision.units['art:ta:translate']).toBe(1)
     // the patch has no art group: only the base answered the article
     expect(patch.listed('art:ta:translate')).toBe(false)
+  })
+
+  test('a patch table with no resource entry: the book the base lacks gives no rows and one E_PATCH_RES', async () => {
+    const r = patchedReader(base, [bareSource])
+    const a = await r.passage('rut 1:1')
+    expect(a.data!.notes).toEqual([])
+    expect(a.cites.some((c) => c.patch !== undefined)).toBe(false)
+    await r.passage('rut 1:1')
+    expect(r.problems.filter((x) => x.code === 'E_PATCH_RES')).toEqual([{ id: 'aquifer/hi/tn', code: 'E_PATCH_RES' }])
+  })
+
+  test('a patch table with no resource entry: the table the base lacks stays absent and is reported once', async () => {
+    const r = patchedReader(base, [bareSource])
+    const a = await r.passage('tit 1:1')
+    expect(a.data!.questions).toEqual([])
+    expect(a.data!.notes.map((x) => x.id)).toEqual(['base-n1'])
+    expect(a.cites.some((c) => c.patch !== undefined || c.res === 'aquifer/hi/tq')).toBe(false)
+    await r.passage('tit 1:1')
+    expect(r.problems.filter((x) => x.code === 'E_PATCH_RES')).toEqual([{ id: 'aquifer/hi/tq', code: 'E_PATCH_RES' }])
+    expect(JSON.stringify(a)).not.toContain('"license":""')
   })
 
   test('a book neither has: not installed as before', async () => {
