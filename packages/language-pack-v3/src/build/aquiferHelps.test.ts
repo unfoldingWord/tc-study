@@ -98,6 +98,42 @@ describe('htmlToMarkdown', () => {
   })
 })
 
+describe('Hebrew and Greek quotes, by script (real forms of the Hindi notes)', () => {
+  const one = (html: string) => aquiferNotes([{ content_id: 1, index_reference: '01001001', content: html }], 'gen', NOTES, new Map()).rows[0]
+
+  test('an rtl span that is not in strong', () => {
+    const r = one("<p><span style='direction: rtl;'>אַרְבָּעִ֥ים י֖וֹם</span></p><p><strong>&quot;चालीस दिन&quot;</strong></p><p>टिप्पणी</p>")
+    expect(r.cols.quote).toBe('אַרְבָּעִ֥ים י֖וֹם')
+    expect(r.cols.note).toBe('**"चालीस दिन"**\n\nटिप्पणी')
+  })
+
+  test('a Hindi gloss in parentheses first, then the quote in parentheses, with & kept (Deuteronomy 2:34 form, article 972725)', () => {
+    const r = one('<p>  (और हमने पूरी तरह नाश कर दिया और नाश करते हुए)    </p><p>(וַ⁠נַּחֲרֵ֣ם &amp; הַחֲרֵם֙)</p><p><strong>&quot;और हमने - सत्यानाश कर डाला&quot; </strong></p><p>मूलभाषा</p>')
+    expect(r.cols.quote).toBe('וַ⁠נַּחֲרֵ֣ם & הַחֲרֵם֙')
+    expect(r.cols.note).toBe('(और हमने पूरी तरह नाश कर दिया और नाश करते हुए)\n\n**"और हमने - सत्यानाश कर डाला"**\n\nमूलभाषा')
+  })
+
+  test('Greek by script in an ltr span in strong, and a Hindi or Latin paragraph is never a quote', () => {
+    expect(one("<p><strong><span style='direction: ltr;'>τὸν &amp; πρῶτον λόγον</span></strong></p><p>x</p>").cols.quote).toBe('τὸν & πρῶτον λόγον')
+    expect(one('<p><strong>&quot;मैंने पहली पुस्तिका लिखी&quot;</strong></p><p>x</p>').cols.quote).toBeUndefined()
+    expect(one('<p>Connecting Statement:</p><p>x</p>').cols.quote).toBeUndefined()
+    expect(one("<p><span style='direction: ltr;'>Hindi और Greek τὸν</span></p><p>x</p>").cols.quote).toBeUndefined()
+  })
+})
+
+describe('bold', () => {
+  test('adjacent and nested bold around quote marks are one run (real: Genesis, note 1)', () => {
+    const html = '<p><strong>&quot;</strong><span><strong>चालीस दिन तक</strong></span><strong>&quot;</strong></p>'
+    expect(htmlToMarkdown(html)).toBe('**"चालीस दिन तक"**')
+    expect(htmlToMarkdown('<p><strong>&quot;<strong>चालीस</strong> दिन&quot;</strong></p>')).toBe('**"चालीस दिन"**')
+    expect(htmlToMarkdown('<p>a<strong></strong>b <strong> </strong>c</p>')).toBe('ab c')
+  })
+
+  test('literal ** around a <strong> in the data (note 913792) is one bold', () => {
+    expect(htmlToMarkdown('<p>यहाँ, **<strong>सुन</strong>** एक</p>')).toBe('यहाँ, **सुन** एक')
+  })
+})
+
 describe('aquiferNotes', () => {
   const issues: string[] = []
   const table = aquiferNotes(notes, 'tit', NOTES, taMap(), issues)

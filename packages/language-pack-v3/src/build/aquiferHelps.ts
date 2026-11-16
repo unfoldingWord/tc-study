@@ -188,10 +188,35 @@ export type LinkResolver = (link: { code: string; contentId: string; label: stri
 
 const BLOCKS = new Set(['p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
 
-/** Emphasis markers around the text, with the spaces moved outside (`**a **` is not emphasis in markdown); no text, no markers. */
+/** Private-use marks that stand for `**` while the text is built, so that adjacent and nested bold can be merged (`boldText`). */
+const BOLD_OPEN = '\uE000'
+const BOLD_CLOSE = '\uE001'
+
+/**
+ * Emphasis markers around the text, with the spaces moved outside (`**a **` is not emphasis in markdown); no text, no markers. Bold is
+ * written with {@link BOLD_OPEN} and {@link BOLD_CLOSE}, and bold inside bold is just the text.
+ */
 function wrap(marker: string, text: string): string {
-  const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(text)!
-  return match[2] === '' ? text : `${match[1]}${marker}${match[2]}${marker}${match[3]}`
+  const [open, close] = marker === '**' ? [BOLD_OPEN, BOLD_CLOSE] : [marker, marker]
+  const flat = marker === '**' ? text.replace(/[\uE000\uE001]/g, '') : text
+  const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(flat)!
+  return match[2] === '' ? flat : `${match[1]}${open}${match[2]}${close}${match[3]}`
+}
+
+/** The bold runs written with the marks become `**`; two runs with nothing between them are one, and an empty one is dropped. */
+function boldText(text: string): string {
+  return text
+    .replace(/\uE001\uE000/g, '')
+    .replace(/\uE000\uE001/g, '')
+    .replace(/\uE000/g, '**')
+    .replace(/\uE001/g, '**')
+    // The Hindi data also has literal `**` around a `<strong>` (`**<strong>\u0938\u0941\u0928</strong>**`): four stars on each side are two.
+    .replace(/\*{4}([^*\n]+?)\*{4}/g, '**$1**')
+}
+
+/** The blocks of nodes as markdown paragraphs (what the whole article and every list item come to). */
+function render(nodes: Node[], link: LinkResolver | undefined): string {
+  return boldText(blocks(nodes, link, '').join('\n\n'))
 }
 
 function inline(nodes: Node[], link: LinkResolver | undefined): string {
@@ -238,7 +263,7 @@ function blocks(nodes: Node[], link: LinkResolver | undefined, indent: string): 
     }
     flush()
     if (node.tag === 'p') {
-      const text = inline(node.children, link).replace(/[ \t]+\n/g, '\n').trim()
+      const text = inline(node.children, link).replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim()
       if (text !== '') out.push(indent + text)
     } else if (node.tag === 'ul' || node.tag === 'ol') {
       let n = 0
@@ -272,39 +297,43 @@ function blocks(nodes: Node[], link: LinkResolver | undefined, indent: string): 
  * The output is still markdown from a third party: the client must not render raw HTML from note markdown (Door43 notes have the same exposure).
  */
 export function htmlToMarkdown(html: string, link?: LinkResolver): string {
-  return blocks(parseHtml(html), link, '').join('\n\n')
+  return render(parseHtml(html), link)
 }
 
 // Articles to rows
 
-const isOriginalQuote = (node: Node): boolean =>
-  typeof node !== 'string' && node.tag === 'span' && /direction\s*:\s*ltr/i.test(attr(node, 'style') ?? '')
+const firstBlocks = (nodes: Node[]): number[] =>
+  nodes.flatMap((node, i) => (textOf(node).trim() === '' ? [] : [i]))
 
-const findQuoteSpan = (node: Node): Node | undefined => {
-  if (typeof node === 'string') return undefined
-  if (isOriginalQuote(node)) return node
-  for (const child of node.children) {
-    const found = findQuoteSpan(child)
-    if (found !== undefined) return found
-  }
-  return undefined
+/** Hebrew or Greek (the scripts of the originals: Hebrew U+0590-05FF, Greek U+0370-03FF and U+1F00-1FFF) is all the letters the text has, and it has some. */
+const ORIGINAL_LETTER = /^[\p{Script=Hebrew}\p{Script=Greek}]$/u
+export function isOriginalScript(text: string): boolean {
+  const letters = text.match(/\p{L}/gu) ?? []
+  return letters.length > 0 && letters.every((letter) => ORIGINAL_LETTER.test(letter))
 }
 
-const firstBlock = (nodes: Node[]): number => nodes.findIndex((node) => typeof node !== 'string' || node.trim() !== '')
+/** The quote the text of a paragraph is: spaces collapsed, one pair of enclosing parentheses taken off. `&` stays, as in the Door43 quotes. */
+function quoteOf(text: string): string {
+  const flat = clean(text).replace(/\s+/g, ' ').trim()
+  return /^[(（][^()（）]*[)）]$/.test(flat) ? flat.slice(1, -1).trim() : flat
+}
 
 /**
- * The original-language quote at the head of a note: the first block, when it is a paragraph that holds a `<span style='direction: ltr;'>`
- * and nothing but that text. Returns the quote (text) and the nodes that remain, or `quote: undefined` and all of them.
+ * The original-language quote at the head of a note: one of the first two paragraphs, when all its letters are Hebrew or Greek, whatever the
+ * `direction` of its span, whether it is in `<strong>` or not, with parentheses or without (the Hindi OT notes put a gloss in parentheses
+ * before it). A Hindi or Latin paragraph is never a quote. The paragraph is taken out of the note; the others stay. Returns the quote (text)
+ * and the nodes that remain, or `quote: undefined` and all of them.
  */
 function splitQuote(nodes: Node[]): { quote?: string; rest: Node[] } {
-  const at = firstBlock(nodes)
-  const head = nodes[at]
-  if (head === undefined || typeof head === 'string' || head.tag !== 'p') return { rest: nodes }
-  const span = findQuoteSpan(head)
-  if (span === undefined) return { rest: nodes }
-  const quote = clean(textOf(span)).replace(/\s+/g, ' ').trim()
-  if (quote === '' || clean(textOf(head)).replace(/\s+/g, ' ').trim() !== quote) return { rest: nodes }
-  return { quote, rest: nodes.slice(at + 1) }
+  for (const at of firstBlocks(nodes).slice(0, 2)) {
+    const head = nodes[at]
+    if (typeof head === 'string' || head.tag !== 'p') return { rest: nodes }
+    const text = textOf(head)
+    if (!isOriginalScript(text)) continue
+    const quote = quoteOf(text)
+    return quote === '' ? { rest: nodes } : { quote, rest: [...nodes.slice(0, at), ...nodes.slice(at + 1)] }
+  }
+  return { rest: nodes }
 }
 
 const INDEX = /^(\d{2})(\d{3})(\d{3})$/
@@ -375,7 +404,7 @@ export type NoteCounts = { inlineLinks: number; conceptArticles: number }
 
 /**
  * The notes of a book from the articles of an Aquifer tN resource (`NN.content.json`). `res` is the key of the resource (`aquifer/hi/tn`);
- * `taMap` is {@link buildTaMap}'s map. `cols.quote` is the original-language quote when the note begins with one, `cols.note` the rest as
+ * `taMap` is {@link buildTaMap}'s map. `cols.quote` is the original-language quote (Hebrew or Greek, by script) when the note begins with one, `cols.note` the rest as
  * markdown. Each Manual link in the text becomes `[[ta:{manual}/{slug}]]`, or its label when the map has no id for it (a line in
  * `issues`); `concept` is the first link that maps, in the text and then in `associations.resource` (by `content_id`, whatever the code it carries). A link to another resource stays
  * its label, with a line in `issues`.
@@ -395,7 +424,7 @@ export function aquiferNotes(items: AquiferArticle[], book: string, res: string,
       return `[[${id}]]`
     }
     const { quote, rest } = splitQuote(nodes)
-    const note = blocks(rest, link, '').join('\n\n')
+    const note = render(rest, link)
     if (quote !== undefined) row.cols.quote = quote
     if (note !== '') row.cols.note = note
     else report('the note has no text')
@@ -434,7 +463,7 @@ export function aquiferQuestions(items: AquiferArticle[], book: string, res: str
       report('the article has no paragraph; the row has no question')
     } else {
       const question = clean(textOf(nodes[at])).replace(/\s+/g, ' ').trim()
-      const response = blocks(nodes.slice(at + 1), undefined, '').join('\n\n')
+      const response = render(nodes.slice(at + 1), undefined)
       row.cols.question = question
       if (response !== '') row.cols.response = response
       else report('the question has no response')
