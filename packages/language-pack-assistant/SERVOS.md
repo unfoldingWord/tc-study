@@ -16,5 +16,4 @@ What an app that embeds `@bt-synergy/language-pack-assistant` should know, from 
 - **Time.** Cards are quick when warm (median 3 to 8 ms with the SQL index). The slow tail is `renderings` for very frequent
   Strong keys (G5485 among them) and some searches on `en` (p95 about 2.9 s on the tune set, 6 of 60 cards over 300 ms); `es` p95
   is 218 ms, `pt` 429 ms. Show the interpretation line first and the pieces when they arrive; do not block the UI on the card.
-- **`choose` decisions** hold up to three calls: show them as buttons and send the one chosen to `assistant.run(call)`.
-- **Query names stay English;** people-facing labels come from `schemas.json` of the client.
+- **`choose` decisions.** An ambiguous name (a book that is also a person, such as Juan) keeps every option: the book's introduction when listed, then every person (R27). Other chooses (renderings by several Strong keys, the classifier's two best) hold up to 3 (`MAX_OPTIONS`). Show them as buttons and send the one chosen to `assistant.run(call)`.

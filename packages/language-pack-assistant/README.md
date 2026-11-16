@@ -39,6 +39,19 @@ phrases, templates and complements. Another base gets rules and search only. `co
 
 A decision carries `interpretation`, one line of what was understood, in the question's language.
 
+## Fragment
+
+`card.pieces` are `Fragment`s: `{ id, kind, title, ref?, concepts, length, cite, license?, link }`. `kind` is one of `verse`, `note`,
+`question`, `link`, `section`, `concept`, `rendering`, `book`, `topic`. `concepts` are the concept ids the piece is about, `length`
+the character count of the text shown, `cite` the resource and release it comes from.
+
+Ids (R29): `verse:<last part of the resource key> <book> <c>:<v>`, `note:<book>/<rowid>`, `question:<book>/<rowid>`,
+`link:<book>/<rowid>`, `section:<article id>#<sid>`, `concept:<id>`, `rendering:<Strong key>/<form>`, `book:<code>`, `topic:<id>`.
+`canonId` puts an id in the form ids compare in (a canonical Strong key, a folded form).
+
+`link` is where the piece leads, in one of four forms: `ref:<book> <c>:<v>`, `concepto:<id>`, `articulo:<id>#<role>` or
+`pieza:<fragment id>`.
+
 ## Files
 
 - `src/`: the chain, the lexicon, the rules, the card and the fragments. `index.ts` is the public surface.

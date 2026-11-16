@@ -167,7 +167,8 @@ The phone has not been measured yet: that is C3.
 - **SQL drivers.** `sqlIndex(driver)` takes a `SqlDriver`; the library ships none (SQLite in a WebView, `bun:sqlite`, D1 are the app's to wire). Without one, `memoryIndex` is used and filled on the first search.
 - **OPFS.** Only memory, IndexedDB and the Node folder store exist; an OPFS store for big installs is an app (or a later task), through `BlobStore`.
 - **Phone timings.** Only desktop numbers are here; the targets above are checked on the 2 GB phone in C3.
-- **Stems.** `search` matches words as they are; stemming per language is for the app (or a later task).
+- **Stems.** Snowball stems for es, pt and en are built in (`stemWord`, `stemForms`): the index keeps every form of each token and a query word matches any form. Other languages match folded words, as they are.
+- **Search index details.** `search` has a `section` kind: one row per article section, hit id `<article id>#<sid>`; `art:` units are indexed like books. `books({ strong })` answers from the xmap `strong` counts. `INDEX_VERSION` is 2: an older index is dropped and rebuilt on `init`, and `has` answers false so the books are indexed again.
 - **Key distribution.** The app decides which public keys it trusts and how it gets them.
 
 ## Open items (after C1, 2026-11-06)
@@ -178,7 +179,7 @@ What C1 left open, so the next phases find it here and not only in the session t
 - **`transfer-v3.ts` and the library.** `resource-pipeline/cli/transfer-v3.ts` keeps its own copy of the import rules (signatures, no going back, forks refused, base check). Open question: should it call `importTransfer` / `exportTransfer` here instead, so the rules live in one place?
 - **Phone timings (C3).** Psalms readable in under 3 s and a verse with its helps in under 50 ms, on the 2 GB phone, store reads included.
 - **Drivers and OPFS (C3, C5).** A `SqlDriver` for wa-sqlite (browser), Capacitor (Servos) and Tauri (desktop); an OPFS `BlobStore` if IndexedDB is too slow for tc-study.
-- **Stems (C2).** Snowball stems for es and pt in the search index.
+- **Memory index.** The memory index over many books needs a lot of memory (the C2 evaluation used the SQL index).
 - **Minors deferred from the final review:**
   - an answer's `usedMaps` can name more maps than it read;
   - a stale entry reuses the `notInstalled` shape;
