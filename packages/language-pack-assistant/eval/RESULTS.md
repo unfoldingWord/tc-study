@@ -38,8 +38,26 @@ The `test` sets are tune data in C2.1 and were run once for these numbers.
 | Correct among accepted (R28) | 78/81 | 87/91 | 47/49 | 94/108 | 48/62 | 48/67 |
 | Median / p95 ms | 0.9 / 50.5 | 1.1 / 35.3 | 2.2 / 88.2 | 1.9 / 63.9 | 2.1 / 119.9 | 2.3 / 117.4 |
 
-The test2 calls-correct numbers (es 83 %, en 75 %, pt 59 %) are at or above those on the tuned-on `test` sets, so the gains are not only
-fitted to known questions, but they are far from the targets.
+The test2 calls correct (es 83.3 %, en 74.7 %, pt 58.7 %) are above the tuned-on `test` sets for es (77.3) and pt (53.3) and below for
+en (77.3). Three sets and one run each cannot say whether the gains are fitted: no conclusion is drawn either way. All are far from the targets.
+
+Accepted and wrong (rule 6 and rule 8). A decision counts as accepted when the chain returns a `call` by a rule or the classifier, and
+a `search` call decided by a rule is one of them. When the question expected another query, that row is accepted and wrong, so it lowers
+correct-among-accepted. Counted from the test2 result files by decision shape only (no expectation read): rule-decided `search` calls:
+es 1, en 2, pt 13 of the accepted rows (es 85, en 94, pt 70). A `choose` that offers `search` next to another query (rule 6) is not
+accepted: es 1 and pt 2 rows, none in en.
+
+## Known defects after C2.1, not fixed
+
+From the chain review. Test2 has been run, so none of these was touched (R42); they need a third held-out set to be measured.
+
+- Rule 1 accepts a `passage` call when leftover words remain (a `context` was asked).
+- Rule 5 accepts an `article` call with leftover words (`books` was asked).
+- Rule 7 accepts a `concept` call when the question holds a concept phrase and leftover words.
+- STOP word gaps with N=1: en from, by, at, as, be, can, you, i, my; pt é, foi, era, ao, pelo, pela.
+- `describesWithName` counts book, reference and category spans as description words.
+- The ASK lists and slot templates look picked from the tune wordings.
+- The time guard can drop a pt reference.
 
 ## Decisions per step
 
