@@ -212,8 +212,10 @@ describe('language-packs.yml obs_images', () => {
     expect(JSON.stringify(job)).not.toContain('production')
   })
 
-  test('it installs with the frozen lockfile and runs publish-obs-images with the R2 names of the v3 publish', () => {
-    expect(stepNamed('Install').run).toBe('bun install --frozen-lockfile')
+  test('it builds the pack tools (frozen install and the dist publishLanguage needs) and runs publish-obs-images with the R2 names of the v3 publish', () => {
+    expect(stepNamed('Build pack tools').run).toBe('bash scripts/build-pack-tools.sh')
+    const at = (n: string): number => job.steps.findIndex((s) => s.name === n)
+    expect(at('Build pack tools')).toBeLessThan(at('Build and publish the OBS images'))
     const publish = stepNamed('Build and publish the OBS images')
     expect(publish.run).toContain('bun packages/resource-pipeline/cli/publish-obs-images.ts')
     const v3Env = find('Build and publish format 3').env ?? {}

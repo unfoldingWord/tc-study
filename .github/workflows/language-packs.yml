@@ -511,8 +511,10 @@ jobs:
         with:
           bun-version: 1.3.3
 
-      - name: Install
-        run: bun install --frozen-lockfile
+      # Installs with the frozen lockfile and builds the dist of the packages publish-obs-images reaches through
+      # publishLanguage (language-pack, resource-catalog, ...): a fresh runner has none.
+      - name: Build pack tools
+        run: bash scripts/build-pack-tools.sh
 
       - name: Build and publish the OBS images
         id: images
