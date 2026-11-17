@@ -71,6 +71,7 @@ export const NOT_ROW_DEPENDENCIES: Readonly<Record<string, string>> = {
   pako: "language-pack's part gzip: the bytes around the rows, not the rows (a carried part decodes to the same rows)",
   react: 'the screens of catalog-manager and resource-types, never imported by a build',
   marked: "a peer resource-parsers never imports",
+  sharp: 'the WebP encoder of the OBS images catalog zxx-obsimg (format 3, src/obsImages), loaded only there: no 2.0 part row passes through it',
 }
 
 /** Workspace packages the row producers depend on that partsCode.test.ts does not scan, and why. */
