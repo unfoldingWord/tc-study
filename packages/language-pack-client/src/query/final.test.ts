@@ -83,6 +83,22 @@ describe('final review, reading and queries', () => {
     expect(a.notInstalled).toContainEqual(expect.objectContaining({ book: 'tit', unit: 'orig:tit', what: 'stale' }))
   })
 
+  test('3b: with the xmap, renderings opens only the books that count the Strong (one book:, one orig:)', async () => {
+    const { client } = await installed({ books: ['tit'] })
+    const reader = await client.open('es-419')
+    const opened: string[] = []
+    const spy: PackReader = {
+      ...reader,
+      // Every book looks installed: only the xmap keeps renderings from opening them.
+      installed: (u) => /^(book|orig):/.test(u) || reader.installed(u),
+      book: async (b) => (opened.push(`book:${b}`), reader.book(b)),
+      orig: async (b) => (opened.push(`orig:${b}`), reader.orig(b)),
+    }
+    const a = await renderingsQuery(spy, { strong: 'G39720' })
+    expect(a.data!.renderings.length).toBeGreaterThan(0)
+    expect(opened.sort()).toEqual(['book:tit', 'orig:tit'])
+  })
+
   test('4: without xmap or map the map queries say installed false and name the unit, never all none', async () => {
     const { client } = await installed({ defaults: false })
     const reader = await client.open('es-419')

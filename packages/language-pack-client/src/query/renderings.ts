@@ -51,6 +51,8 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
     if (/^G\d{4}$/.test(key)) alt = `${key}0`
   }
   for (const book of BOOKS) {
+    // With the `xmap`, only the books where the Strong is counted can have it: the others are not opened.
+    if (maps.xmap !== undefined && !counted.has(book)) continue
     const bookUnit = `book:${book}`
     const origUnit = `orig:${book}`
     if (!reader.installed(bookUnit) || !reader.installed(origUnit)) {
