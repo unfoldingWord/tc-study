@@ -75,12 +75,16 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
   const sharedBlock = (key: string, where: string): boolean => {
     if (sharedByKey.has(key)) return true
     const [file, anchor] = key.split('#')
+    if (anchor === '' || key.split('#').length > 2) {
+      errors.push(`${where}: transclusion ${key}: the anchor is not one heading`)
+      return false
+    }
     const raw = read(`transclusions/${file}.md`)
     if (raw === undefined) {
       errors.push(`${where}: transclusion ${key}: the file does not exist`)
       return false
     }
-    let md = stripComments(raw)
+    let md = stripComments(raw.replace(/^---\n[\s\S]*?\n---\n/, ''))
     let resolved = key
     if (anchor !== undefined) {
       const secs = sections(md)
@@ -161,7 +165,7 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
       return text === '' ? undefined : text
     }
     const numbered = (body: string): { leadText: string; items: string[] } => {
-      const [leadText, ...rest] = body.split(/\n(?=\d+\.\s)/)
+      const [leadText, ...rest] = ('\n' + body).split(/\n(?=\d+\.\s)/)
       const items = rest.join('\n').split(/\n(?=\d+\.\s)/)
       return { leadText, items }
     }
@@ -172,7 +176,11 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
     const intro: string[] = []
     for (const s of secs) {
       const h = s.head
-      if (s.level === 2 && h === 'Introduction') { mode = 'intro'; continue }
+      if (s.level === 2 && h === 'Introduction') {
+        mode = 'intro'
+        if (s.body.trim() !== '') intro.push(s.body.trim())
+        continue
+      }
       if (mode === 'intro' && s.level === 3 && !h.startsWith('Open Bible Story:')) { intro.push(`### ${h}\n${s.body.trim()}`); continue }
       if (s.level === 3 && h.startsWith('Open Bible Story:')) {
         const text = intro.join('\n\n')
@@ -260,7 +268,10 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
     if (st === undefined) {
       // The approved fallback: the language's obs has no such story; the manual's frames stand in.
       storyInTf = true
-      for (const f of tfFrames) for (const id of labelIds(f.label)) frames.push({ frame: id, text: f.text })
+      for (const f of tfFrames) {
+        if (f.text === '') errors.push(`${where}: frame ${f.label} of the manual has no text`)
+        else for (const id of labelIds(f.label)) frames.push({ frame: id, text: f.text })
+      }
       const fr = blocks.find((b) => b.part === 'frames')
       if (fr !== undefined && title !== '') fr.title = title
     } else {
@@ -304,6 +315,9 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
     for (const [p, ls] of Object.entries(listsOf)) {
       if (present.has(p)) for (const l of ls) if (!blocks.some((b) => b.part === p && b.list === l)) warnings.push(`${where}: part ${p} has no list ${l}`)
     }
+    const tokens = [...md.matchAll(/!\[\[([^\]]+)\]\]/g)].filter((m) => !/\.(jpe?g|png)$/i.test(m[1])).length
+    const rows = blocks.filter((b) => b.shared !== undefined).length
+    if (tokens !== rows) errors.push(`${where}: ${tokens} transclusions in the text and ${rows} shared rows: one was not read`)
     coverage.push(n)
     parts.push(...blocks)
   }

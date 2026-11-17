@@ -193,4 +193,18 @@ describe('parseObsTf', () => {
     const noDraft = FILES({ 'obs_story_1.md': storyMd(1).replace('![[movement_2_drafting]]\n', '') })
     expect(parseObsTf(noDraft, RES, [OBS1]).warnings).toContain('story 1: no part drafting')
   })
+
+  test('reads a transclusion file with front matter, a list that starts the body, and the text before the first ### of the introduction', () => {
+    const md = storyMd(1).replace('### Theological Questions\n\n1.', '### Theological Questions\n1.').replace('## Introduction\n\n', '## Introduction\n\nOpening words.\n\n')
+    const r = parseObsTf(FILES({ 'obs_story_1.md': md, 'transclusions/movement_4.md': '---\ntitle: M4\n---\n# Movement 4\n\nM4 text.\n' }), RES, [OBS1])
+    expect(r.errors).toEqual([])
+    expect(r.model.shared.find((x) => x.key === 'movement_4')).toEqual({ key: 'movement_4', title: 'Movement 4', text: 'M4 text.' })
+    expect(r.model.questions.filter((q) => q.list === 'theology').map((q) => q.q)).toEqual(['What does it show?', 'Why does it matter?'])
+    expect(r.model.parts[0].text).toContain('Opening words.')
+  })
+
+  test('an anchor that is not one heading is an error', () => {
+    const md = storyMd(1).replace('#Community Study: Praise', '#')
+    expect(parseObsTf(FILES({ 'obs_story_1.md': md }), RES, [OBS1]).errors.join('\n')).toContain('the anchor is not one heading')
+  })
 })
