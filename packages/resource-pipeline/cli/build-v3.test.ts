@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BOOKS, catalogView, hex, keyId, KNOWN, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
+import { BOOKS, catalogView, hex, keyId, KNOWN, OBS_FRAMES_PER_STORY, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { createHash } from 'node:crypto'
 import { main, optionsFromArgs, readRoleHints, USAGE } from './build-v3'
 import type { TopicSource } from './fetch-topic-sources'
@@ -484,6 +484,15 @@ describe('build-v3: --topics', () => {
       else if (n > 0) stories.set(n, `${stories.get(n)}${line}\n`)
     }
     for (const [story, text] of stories) writeFileSync(join(content, `${String(story).padStart(2, '0')}.md`), text)
+    // bible-story-builder's OBS files: every frame of every story, each telling Titus 1:1
+    OBS_FRAMES_PER_STORY.forEach((frames, i) => {
+      const ss = String(i + 1).padStart(2, '0')
+      const cat = join(dir, 'bsb_obs', String(Math.ceil((i + 1) / 5)).padStart(2, '0'))
+      mkdirSync(cat, { recursive: true })
+      let text = `[[story:${ss}]]\n`
+      for (let f = 1; f <= frames; f++) text += `![Image](obs-en-${ss}-${String(f).padStart(2, '0')}.jpg)\n[[ref:TIT 1:1]]\n`
+      writeFileSync(join(cat, `${ss}.md`), text)
+    })
     return dir
   }
   const files = (out: string): Record<string, string> => snapshot(out, 'segments')
@@ -509,6 +518,16 @@ describe('build-v3: --topics', () => {
     expect(result.code).toBe(0)
     expect(result.out.some((line) => /^xtopics\s+-\s/.test(line))).toBe(true)
     expect(result.out.some((line) => /^topics\s+es-419\s/.test(line))).toBe(true)
+    // the xtopics core has the frame map of the bible-story-builder files
+    let frameKeys = 0
+    for (const name of Object.keys(files(withTopics))) {
+      const bytes = read(join(withTopics, name))
+      const h = readHeader(bytes).header.h as { class?: unknown; part?: unknown }
+      if (h.class !== 'xtopics' || h.part !== 'core') continue
+      const out = (await readerOutput(bytes)) as { 'obs-frames'?: Record<string, unknown> }
+      frameKeys = Object.keys(out['obs-frames'] ?? {}).length
+    }
+    expect(frameKeys).toBe(598)
     const before = files(plain)
     const after = files(withTopics)
     for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
@@ -586,6 +605,12 @@ describe('build-v3: --topics', () => {
     const c = await run(sample(temp(), ['--topics', two]))
     expect(c.code).toBe(1)
     expect(c.err.join('\n')).toMatch(/--topics: .*exactly one \.txt file/)
+
+    const noFrames = sources()
+    rmSync(join(noFrames, 'bsb_obs'), { recursive: true })
+    const d = await run(sample(temp(), ['--topics', noFrames]))
+    expect(d.code).toBe(1)
+    expect(d.err.join('\n')).toMatch(/--topics: .*bsb_obs is not a directory/)
   })
 })
 

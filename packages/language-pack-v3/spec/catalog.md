@@ -83,6 +83,7 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog. A map part keeps its segment id, but its `inputs` carry the tN stamp of its book and so change: the part is re-checked, not re-published |
 | The alias list | the `xmap` core and the parts whose books they touch |
 | TIPNR, Theographic, English OBS, the English tN outlines or the builder's list of events | the `xtopics` core and every `xtopics` part (all of them share the `inputs` of the sources, so each is re-checked; only the core and the parts whose books they touch change in content); never an `xmap` or `map` segment |
+| The English ULT (its `	s\*` sections) or the Bible Story Builder files (the verses of the OBS frames) | the `xtopics` core only (`chunks`, `obs-frames`): they are in the core's `inputs` and `res`, not in the parts', so every part keeps its id and bytes; never an `xmap` or `map` segment |
 | A language's aligned text, or the outline of its introductions | its `topics` core and every `topics` part of that language (all share the `inputs` of the core, so each is re-checked; only the core and the parts whose books they touch change in content); never a segment of the map |
 
 ## Signatures

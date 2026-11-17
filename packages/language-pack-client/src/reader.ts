@@ -36,6 +36,7 @@ import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/m
 import { type PassageData, passageQuery } from './query/passage'
 import { type StoryData, type StoryRef, storiesQuery, storyQuery } from './query/stories'
 import { type SectionsData, sectionsQuery } from './query/sections'
+import { type FramesAtData, framesAtQuery, type FrameVersesData, frameVersesQuery } from './query/obsFrames'
 import { searchQuery } from './query/search'
 import { memoryIndex } from './search/memory'
 import type { Hit, SearchFilters, SearchIndex } from './search/types'
@@ -133,6 +134,14 @@ export interface PackReader {
   story(n: number): Promise<Answer<StoryData>>
   /** The sections of a book in the English ULT, from the `chunks` of the `xtopics` core, in order (`data: null` when `xtopics` is not installed; `sections: []` and coverage `none` when it has no entry for the book). */
   sections(book: string): Promise<Answer<SectionsData | null>>
+  /**
+   * The verses an Open Bible Stories frame tells, from the `obs-frames` table of the `xtopics` core (`data: null` when `xtopics` is not
+   * installed; `ranges: []` and coverage `none` when the core has no such table, an older common catalog; `ranges: []` and `count` for a frame
+   * that tells no verse).
+   */
+  frameVerses(story: number, frame: number): Promise<Answer<FrameVersesData | null>>
+  /** The frames that tell any verse of `first`..`last` (verse ids of one book), most specific first (fewest verses, then story order). */
+  framesAt(first: number, last?: number): Promise<Answer<FramesAtData | null>>
   /**
    * One picture of an Open Bible Stories frame, from the `obsimg` unit of the catalog `zxx-obsimg` (open that catalog). Reads only the one
    * segment of the story. `null` when the unit is not installed, or the story or the frame is not there. `media` is passed through as written.
@@ -451,6 +460,8 @@ export function makeReader(o: ReaderInput): PackReader {
     stories: (ref) => storiesQuery(reader, ref),
     story: (n) => storyQuery(reader, n),
     sections: (book) => sectionsQuery(reader, book),
+    frameVerses: (story, frame) => frameVersesQuery(reader, story, frame),
+    framesAt: (first, last) => framesAtQuery(reader, first, last),
   }
   return reader
 }

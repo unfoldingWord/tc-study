@@ -413,6 +413,11 @@ export type XtopicsCore = {
   ranges?: Record<string, [first: number, last: number][]>
   /** The sections of the English ULT per book (its ts chunks): first and last verse of each, ascending, no overlap. */
   chunks?: Record<string, [first: number, last: number][]>
+  /**
+   * The verses each frame of Open Bible Stories tells (`obs-frames`, from bible-story-builder): per frame key "N:F" (story,
+   * frame; no leading zeros), its verse ranges in the order of the source. A frame that tells no verse has no key.
+   */
+  obsFrames?: Record<string, [first: number, last: number][]>
 }
 
 /** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */

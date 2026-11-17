@@ -142,7 +142,9 @@ let memo: Promise<Built> | undefined
  * catalog only (same key, same common catalog); `commonRevision` builds a common catalog of another id (the language catalog
  * still requires the first one). `books` builds the language catalog with those books only (`[]`: none).
  */
-export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean; books?: string[] } = {}): Promise<Sample> {
+export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean; books?: string[]; frames?: Map<string, string> } = {}): Promise<Sample> {
+  // `frames` (bible-story-builder's OBS files): another sample, built afresh, whose common xtopics core has the obs-frames table
+  if (o.frames !== undefined) return (await make(o.frames)).sample
   memo ??= make()
   const base = await memo
   if (o.revision === undefined && o.tweak === undefined && o.commonRevision === undefined && o.books === undefined) return base.sample
@@ -172,7 +174,7 @@ export async function buildSample(o: { revision?: number; tweak?: Tweak; commonR
   return { ...base.sample, segments, langCatalog, commonCatalog }
 }
 
-async function make(): Promise<Built> {  const parts = join(DATA, 'parts')
+async function make(frames?: Map<string, string>): Promise<Built> {  const parts = join(DATA, 'parts')
   const originals = join(DATA, 'originals', 'list.json')
   const source = async (lang: string) => {
     const inner = await partsSource({ list: join(DATA, lang, 'list.json'), partsDir: parts, originals })
@@ -198,7 +200,7 @@ async function make(): Promise<Built> {  const parts = join(DATA, 'parts')
     source: await source('en'),
     about,
     mapLang: 'en',
-    topics: { tipnr, theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') }, obs },
+    topics: { tipnr, theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') }, obs, ...(frames !== undefined ? { frames } : {}) },
   })
   const core = xtopicsView(common.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!.seg) as XtopicsCore
   const records = parseTipnr(tipnr, [])

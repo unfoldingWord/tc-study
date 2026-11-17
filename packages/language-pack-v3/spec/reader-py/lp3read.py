@@ -63,7 +63,7 @@ KNOWN_TABLES = {
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
-    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks"},
+    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks", "obs-frames"},
     "topics": {"names", "local", "coverage"},
     "aligned": {"keys", "strongs", "data"},
 }
@@ -1434,7 +1434,7 @@ BOOK_SOURCES = ("text", "list", "none")
 # Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
 CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
              "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"},
-             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks"},
+             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks", "obs-frames"},
              "topics": {"coverage", "local"}}
 
 
@@ -1757,7 +1757,20 @@ def _decode_xtopics_core(p: Segment) -> dict:
             if any(b[0] <= a[1] for a, b in zip(v, v[1:])):
                 _bad()
         out["chunks"] = {k: [list(x) for x in v] for k, v in c.items()}
+    if p.has("obs-frames"):
+        f = _str_map(p.t["obs-frames"], lambda v: type(v) is list and len(v) > 0 and all(
+            type(x) is list and len(x) == 2 and _verse_id_ok(x[0]) and _verse_id_ok(x[1]) and x[0] <= x[1]
+            for x in v))
+        if any(OBS_FRAME_KEY.fullmatch(k) is None for k in f):
+            _bad()
+        if any(x[0] // 1000 != x[1] // 1000 for v in f.values() for x in v):
+            _bad()
+        out["obs-frames"] = {k: [list(x) for x in v] for k, v in f.items()}
     return out
+
+
+# A frame key of the xtopics table obs-frames: story 1 to 50 and frame 1 to 99, no leading zeros ("1:3")
+OBS_FRAME_KEY = re.compile(r"(?:[1-9]|[1-4][0-9]|50):[1-9][0-9]?")
 
 
 def _decode_xtopics(p: Segment) -> dict:

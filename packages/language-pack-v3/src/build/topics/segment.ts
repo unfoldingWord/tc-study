@@ -9,6 +9,7 @@ import type { Segment } from '../../codec/container'
 import { encodeBookSet, encodeCounts, encodeCoverage, encodeVerseLists } from '../../codec/counts'
 import { put } from '../../codec/values'
 import { chunksTable } from './chunks'
+import { OBS_FRAME_KEY } from '../../read/topics'
 import { TOPIC_KINDS, TOPIC_NAME_SOURCES, type TopicsCore, type TopicsPart, type XtopicsCore, type XtopicsPart } from '../../model'
 
 type Built = { tables: Record<string, [number, boolean]>; t: Record<string, CborValue> }
@@ -130,6 +131,23 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     for (const [book, list] of byBook) if (list.length === 0) throw new Error(`chunks: ${JSON.stringify(book)} has no section`)
     tables.chunks = [1, false]
     t.chunks = chunksTable(byBook)
+  }
+  if (m.obsFrames !== undefined) {
+    const out: Record<string, number[][]> = {}
+    for (const [k, v] of Object.entries(sortedRecord(m.obsFrames))) {
+      if (!OBS_FRAME_KEY.test(k)) throw new Error(`obs-frames: ${JSON.stringify(k)} is not a frame "N:F"`)
+      if (v.length === 0) throw new Error(`obs-frames: ${JSON.stringify(k)} has no range`)
+      for (const [a, b] of v) {
+        for (const n of [a, b]) {
+          if (!Number.isSafeInteger(n) || n < 1_000_000 || n >= 67_000_000) throw new Error(`obs-frames: ${JSON.stringify(k)} has ${n}, which is not a verse id`)
+        }
+        if (a > b) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range that runs backwards`)
+        if (Math.floor(a / 1000) !== Math.floor(b / 1000)) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range across two chapters`)
+      }
+      put(out, k, v.map(([a, b]) => [a, b]))
+    }
+    tables['obs-frames'] = [1, false]
+    t['obs-frames'] = out
   }
   return { tables, t }
 }

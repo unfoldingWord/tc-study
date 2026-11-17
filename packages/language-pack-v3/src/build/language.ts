@@ -60,6 +60,7 @@ import { outlineOf } from './topics/outline'
 import { topicsSegment, xtopicsSegment } from './topics/segment'
 import { buildTopics } from './topics/topics'
 import { chunksOfText, chunksTable } from './topics/chunks'
+import { parseObsFrames } from '../source/obsFrames'
 import { buildXtopics, chapterLengths, type TwName, type XtopicsSources } from './topics/xtopics'
 import { parseObsRefs } from '../source/obsRefs'
 import { parseTheographic } from '../source/theographic'
@@ -473,6 +474,21 @@ const TITLE_ROW = /^helps-text:(tw|ta)-title:/
 const ULT_LANG = 'en'
 const ULT_KEY = 'unfoldingWord/en/ult'
 
+/** The source of the `obs-frames` table of the xtopics core (`spec/fuentes.md`), at its pinned commit. */
+export const OBS_FRAMES_SOURCE = {
+  key: 'bcv-commons/bible-story-builder',
+  release: 'c07d4539',
+  title: 'Bible Story Builder: the verses of each Open Bible Stories frame',
+  license: 'MIT',
+  attribution:
+    'Bible Story Builder (https://github.com/bcv-commons/bible-story-builder), templates/OBS at commit c07d45395d01b987c31f4e06871314f129c975e8. ' +
+    'MIT License. Copyright (c) 2024 unfoldingWord Box3. ' +
+    'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: ' +
+    'The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. ' +
+    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. ' +
+    'Changed: only the verse references of the OBS frames were read, as verse ids, each range within one chapter.',
+} as const
+
 /** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */
 const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines'> = {
   tipnr: ['STEPBible/STEPBible-Data/TIPNR', 'be4191f0'],
@@ -552,6 +568,8 @@ export async function buildCommon(o: {
     theographic: { events: string; verses: string; people: string; places: string }
     obs: Map<number, string>
     releases?: Partial<Omit<XtopicsSources, 'outlines'>>
+    /** The `templates/OBS/<category>/<story>.md` files of bible-story-builder (path below `templates/OBS` to text): the `obs-frames` table */
+    frames?: Map<string, string>
   }
 }): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[] }> {
   const refs = await o.source.resources(ORIGINALS)
@@ -692,6 +710,30 @@ export async function buildCommon(o: {
         built.core.coverage.set(ult.key, { whole: [...byBook.keys()].sort((a, b) => bookNumber(a) - bookNumber(b)), partial: [] })
       } else if (noBook.length + noVerses.length + noBreaks.length === 0) report.push(`topics: chunks: no book of the originals was built: the xtopics have no section map`)
     }
+    // The verses of each OBS frame (bible-story-builder): the core only, like the section map
+    const frameRows: RowKey[] = []
+    if (t.frames === undefined) report.push('topics: obs-frames: no bible-story-builder files: the xtopics have no frame map')
+    else {
+      const frameReport: string[] = []
+      const frames = parseObsFrames(t.frames, frameReport, lastVerse)
+      // The frames whose verses are not all in their story's ranges (the closing line of English OBS): reported, not dropped
+      const outside: string[] = []
+      for (const [frame, list] of frames) {
+        const story = built.core.ranges?.[`obs:${frame.split(':')[0]}`]
+        if (story === undefined) continue
+        if (list.some(([a, b]) => !story.some(([x, y]) => x <= a && b <= y))) outside.push(frame)
+      }
+      if (outside.length > 0) frameReport.push(`obs-frames: ${outside.length} frames have verses outside their story's ranges: ${outside.join(', ')}`)
+      report.push(...frameReport.map((line) => `topics: ${line}`))
+      if (frames.size > 0) {
+        built.core.obsFrames = Object.fromEntries(frames)
+        built.core.res = [...built.core.res, [OBS_FRAMES_SOURCE.key, OBS_FRAMES_SOURCE.release] as [string, string]].sort((a, b) => compareCodePoints(a[0], b[0]))
+        const books = [...new Set([...frames.values()].flat(2).map((v) => BOOKS[Math.floor(v / 1_000_000) - 1]))].sort((a, b) => bookNumber(a) - bookNumber(b))
+        built.core.coverage.set(OBS_FRAMES_SOURCE.key, { whole: [], partial: books })
+        for (const [path, text] of [...t.frames].sort((a, b) => compareCodePoints(a[0], b[0]))) frameRows.push({ layer: 'topics', key: `obs-frames ${path}|${sha256Hex(text)}` })
+        extra.push({ key: OBS_FRAMES_SOURCE.key, title: OBS_FRAMES_SOURCE.title, subject: 'Topics', release: OBS_FRAMES_SOURCE.release, license: OBS_FRAMES_SOURCE.license, attribution: OBS_FRAMES_SOURCE.attribution, books: bookSet(books) })
+      }
+    }
     const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))
     const stamps = [
@@ -700,7 +742,12 @@ export async function buildCommon(o: {
     ]
     const inputs = inputsOf(rows, stamps)
     // The core also reads the rows of the ULT; the parts do not, so their inputs and bytes are those of a build without it
-    const coreInputs = built.core.chunks === undefined ? inputs : inputsOf([...rows, ...chunkRows], [...stamps, { key: ult!.key, stamp: tagOf(ult!.stamp) }])
+    const coreStamps = [
+      ...stamps,
+      ...(built.core.chunks === undefined ? [] : [{ key: ult!.key, stamp: tagOf(ult!.stamp) }]),
+      ...(built.core.obsFrames === undefined ? [] : [{ key: OBS_FRAMES_SOURCE.key, stamp: OBS_FRAMES_SOURCE.release }]),
+    ]
+    const coreInputs = built.core.chunks === undefined && built.core.obsFrames === undefined ? inputs : inputsOf([...rows, ...chunkRows, ...frameRows], coreStamps)
     segments.push(await builtSegment(xtopicsSegment(built.core), coreInputs))
     for (const part of built.parts) segments.push(await builtSegment(xtopicsSegment(part), inputs))
     const topicKeys = new Set(built.core.res.map(([key]) => key))
