@@ -190,6 +190,8 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     return value
   }
   if (flags.has('obs-images')) return obsImagesOptions(flags, need)
+  // A language build has --previous-common and --previous-lang: a bare --previous (or --cache) would be ignored without a word.
+  for (const name of ['previous', 'cache']) if (flags.has(name)) throw new UsageError(`--${name} applies only to --obs-images`)
   const list = need('list')
   const originals = need('originals')
   const parts = need('parts')

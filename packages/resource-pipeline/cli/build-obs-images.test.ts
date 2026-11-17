@@ -49,6 +49,12 @@ describe('--obs-images options', () => {
     expect(() => optionsFromArgs(['--obs-images', '--out', 'x', '--aligned'])).toThrow('--aligned does not apply')
     expect(() => optionsFromArgs(['--obs-images', '--out', 'x', '--previous', 'zz'])).toThrow('is not an id')
   })
+
+  test('a language build refuses the flags only --obs-images reads, rather than ignoring them', () => {
+    const base = ['--list', 'l.json', '--originals', 'o', '--parts', 'p', '--out', 'x']
+    expect(() => optionsFromArgs([...base, '--previous', 'ab'.repeat(32)])).toThrow('--previous applies only to --obs-images')
+    expect(() => optionsFromArgs([...base, '--cache', 'c'])).toThrow('--cache applies only to --obs-images')
+  })
 })
 
 describe('readObsJpegs', () => {

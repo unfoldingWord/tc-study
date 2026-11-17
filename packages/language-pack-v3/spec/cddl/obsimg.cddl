@@ -11,7 +11,7 @@ obsimg-header = {
   "tables": { * table-name => [uint, bool] },
   "lang": tstr,                ; always the name of the catalog: "zxx-obsimg"
   "group": obsimg-story,       ; the story, as two digits
-}                              ; no "book", "part", "orig" or "res"
+}                              ; no "book", "part", "orig" or "res": a builder writes none, and a reader does not read them
 
 obsimg-story = tstr            ; "01" to "50"
 
@@ -32,6 +32,6 @@ obsimg-frame = {
 obsimg-meta = {
   "license": tstr,             ; "CC BY-SA 3.0"
   "credit": tstr,              ; "Illustrations © Sweet Publishing, https://sweetpublishing.com"
-  "changes": tstr,             ; "converted to WebP quality 75"
+  "changes": tstr,             ; "converted to WebP quality 75 (sharp 0.33.5 (libwebp 1.4.0))": the encoder as built
   "source": tstr,              ; the file the images were taken from
 }
