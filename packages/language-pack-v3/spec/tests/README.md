@@ -123,7 +123,7 @@ required table it does not know is `E_TABLE`.
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
 **What a phase 1 reader knows.** Every table of `cddl/<class>.cddl`, at version 1, for the classes `book`, `orig`, `art`,
-`lex`, `obs`, `obsimg` and `catalog`. For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
+`lex`, `obs` and `catalog` (a current reader also knows those of `obsimg`; a phase 1 reader does not know that class, which is `E_BODY`). For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
 "`map`, `xmap`" below), so **a segment of
 these classes is `E_TABLE`** for a phase 1 reader, even if its tables are all optional, once the checks of `container.md` up to
 `E_HMISMATCH` have passed. The same holds for a segment inside a transfer file (below).

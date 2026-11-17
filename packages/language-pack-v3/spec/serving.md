@@ -114,5 +114,5 @@ The packs bucket (R2) holds format 3 under its own prefix, so the format 2.0 cle
 | `v3/registry/{lang}.json` | the section registry of the language's builds (`ids.md`) | after the segments and before any catalog (a catalog that is visible always has its registry); never served. A catalog with no linguistic content has no registry entry |
 
 Uploads use `Cache-Control: public, max-age=31536000, immutable` for segments and `no-cache` for catalogs; the Worker sets its own
-headers anyway. Nothing else is written under `v3/`; a catalog with no linguistic content (`catalog.md`) writes only its catalog and its segments, in that order (all the segments, then the catalog). Source files the builders read (TIPNR, Theographic, OBS) are never uploaded
+headers anyway. Nothing else is written under `v3/`; a catalog with no linguistic content (`catalog.md`) writes only its segments, then its catalog. Source files the builders read (TIPNR, Theographic, OBS) are never uploaded
 (`fuentes.md`). Segments no catalog names are not deleted in phase 3.
