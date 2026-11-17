@@ -18,6 +18,7 @@ import {
   type MapSet,
   type ObsModel,
   obsView,
+  obsimgView,
   type OrigModel,
   type Role,
   origView,
@@ -132,6 +133,13 @@ export interface PackReader {
   story(n: number): Promise<Answer<StoryData>>
   /** The sections of a book in the English ULT, from the `chunks` of the `xtopics` core, in order (`data: null` when `xtopics` is not installed; `sections: []` and coverage `none` when it has no entry for the book). */
   sections(book: string): Promise<Answer<SectionsData | null>>
+  /**
+   * One picture of an Open Bible Stories frame, from the `obsimg` unit of the catalog `zxx-obsimg` (open that catalog). Reads only the one
+   * segment of the story. `null` when the unit is not installed, or the story or the frame is not there. `media` is passed through as written.
+   */
+  obsImage(story: number, frame: number): Promise<{ bytes: Uint8Array; media: string; w: number; h: number } | null>
+  /** The credit the pictures carry (license, credit, changes, source), from the first segment of the unit; `null` when `obsimg` is not installed. */
+  obsImageCredit(): Promise<{ license: string; credit: string; changes: string; source: string } | null>
 }
 
 export type ReaderInput = {
@@ -256,6 +264,39 @@ export function makeReader(o: ReaderInput): PackReader {
     return v
   }
 
+  // The story of each `obsimg` segment (its `group`, "01" to "50"), from the catalog entries of the unit, so one story reads one segment.
+  let obsimgIndex: Map<number, number> | undefined
+  function obsimgAt(story: number): number | undefined {
+    if (obsimgIndex === undefined) {
+      obsimgIndex = new Map()
+      const ids = activeIds.get('obsimg')
+      const unit = o.catalogs.flatMap((c) => c.catalog.units.filter((u) => u.id === 'obsimg').map((u) => ({ c, u }))).find(({ c, u }) => u.segments.some((i) => ids?.includes(hex(c.catalog.segments[i]!.id))))
+      if (ids !== undefined && unit !== undefined) {
+        for (const i of unit.u.segments) {
+          const e = unit.c.catalog.segments[i]!
+          const at = ids.indexOf(hex(e.id))
+          if (at >= 0 && e.group !== undefined && /^\d+$/.test(e.group)) obsimgIndex.set(Number(e.group), at)
+        }
+      }
+    }
+    return obsimgIndex.get(story)
+  }
+  async function obsimgStory(story: number): Promise<ReturnType<typeof obsimgView> | undefined> {
+    const index = Number.isInteger(story) ? obsimgAt(story) : undefined
+    if (index === undefined) return undefined
+    const seg = await readOne(activeIds.get('obsimg')![index]!, 'obsimg')
+    return seg === undefined ? undefined : viewOf('obsimg', index, seg, obsimgView)
+  }
+  async function obsImage(story: number, frame: number): Promise<{ bytes: Uint8Array; media: string; w: number; h: number } | null> {
+    const f = (await obsimgStory(story))?.frames.find((x) => x.n === frame)
+    return f === undefined ? null : { bytes: f.data, media: f.media, w: f.w, h: f.h }
+  }
+  async function obsImageCredit(): Promise<{ license: string; credit: string; changes: string; source: string } | null> {
+    obsimgAt(0)
+    const first = obsimgIndex === undefined ? undefined : Math.min(...obsimgIndex.keys())
+    return first === undefined || !Number.isFinite(first) ? null : ((await obsimgStory(first))?.meta ?? null)
+  }
+
   const VIEWS = { xmap: xmapView, map: mapView, xtopics: xtopicsView, topics: topicsView } as const
   type Part = { part: string }
   /** One map unit: its core and parts, or `undefined` when a segment is missing or bad, or no segment is the core. */
@@ -366,6 +407,8 @@ export function makeReader(o: ReaderInput): PackReader {
     book: (book) => single(`book:${book}`, bookView),
     orig: (book) => single(`orig:${book}`, origView),
     obs: () => single('obs', obsView),
+    obsImage,
+    obsImageCredit,
     async articles(group) {
       return (await single(`art:${group}`, artView))?.articles
     },
