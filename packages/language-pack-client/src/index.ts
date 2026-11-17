@@ -25,3 +25,4 @@ export type { Hit, SearchFilters, SearchIndex, SearchKind } from './search/types
 export type { StoryData, StoryFrame, StoryRef } from './query/stories'
 export type { AcademyArticle, AcademyData } from './query/academy'
 export type { SectionsData } from './query/sections'
+export type { FrameAt, FrameRange, FramesAtData, FrameVersesData } from './query/obsFrames'

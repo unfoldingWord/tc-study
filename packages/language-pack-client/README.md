@@ -76,7 +76,7 @@ All are methods of `PackReader`; each returns an `Answer<T>`:
 
 ```ts
 type Answer<T> = {
-  query: 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy' | 'sections'
+  query: 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy' | 'sections' | 'frameVerses' | 'framesAt'
   data: T | null                                   // null when the unit that answers is not installed
   cites: { res; release; id?; ref?; section? }[]   // where each datum comes from
   revision: { lang?; common?; units: Record<unit, number> } // a book of revision 1 under a map of revision 2 says both
@@ -96,6 +96,8 @@ type Answer<T> = {
 | `renderings({ strong } or { book, word })` | a Strong's number or a word | how the language renders it, with counts and references |
 | `academy(book)` | `'rut'` | the tA articles the notes of the book cite: `book`, `covered` (false when the language has no tN that covers the book: then `articles` is `[]` for lack of a source, not because nothing is cited), `articles` (`id`, `title`, `count`, `partial`, most cited first); `data: null` when the `map` is not installed |
 | `sections(book)` | `'tit'` | the sections of the book in the English ULT, from the `chunks` of the `xtopics` core: `book`, `sections` (`from`, `to`, `first`, `last`, in order), `source`; `data: null` when `xtopics` is not installed; `sections: []` with coverage `none` when the common unit has no entry for the book |
+| `frameVerses(story, frame)` | `48, 10` | the verses an Open Bible Stories frame tells, from the `obs-frames` of the `xtopics` core (source: bible-story-builder): `story`, `frame`, `ranges` (`book`, `ref`, `first`, `last`, in the order of the source), `source`; `data: null` when `xtopics` is not installed; `ranges: []` with coverage `none` when the core has no such table (an older common catalog), and with `count` for a frame that tells no verse |
+| `framesAt(first, last?)` | `1001010` | the frames that tell any verse of `first`..`last` (verse ids of one book): `frames` (`story`, `frame`, `verses`), most specific first (fewest verses, then story and frame order); built in memory from `obs-frames` once per core |
 | `search(text, filters?)` | full text | hits over the installed books, from the client's index or one built in memory |
 
 ### Sections of a book
@@ -106,6 +108,15 @@ type Answer<T> = {
 const { data } = await reader.sections('tit')
 // data.sections[0] -> { from: '1:1', to: '1:3', first: 56001001, last: 56001003 }
 const next = data?.sections.find((s) => s.first > current) // current: the verse id being read
+```
+
+`frameVerses` and `framesAt` read the `obs-frames` table: the two directions between a frame of Open Bible Stories and the Bible. The table comes with the common `xtopics` unit, so a phone that has the stories has it with no other download; an older common catalog has no table, and the answers say so with coverage `none`.
+
+```ts
+const at = await reader.framesAt(1001010)          // Genesis 1:10
+// at.data.frames[0] -> { story: 1, frame: 4, verses: 2 }  ("told in OBS 1:4")
+const fv = await reader.frameVerses(1, 4)
+// fv.data.ranges -> [{ book: 'gen', ref: '1:9-10', first: 1001009, last: 1001010 }]
 ```
 
 A `lookup` query with no words (only punctuation) returns `matches: []`; empty or non-string text is `E_ARG`.
