@@ -80,28 +80,34 @@ obs-helps = {
 ;
 ; Columns. The tf-* tables never use the encoding "strings" (E_BODY if a column does) and never "flags". Text columns are
 ; "texts"; number columns are "uints". Each column below says whether it has "has". A "has" bit is 1 only for a non-empty
-; value; an empty string is never stored, and no column has a "has" that is all ones.
+; value; an empty string is never stored, and no column has a "has" that is all ones. A column marked "no has" that has one is E_BODY. The values of a column with
+; "has" are as many as its bits that are 1; a column without it has one value per row; any other count is E_BODY.
+; The "required" flag of a tf-* table is false; a reader treats true as false. A "res" index outside the header's "res" is
+; E_BODY. A "refText" lists rows in ascending order, without repeats, each below "n".
 ;
 ; Numbers. Rows and codes are numbered from 0. "k" is not a row: in tf-questions it counts from 1 within a part, in
 ; tf-terms from 1 within a frame. The values of a column "shared" and the rows of "refText" are row numbers of their table,
 ; from 0.
 ;
-; Codes. Each table writes the codes it uses in its own "codes", in this fixed order, which is also the sort order (a reader
-; sorts by number and never by text), and a code a table does not use is not listed:
+; Codes. Each table writes the codes it uses in its own "codes" (one table of codes for both "part" and "list"), in this
+; fixed order, parts first and then lists, which is also the sort order (a reader sorts by number and never by text); a code a
+; table does not use is not listed. A part code and a list code never coincide:
 ;   parts: intro, frames, community, m1, m2, drafting, m3, checking, m4, m5, conclusion
 ;   lists: observation, terms, discourse, theology, journal
-; Codes are fixed and never translated. A reader skips a row whose code it does not know.
+; Codes are fixed and never translated. A reader skips a row whose code it does not know, and only that row.
 ;
 ; Order of rows. tf-parts: stories ascending, then the parts in the order above; a part's first row is its heading row (no
-; "list"), then one row per list of the part in the order of the list codes. "stories" is ascending, with no repeats. A row
-; for a story that is not in "stories" is E_BODY. tf-questions: by story, part, k. tf-terms: by frame, k. tf-shared: in the
+; "list"), then one row per list of the part in the order of the list codes. The coverage ("stories" of tf-parts, not the segment's table of that name) is ascending, with no repeats. A row
+; of any tf-* table for a story that is not in the coverage is E_BODY. tf-questions: by story, part, k. tf-terms: by frame, k. tf-shared: in the
 ; order of first use, going through tf-parts in row order. tf-frames: by frame ascending. tf-framework: m1 to m5, then
 ; overview. "frames" ids of a question: the frames in the order the source writes them, without repeats.
 ;
 ; Missing tables and references. A reader that has tf-parts but does not have a table that a row needs (the header does not
 ; list it, or it has a version the reader does not know) shows that row's heading and no body, and it is not an error: no
 ; tf-shared (rows with "shared"), no tf-frames (a frame missing from "stories"), no tf-questions or tf-terms (a list with no
-; rows). A value that names a row or frame that does not exist in a table the reader has, and knows, is E_BODY.
+; rows). A "shared" value that is not a row of tf-shared, a "refText" row that is not a row of its table, or a res index outside the
+; header's "res", is E_BODY. A frame that is neither in the segment's table "stories" nor in tf-frames is E_BODY when the
+; reader has tf-frames; when it does not, that frame shows its number and no text.
 ;
 ; Heading rows. A row with "shared" shows that block of tf-shared: its tf-parts "title" and "text" are not written (no
 ; "has" bit), and the title is the block's. The row of the part "frames" has no title and no text: the app shows the story's
@@ -121,8 +127,8 @@ tf-parts = {
   "n": uint,
   "story": uvarints,
   "part": uvarints,            ; a number of "codes"
-  "list": column,              ; uints, a number of "codes"; "has" only on the heading rows of lists
-  "title": column,             ; texts, as published in the language; "has"
+  "list": column,              ; uints, a number of "codes"; "has" is 1 on the rows of a list and 0 on the heading row of a part
+  "title": column,             ; texts, as published in the language; "has" (on heading rows of parts and of lists, not on rows with "shared")
   "text": column,              ; texts, minimal markdown; "has"
   "shared": column,            ; uints, a row of tf-shared; "has"
 }
@@ -160,7 +166,7 @@ tf-terms = {
 tf-shared = {
   "res": res-index,
   "n": uint,
-  "key": column,               ; texts; no "has"
+  "key": column,               ; texts; no "has"; two rows with the same key are E_BODY
   "title": column,             ; texts: the block's first heading; no "has"
   "text": column,              ; texts: the rest, minimal markdown; "has"
 }
@@ -178,12 +184,12 @@ tf-frames = {
 ; The five movements: code (m1-m5, then overview) and name, from the headings of the source. The framing text of the method
 ; (transclusions/overview.md, CC BY-SA 4.0 like the manual; Abel cleared the license on 2026-11-17) is in "text": the
 ; purpose of each movement, and in the row "overview" the general framing text. This table has its own codes, in the order
-; above, and is not subject to the part codes.
+; above, and is not subject to the part codes. It belongs to the set: a reader that has no tf-parts ignores it too.
 tf-framework = {
   "res": res-index,
   "codes": strtab,
   "n": uint,
   "code": uvarints,
-  "name": column,              ; texts with "has" (the row overview has no name)
+  "name": column,              ; texts with "has": the rows m1-m5 have a name, the row overview has none; a reader requires neither
   ? "text": column,            ; texts with "has"
 }
