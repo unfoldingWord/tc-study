@@ -19,6 +19,7 @@ The base is the packs Worker's origin, for example `https://<worker host>`. Path
 
 - `{lang}` is a BCP 47 tag. The Worker lowercases it and applies the same aliases as `/v2/packs` (today `es` → `es-419`),
   then checks it against `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. The answer for an alias is the catalog of the tag it maps to.
+- `zxx-obsimg`, the catalog of the Open Bible Stories pictures (`catalog.md`, "Catalogs with no linguistic content"), is served at the same paths and matches this rule: `zxx` has 3 letters and `obsimg` is a subtag of 6 characters.
 - `common` is reserved: no language is called `common` (a language tag has 2 or 3 letters before the first `-`).
 - The path `/v3/packs/seg/catalog` is the catalog of the language `seg` (Segeju), not a segment: a path whose first element is `seg` is a segment only when the second is 64 lowercase hex.
 - `{id}` is the segment's id (`container.md`: the sha256 of the **uncompressed body**, not of the file) in 64 lowercase hex

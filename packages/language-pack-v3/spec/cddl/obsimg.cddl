@@ -1,0 +1,37 @@
+; Format 3: the Open Bible Stories pictures. One segment per story, in the catalog "zxx-obsimg" (catalog.md, "Catalogs with no
+; linguistic content"). The pictures are the same for every language, so the header names the catalog and no resource. A reader never
+; decodes an image: it hands the bytes and the media type on. Each segment carries the credit, so that one story read alone has it.
+; The image bytes barely compress; the segment is still deflate-raw like every segment (a story is about 100 to 600 KB).
+
+obsimg-segment = body<obsimg-header, obsimg-tables>
+
+obsimg-header = {
+  "class": "obsimg",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,                ; always the name of the catalog: "zxx-obsimg"
+  "group": obsimg-story,       ; the story, as two digits
+}                              ; no "book", "part", "orig" or "res"
+
+obsimg-story = tstr            ; "01" to "50"
+
+obsimg-tables = {
+  "frames": [+ obsimg-frame],  ; required, v1; ordered by n, no n twice
+  "meta": [obsimg-meta],       ; required, v1; exactly one row
+}
+
+obsimg-frame = {
+  "n": uint,                   ; the frame number in the story (1 to the last frame)
+  "media": tstr,               ; "image/webp" as built; a reader passes it through and never decodes
+  "w": uint,                   ; width in pixels, at least 1
+  "h": uint,                   ; height in pixels, at least 1
+  "data": bstr,                ; the bytes of the image file, as published; not empty
+}
+
+; The same row in every segment of the catalog. Neither the header nor the catalog's about has a field for the credit.
+obsimg-meta = {
+  "license": tstr,             ; "CC BY-SA 3.0"
+  "credit": tstr,              ; "Illustrations © Sweet Publishing, https://sweetpublishing.com"
+  "changes": tstr,             ; "converted to WebP quality 75"
+  "source": tstr,              ; the file the images were taken from
+}

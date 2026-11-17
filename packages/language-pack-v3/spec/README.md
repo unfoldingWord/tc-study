@@ -45,6 +45,7 @@ for every language and are published once.
 | `art` | Word (tW) and Academy (tA) articles, in sections with stable ids | One language, one group of articles |
 | `lex` | Lexicon entries for a range of Strong numbers | One language, one group |
 | `obs` | Open Bible Stories with their frames, notes, questions, word links and study notes and questions | One language |
+| `obsimg` | The pictures of the Open Bible Stories frames, one segment per story, with their credit. Language independent: only in the catalog `zxx-obsimg` | One story |
 | `gen` | Reserved for text a model generated, with its provenance. Not built now | — |
 
 Complements (question classifiers, vectors, number words) are not part of the format. They travel through the same
