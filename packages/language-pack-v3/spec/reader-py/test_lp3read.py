@@ -3223,6 +3223,24 @@ def test_xtopics_unknown_required_table_is_e_table():
     err(build(h, t).data, "E_TABLE")
 
 
+def test_xtopics_obs_frames():
+    _, _, (h, t) = xtopics_core()
+    h["tables"]["obs-frames"] = [1, False]
+    t["obs-frames"] = {"1:10": [[1002001, 1002001]], "1:3": [[1001006, 1001008]], "48:10": [[58009011, 58009014], [43001029, 43001029]]}
+    assert read_file(build(h, t).data)["obs-frames"] == t["obs-frames"]
+    for bad in ({"01:3": [[1001006, 1001008]]}, {"51:1": [[1001006, 1001008]]}, {"obs:1": [[1001006, 1001008]]},
+                {"1:3": []}, {"1:3": [[1001008, 1001006]]}, {"1:3": [[1001006]]}):
+        t["obs-frames"] = bad
+        err(build(h, t).data, "E_BODY")
+
+
+def test_xtopics_obs_frames_not_in_a_part():
+    _, _, (h, t) = xtopics_part()
+    h["tables"]["obs-frames"] = [1, False]
+    t["obs-frames"] = {"1:3": [[1001006, 1001008]]}
+    err(build(h, t).data, "E_BODY")
+
+
 def test_xtopics_chunks_single_verse_and_adjacent_sections():
     _, _, (h, t) = xtopics_core()
     t["chunks"] = {"tit": [[56001001, 56001001], [56001002, 56001002]]}

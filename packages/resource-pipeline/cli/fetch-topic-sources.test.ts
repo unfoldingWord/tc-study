@@ -45,6 +45,7 @@ describe('fetch-topic-sources', () => {
     for (const s of sources) expect(readFileSync(join(out, s.target), 'utf8')).toBe(s.eol === 'crlf' ? body(s).replace(/\n/g, '\r\n') : body(s))
     expect(readdirSync(join(out, 'theographic')).sort()).toEqual(['events.json', 'people.json', 'places.json', 'verses.json'])
     expect(readdirSync(join(out, 'en_obs', 'obs-repo', 'content')).length).toBe(50)
+    expect(readdirSync(join(out, 'bsb_obs')).sort()).toEqual(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'])
   })
 
   test('a wrong hash fails and leaves nothing', async () => {
@@ -91,6 +92,7 @@ describe('fetch-topic-sources', () => {
       'STEPBible/STEPBible-Data': commitOf('STEPBible TIPNR'),
       'robertrouse/theographic-bible-metadata': commitOf('Theographic Bible Metadata'),
       'unfoldingWord/en_obs': commitOf('English OBS'),
+      'bcv-commons/bible-story-builder': commitOf('Bible Story Builder'),
     }
     for (const s of PINS.sources) expect(s.commit).toBe(want[s.repository])
     const theo = [...md.matchAll(/`(events|people|places|verses)\.json` `([0-9a-f]{64})`/g)]
@@ -100,7 +102,10 @@ describe('fetch-topic-sources', () => {
     expect(obs.length).toBe(50)
     for (const m of obs) expect(PINS.sources.find((s) => s.target === `en_obs/obs-repo/content/${m[2]}.md`)?.sha256).toBe(m[1])
     expect(PINS.sources.find((s) => s.name === 'tipnr')?.sha256).toBe(/sha256 of the file: `([0-9a-f]{64})`/.exec(md)![1])
-    expect(PINS.sources.length).toBe(1 + 4 + 50)
+    const bsb = [...md.matchAll(/^([0-9a-f]{64})  (\d\d\/\d\d)\.md$/gm)]
+    expect(bsb.length).toBe(50)
+    for (const m of bsb) expect(PINS.sources.find((s) => s.target === `bsb_obs/${m[2]}.md`)?.sha256).toBe(m[1])
+    expect(PINS.sources.length).toBe(1 + 4 + 50 + 50)
   })
 
   test('the URLs are raw GitHub for GitHub repositories and Door43 for the stories', () => {
@@ -108,5 +113,6 @@ describe('fetch-topic-sources', () => {
     expect(urls.find((u) => u.includes('TIPNR'))).toMatch(/^https:\/\/raw\.githubusercontent\.com\/STEPBible\/STEPBible-Data\/be4191f[0-9a-f]+\/Proper%20Nouns\/TIPNR%20-/)
     expect(urls.find((u) => u.endsWith('events.json'))).toMatch(/^https:\/\/raw\.githubusercontent\.com\/robertrouse\/theographic-bible-metadata\/744355c[0-9a-f]+\/json\/events\.json$/)
     expect(urls.find((u) => u.endsWith('01.md'))).toBe('https://git.door43.org/unfoldingWord/en_obs/raw/commit/d39a1dc7a7557ac54e4a8fecc3462147fe7eec3b/content/01.md')
+    expect(urls.find((u) => u.endsWith('OBS/01/01.md'))).toBe('https://raw.githubusercontent.com/bcv-commons/bible-story-builder/c07d45395d01b987c31f4e06871314f129c975e8/templates/OBS/01/01.md')
   })
 })

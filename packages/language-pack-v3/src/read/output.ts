@@ -191,6 +191,7 @@ function xtopicsOut(seg: Segment): Record<string, unknown> {
     strongs: c.strongs,
     ranges: c.ranges,
     chunks: c.chunks,
+    'obs-frames': c.obsFrames,
   }
 }
 

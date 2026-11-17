@@ -303,6 +303,7 @@ describe('tables a reader does not know (case 9)', () => {
     strongs: { 'per:abraham': ['H0085'] },
     ranges: { 'obs:10': [[2001001, 2001010]] },
     chunks: { gen: [[1001001, 1001005], [1001006, 1001031]] },
+    obsFrames: { '1:3': [[1001006, 1001008]] },
   }
 
   test('xtopics core: coverage, topics, occurrences, relations, strongs, ranges', async () => {
@@ -314,9 +315,10 @@ describe('tables a reader does not know (case 9)', () => {
     expect(result.strongs).toEqual({ 'per:abraham': ['H0085'] })
     expect(result.ranges).toEqual({ 'obs:10': [[2001001, 2001010]] })
     expect(result.chunks).toEqual({ gen: [[1001001, 1001005], [1001006, 1001031]] })
-    const { relations: _r, strongs: _s, ranges: _g, chunks: _k, ...small } = xtCore
+    expect(result['obs-frames']).toEqual({ '1:3': [[1001006, 1001008]] })
+    const { relations: _r, strongs: _s, ranges: _g, chunks: _k, obsFrames: _f, ...small } = xtCore
     const bare = await out((await writeSegment(xtopicsSegment(small))).bytes)
-    expect([bare.relations, bare.strongs, bare.ranges, bare.chunks]).toEqual([undefined, undefined, undefined, undefined])
+    expect([bare.relations, bare.strongs, bare.ranges, bare.chunks, bare['obs-frames']]).toEqual([undefined, undefined, undefined, undefined, undefined])
   })
 
   test('xtopics part: occurrences as full verse ids', async () => {

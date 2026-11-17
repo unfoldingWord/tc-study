@@ -22,7 +22,7 @@
  * exists and written after the build. Without it nothing is read or written, and the report says so.
  *
  * With `--topics <dir>` (the sources folder: `tipnr/*.txt`, `theographic/{events,verses,people,places}.json`,
- * `en_obs/obs-repo/content/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
+ * `en_obs/obs-repo/content/NN.md`, `bsb_obs/<category>/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
  * segments are the same bytes with or without it.
  *
  * With `--ta-config <dir>` (what `fetch-ta-config.ts` writes: `<dir>/<resource key>/<manual>/config.yaml`) the `related` of the tA
@@ -91,7 +91,7 @@ export const USAGE =
   '  --map-lang   the language whose helps make the common map (default en; with no list for it, no common map)\n' +
   '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
   '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map\n' +
-  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language\n' +
+  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/, bsb_obs/): builds the xtopics and the topics of the language\n' +
   '  --sign-key   a PKCS#8 PEM file of an Ed25519 key: both catalogs this build writes are signed with it (segments are the same bytes; the key is read\n' +
   '               into memory and never printed or written)\n' +
   '  --ta-config  the folder fetch-ta-config wrote (<resource key>/<manual>/config.yaml): the related of the tA articles also has the ties\n' +
@@ -258,7 +258,7 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
   if (!existsSync(parts) || !statSync(parts).isDirectory()) throw new UsageError(`--parts: ${parts} is not a directory`)
 
   if (topics !== undefined) {
-    for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content')]) {
+    for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content'), join(topics, 'bsb_obs')]) {
       if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new UsageError(`--topics: ${dir} is not a directory`)
     }
     for (const name of ['events', 'verses', 'people', 'places']) {
@@ -298,10 +298,18 @@ function topicTexts(dir: string) {
   const obsDir = join(dir, 'en_obs', 'obs-repo', 'content')
   for (const f of readdirSync(obsDir)) if (/^\d\d\.md$/.test(f)) obs.set(Number(f.slice(0, 2)), text(join(obsDir, f)))
   const theo = (name: string): string => text(join(dir, 'theographic', `${name}.json`))
+  // bible-story-builder's OBS files (`bsb_obs/<category>/<story>.md`): the verses of each frame (`obs-frames`)
+  const frames = new Map<string, string>()
+  const bsb = join(dir, 'bsb_obs')
+  for (const cat of readdirSync(bsb).sort()) {
+    if (!/^\d\d$/.test(cat) || !statSync(join(bsb, cat)).isDirectory()) continue
+    for (const f of readdirSync(join(bsb, cat)).sort()) if (/^\d\d\.md$/.test(f)) frames.set(`${cat}/${f}`, text(join(bsb, cat, f)))
+  }
   return {
     tipnr: text(join(tipnrDir, tipnrFile)),
     theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') },
     obs,
+    frames,
   }
 }
 

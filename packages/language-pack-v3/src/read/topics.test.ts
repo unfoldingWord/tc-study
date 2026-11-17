@@ -36,6 +36,7 @@ const core: XtopicsCore = {
   strongs: { 'per:abraham': ['H0085', 'H0087'] },
   ranges: { 'obs:10': [[2_001_001, 2_001_010]] },
   chunks: { gen: [[1_001_001, 1_001_005], [1_001_006, 1_001_031]], tit: [[56_001_001, 56_001_003]] },
+  obsFrames: { '1:3': [[1_001_006, 1_001_008]], '48:10': [[58_009_011, 58_009_014], [43_001_029, 43_001_029]] },
 }
 const xpart: XtopicsPart = { part: 'gen', occurrences: new Map([['per:abraham', [1_011_026, 1_012_001, 1_012_004]]]) }
 
@@ -89,9 +90,23 @@ describe('xtopics round trips', () => {
     const { chunks: _c, ...rest } = core
     expect(view).toEqual(rest as XtopicsCore)
   })
+  test('a reader that does not know obs-frames skips the table', async () => {
+    const { bytes } = await writeSegment(xtopicsSegment(core))
+    const known = { ...XTOPICS_TABLES }
+    delete known['obs-frames']
+    const view = xtopicsView((await readSegment(bytes, { known })).seg) as XtopicsCore
+    const { obsFrames: _f, ...rest } = core
+    expect(view).toEqual(rest as XtopicsCore)
+  })
+  test('obs-frames keys are written in code point order ("1:10" before "1:2")', () => {
+    const seg = xtopicsSegment({ ...core, obsFrames: { '1:2': [[1_001_003, 1_001_005]], '1:10': [[1_002_001, 1_002_001]] } })
+    expect(Object.keys(body(seg, 'obs-frames'))).toEqual(['1:10', '1:2'])
+    expect(seg.h.tables['obs-frames']).toEqual([1, false])
+  })
   test('a core with no optional table', () => {
-    const small: XtopicsCore = { ...core, relations: undefined, strongs: undefined, ranges: undefined, chunks: undefined }
+    const small: XtopicsCore = { ...core, relations: undefined, strongs: undefined, ranges: undefined, chunks: undefined, obsFrames: undefined }
     delete small.chunks
+    delete small.obsFrames
     delete small.relations
     delete small.strongs
     delete small.ranges
@@ -178,6 +193,17 @@ describe('xtopicsView rejects', () => {
   test('chunks: a verse id of another book', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_001, 2_001_001]])))
   test('chunks: a key that is not a book', () => rejects((s) => (body(s, 'chunks').zzz = [[1_001_001, 1_001_002]])))
   test('chunks: a pair that is not two verse ids', () => rejects((s) => (body(s, 'chunks').gen = [[1_001_001]])))
+  test('obs-frames: an empty list', () => rejects((s) => (body(s, 'obs-frames')['1:3'] = [])))
+  test('obs-frames: backwards', () => rejects((s) => (body(s, 'obs-frames')['1:3'] = [[1_001_008, 1_001_006]])))
+  test('obs-frames: a key with a leading zero', () => rejects((s) => (body(s, 'obs-frames')['01:3'] = [[1_001_006, 1_001_008]])))
+  test('obs-frames: a key that is not a frame', () => rejects((s) => (body(s, 'obs-frames')['obs:1'] = [[1_001_006, 1_001_008]])))
+  test('obs-frames: story 51', () => rejects((s) => (body(s, 'obs-frames')['51:1'] = [[1_001_006, 1_001_008]])))
+  test('obs-frames: a pair that is not two verse ids', () => rejects((s) => (body(s, 'obs-frames')['1:3'] = [[1_001_006]])))
+  test('obs-frames: a part may not have it', () =>
+    rejects((s) => {
+      s.h.tables['obs-frames'] = [1, false]
+      s.t['obs-frames'] = { '1:3': [[1_001_006, 1_001_008]] }
+    }, xpart))
   test('ranges: a key not in topics', () => rejects((s) => (body(s, 'ranges')['per:zz'] = [[1_001_001, 1_001_002]])))
   test('ranges: an empty list', () => rejects((s) => (body(s, 'ranges')['obs:10'] = [])))
   test('ranges: backwards', () => rejects((s) => (body(s, 'ranges')['obs:10'] = [[2_001_010, 2_001_001]])))
@@ -254,6 +280,12 @@ describe('writers never emit what the view rejects', () => {
     expect(() => xtopicsSegment({ ...core, chunks: { gen: [[1_001_002, 1_001_001]] } })).toThrow()
     expect(() => xtopicsSegment({ ...core, chunks: { gen: [[1_001_001, 1_001_003], [1_001_003, 1_001_004]] } })).toThrow()
     expect(() => xtopicsSegment({ ...core, chunks: { gen: [[2_001_001, 2_001_002]] } })).toThrow()
+  })
+  test('obs-frames: empty, backwards, across books and a bad key throw', () => {
+    expect(() => xtopicsSegment({ ...core, obsFrames: { '1:3': [] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, obsFrames: { '1:3': [[1_001_008, 1_001_006]] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, obsFrames: { '1:3': [[1_050_026, 2_001_001]] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, obsFrames: { '01:3': [[1_001_006, 1_001_008]] } })).toThrow()
   })
   test('ranges: empty, backwards and bad ids throw', () => {
     expect(() => xtopicsSegment({ ...core, ranges: { 'obs:10': [] } })).toThrow()

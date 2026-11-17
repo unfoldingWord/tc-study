@@ -30,6 +30,7 @@ export const XTOPICS_TABLES: Record<string, number[]> = {
   occurrences: [1],
   ranges: [1],
   chunks: [1],
+  'obs-frames': [1],
 }
 
 /** The tables the `topics` reader knows. */
@@ -39,7 +40,7 @@ export const TOPICS_TABLES: Record<string, number[]> = {
   coverage: [1],
 }
 
-const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks']
+const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks', 'obs-frames']
 const TOPICS_CORE_ONLY = ['local', 'coverage'] // "names" is in both: a map in the core, verse lists in a part
 
 type Bad = (what: string) => never
@@ -213,8 +214,31 @@ function readXCore(seg: Segment): XtopicsCore {
     }
     core.chunks = out
   }
+  if (hasOwn(t, 'obs-frames')) {
+    const out: Record<string, [number, number][]> = {}
+    for (const [k, v] of Object.entries(table(t['obs-frames'], 'obs-frames', xbad))) {
+      if (!OBS_FRAME_KEY.test(k)) xbad(`obs-frames names ${JSON.stringify(k)}, which is not a frame "N:F"`)
+      if (!Array.isArray(v) || v.length === 0) xbad(`obs-frames[${JSON.stringify(k)}] is not a non-empty list`)
+      put(
+        out,
+        k,
+        v.map((pair) => {
+          if (!Array.isArray(pair) || pair.length !== 2 || !isVerseId(pair[0]) || !isVerseId(pair[1])) {
+            xbad(`obs-frames[${JSON.stringify(k)}] has a pair that is not two verse ids`)
+          }
+          const [a, b] = pair as [number, number]
+          if (a > b) xbad(`obs-frames[${JSON.stringify(k)}] has a range that runs backwards`)
+          return [a, b] as [number, number]
+        }),
+      )
+    }
+    core.obsFrames = out
+  }
   return core
 }
+
+/** A frame key of `obs-frames`: story 1 to 50 and frame 1 to 99, decimal, no leading zeros ("1:3"). */
+export const OBS_FRAME_KEY = /^(?:[1-9]|[1-4][0-9]|50):[1-9][0-9]?$/
 
 function readXPart(seg: Segment, part: string): XtopicsPart {
   checkPart(seg, part, xbad)

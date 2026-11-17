@@ -31,6 +31,12 @@ xtopics-core-tables = {
                                ; both ends are in one book, or that the verses exist in any original
   ? "chunks": { * book-code => [+ [verse-id, verse-id]] },  ; optional, v1; the sections of the English ULT (its \ts\* chunks), per book, in order: first and last verse of each, first <= last, no overlap, ascending.
                                ; Every verse id is of the book of the key. A book whose ULT has no \ts\* has no key
+  ? "obs-frames": { * tstr => [+ [verse-id, verse-id]] },  ; optional, v1; core only; the verses each Open Bible Stories frame
+                               ; tells, from bible-story-builder (fuentes.md). Key: the frame "N:F", story 1 to 50 and frame 1 to
+                               ; 99, decimal, no leading zeros ("1:3"); keys sorted by code point ("1:10" before "1:2"). Value: its
+                               ; verse ranges in the order of the source, first <= last. A frame that tells no verse has no key.
+                               ; A reader checks the key form and each pair as in "ranges"; the builder also keeps both ends of a
+                               ; range in one book
 }
 
 topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)
