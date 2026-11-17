@@ -185,7 +185,9 @@ macula-v2 = {
 ;     sorted most used first, ties by code point, counting every use in the book.
 ;   - What is left out: a tree leaf (a word or a piece) whose place cannot be found in this book's words, and a referring
 ;     word whose place cannot be found. Both are counted in the build report, per book. An antecedent the rule cannot fix is
-;     left empty (0), not left out.
+;     left empty (0), not left out. A third case (Ruling R8): a referent target whose verse is not valid (exactly one of x, y
+;     is 0, or the resolved verse has a 0) is left out, and counted in the build report as "N reference(s) with no valid
+;     verse: left out".
 ;   - After the leaves are dropped, a part left with no word or piece is dropped too, recursively (a part's children are
 ;     its remaining parts and leaves; a part with none goes), and it is counted with the sentence's dropped leaves. A
 ;     sentence left with no word or piece is dropped and counted. This is done before `lo` and `span` are computed, so a tree
