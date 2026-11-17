@@ -142,7 +142,7 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
           if (!Number.isSafeInteger(n) || n < 1_000_000 || n >= 67_000_000) throw new Error(`obs-frames: ${JSON.stringify(k)} has ${n}, which is not a verse id`)
         }
         if (a > b) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range that runs backwards`)
-        if (Math.floor(a / 1_000_000) !== Math.floor(b / 1_000_000)) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range across two books`)
+        if (Math.floor(a / 1000) !== Math.floor(b / 1000)) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range across two chapters`)
       }
       put(out, k, v.map(([a, b]) => [a, b]))
     }

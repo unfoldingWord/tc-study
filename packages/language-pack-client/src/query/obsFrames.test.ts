@@ -108,13 +108,6 @@ describe('framesAt', () => {
     expect((await framesAtQuery(r, 43_001_029)).data!.frames).toEqual([{ story: 48, frame: 10, verses: 7 }])
     expect((await framesAtQuery(r, 56_001_001)).data!.frames).toEqual([])
   })
-  test('a range across chapters counts 1000 and is still found', async () => {
-    const r = withFrames(await open(), { '1:1': [[1_001_031, 1_002_003]], '1:2': [[1_002_001, 1_002_002]] })
-    expect((await framesAtQuery(r, 1_002_002)).data!.frames).toEqual([
-      { story: 1, frame: 2, verses: 2 },
-      { story: 1, frame: 1, verses: 1000 },
-    ])
-  })
   test('the same core answers from the same index; a passage of two books or backwards is E_ARG', async () => {
     const r = withFrames(await open())
     expect((await framesAtQuery(r, 1_001_007)).data).toEqual((await framesAtQuery(r, 1_001_007)).data)

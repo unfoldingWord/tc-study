@@ -228,6 +228,7 @@ function readXCore(seg: Segment): XtopicsCore {
           }
           const [a, b] = pair as [number, number]
           if (a > b) xbad(`obs-frames[${JSON.stringify(k)}] has a range that runs backwards`)
+          if (Math.floor(a / 1000) !== Math.floor(b / 1000)) xbad(`obs-frames[${JSON.stringify(k)}] has a range across two chapters`)
           return [a, b] as [number, number]
         }),
       )

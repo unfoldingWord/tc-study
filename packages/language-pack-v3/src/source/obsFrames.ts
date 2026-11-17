@@ -13,9 +13,16 @@
  *
  * ## What fails the build
  *
- * A story whose frame count is not {@link OBS_FRAMES_PER_STORY}; a book code that is neither a format 3 book nor in
- * {@link BOOK_FIXES}; a piece that cannot be read; a verse past the end of its chapter (when `lastVerse` knows the chapter);
- * a range that runs backwards. A frame with no verse is left out and reported; so is every fix of {@link BOOK_FIXES}.
+ * Only a change of the source's shape: a story whose frame count is not {@link OBS_FRAMES_PER_STORY}, a picture twice or of story or
+ * frame 0, a tag before any picture, a book code that is neither a format 3 book nor in {@link BOOK_FIXES}, a piece that cannot be read.
+ *
+ * ## What is reported and left out
+ *
+ * A piece whose verses do not hold with the chapter lengths `lastVerse` gives (a verse past the end of its chapter, a range that runs
+ * backwards), or that needs a length the build does not have (a whole chapter, or a range across chapters, of a book it did not
+ * build): that piece is left out and named in the report, like the story references of `parseObsRefs`. A range across chapters is
+ * split at each chapter's end, so every range of the table is within one chapter. A frame left with no verse is left out and reported;
+ * so is every fix of {@link BOOK_FIXES}.
  */
 import { OBS_FRAMES_PER_STORY } from '../build/obsimg'
 import { BOOKS, verseId } from '../ids'
@@ -39,11 +46,13 @@ export function parseObsFrames(
   const frames = new Map<number, [number, number][]>() // story * 100 + frame
   let unchecked = 0
   const fixes = new Map<string, number>()
+  const dropped: string[] = []
   for (const [path, text] of [...files].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
     if (!path.endsWith('.md')) continue
     let current: number | undefined
     for (const m of text.matchAll(PICTURE)) {
       if (m[1] !== undefined) {
+        if (Number(m[1]) < 1 || Number(m[2]) < 1) throw new Error(`obs-frames: ${path}: the picture obs-en-${m[1]}-${m[2]}.jpg is not a frame (story and frame start at 1)`)
         current = Number(m[1]) * 100 + Number(m[2])
         if (frames.has(current)) throw new Error(`obs-frames: ${path}: the picture of ${key(current)} is there twice`)
         frames.set(current, [])
@@ -53,7 +62,7 @@ export function parseObsFrames(
       if (tag === '') continue
       if (current === undefined) throw new Error(`obs-frames: ${path}: [[ref:${tag}]] comes before any frame picture`)
       const where = `${path}, ${key(current)}, [[ref:${tag}]]`
-      frames.get(current)!.push(...rangesOf(tag, where, lastVerse, fixes, () => unchecked++))
+      frames.get(current)!.push(...rangesOf(tag, where, lastVerse, fixes, () => unchecked++, dropped))
     }
   }
   // The shape: every story with the frames OBS has
@@ -74,6 +83,7 @@ export function parseObsFrames(
     if (list.length === 0) empty.push(key(k))
     else out.set(key(k), list)
   }
+  for (const line of dropped) report.push(`obs-frames: left out: ${line}`)
   if (empty.length > 0) report.push(`obs-frames: ${empty.length} frames tell no verse and are left out: ${empty.join(', ')}`)
   for (const [from, n] of fixes) report.push(`obs-frames: the book code ${from.toUpperCase()} was read as ${BOOK_FIXES.get(from)} (${n} times)`)
   if (unchecked > 0) report.push(`obs-frames: ${unchecked} range ends are in chapters this build has no length for; they were not checked`)
@@ -88,11 +98,12 @@ function rangesOf(
   lastVerse: (book: string, chapter: number) => number | undefined,
   fixes: Map<string, number>,
   uncheckedOne: () => void,
+  dropped: string[],
 ): [number, number][] {
   const out: [number, number][] = []
   let book: string | undefined
   let chapter: number | undefined
-  for (const raw of tag.split(/[,;]/)) {
+  pieces: for (const raw of tag.split(/[,;]/)) {
     let piece = raw.trim()
     if (piece === '') throw new Error(`obs-frames: ${where}: an empty piece`)
     const b = BOOK_PIECE.exec(piece)
@@ -135,21 +146,46 @@ function rangesOf(
       const c1 = Number(n1)
       const c2 = Number(n3 ?? n1)
       const last = lastVerse(book, c2)
-      if (last === undefined) throw new Error(`obs-frames: ${where}: the whole chapter ${book} ${c2} needs its length, which this build does not have`)
+      chapter = c2
+      if (last === undefined) {
+        dropped.push(`${where}: the whole chapter ${book} ${c2} needs its length, which this build does not have`)
+        continue
+      }
       from = [c1, 1]
       to = [c2, last]
-      chapter = c2
     }
     for (const [c, v] of [from, to]) {
-      if (c < 1 || v < 1) throw new Error(`obs-frames: ${where}: ${book} ${c}:${v} is not a verse`)
+      if (c < 1 || v < 1) {
+        dropped.push(`${where}: ${book} ${c}:${v} is not a verse`)
+        continue pieces
+      }
       const last = lastVerse(book, c)
       if (last === undefined) uncheckedOne()
-      else if (v > last) throw new Error(`obs-frames: ${where}: ${book} ${c}:${v} is past the end of the chapter (${last})`)
+      else if (v > last) {
+        dropped.push(`${where}: ${book} ${c}:${v} is past the end of the chapter (${last})`)
+        continue pieces
+      }
     }
-    const a = verseId(book, from[0], from[1])
-    const z = verseId(book, to[0], to[1])
-    if (a > z) throw new Error(`obs-frames: ${where}: "${piece}" runs backwards`)
-    out.push([a, z])
+    if (verseId(book, from[0], from[1]) > verseId(book, to[0], to[1])) {
+      dropped.push(`${where}: "${piece}" runs backwards`)
+      continue
+    }
+    // A range across chapters is split at each chapter's end, so every range of the table is within one chapter
+    const split: [number, number][] = []
+    for (let c = from[0]; c <= to[0]; c++) {
+      const v1 = c === from[0] ? from[1] : 1
+      let v2 = to[1]
+      if (c < to[0]) {
+        const last = lastVerse(book, c)
+        if (last === undefined) {
+          dropped.push(`${where}: "${piece}" crosses the end of ${book} ${c}, whose length this build does not have`)
+          continue pieces
+        }
+        v2 = last
+      }
+      split.push([verseId(book, c, v1), verseId(book, c, v2)])
+    }
+    out.push(...split)
   }
   return out
 }

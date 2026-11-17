@@ -481,7 +481,12 @@ export const OBS_FRAMES_SOURCE = {
   title: 'Bible Story Builder: the verses of each Open Bible Stories frame',
   license: 'MIT',
   attribution:
-    'Bible Story Builder (https://github.com/bcv-commons/bible-story-builder), Copyright (c) 2024 unfoldingWord Box3, MIT License: Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. Changed: only the verse references of the OBS frames (templates/OBS at commit c07d45395d01b987c31f4e06871314f129c975e8) were read, as verse ids.',
+    'Bible Story Builder (https://github.com/bcv-commons/bible-story-builder), templates/OBS at commit c07d45395d01b987c31f4e06871314f129c975e8. ' +
+    'MIT License. Copyright (c) 2024 unfoldingWord Box3. ' +
+    'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: ' +
+    'The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. ' +
+    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. ' +
+    'Changed: only the verse references of the OBS frames were read, as verse ids, each range within one chapter.',
 } as const
 
 /** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */

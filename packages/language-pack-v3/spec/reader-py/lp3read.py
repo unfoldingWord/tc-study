@@ -1763,6 +1763,8 @@ def _decode_xtopics_core(p: Segment) -> dict:
             for x in v))
         if any(OBS_FRAME_KEY.fullmatch(k) is None for k in f):
             _bad()
+        if any(x[0] // 1000 != x[1] // 1000 for v in f.values() for x in v):
+            _bad()
         out["obs-frames"] = {k: [list(x) for x in v] for k, v in f.items()}
     return out
 

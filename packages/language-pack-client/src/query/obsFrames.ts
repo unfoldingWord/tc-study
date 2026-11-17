@@ -13,15 +13,12 @@ export const OBS_FRAMES_SOURCE = 'bcv-commons/bible-story-builder'
 /** One verse range of a frame: its book, its reference in that book (`1:6-8`), and its first and last verse ids. */
 export type FrameRange = { book: string; ref: string; first: number; last: number }
 export type FrameVersesData = { story: number; frame: number; ranges: FrameRange[]; source: typeof OBS_FRAMES_SOURCE }
-/** A frame that tells a verse: `verses` is how many verses all its ranges cover (a range across chapters counts 1000), the order's measure. */
+/** A frame that tells a verse: `verses` is how many distinct verses all its ranges cover, the order's measure. */
 export type FrameAt = { story: number; frame: number; verses: number }
 export type FramesAtData = { first: number; last: number; frames: FrameAt[]; source: typeof OBS_FRAMES_SOURCE }
 
 type Index = { size: Map<string, number>; byVerse: Map<number, string[]> }
 const indexes = new WeakMap<XtopicsCore, Index>()
-
-/** How many verses a range covers: exact in one chapter; a range across chapters counts 1000 (the reader has no chapter lengths). */
-const span = (a: number, b: number): number => (Math.floor(a / 1000) === Math.floor(b / 1000) ? b - a + 1 : 1000)
 
 function indexOf(core: XtopicsCore): Index {
   let ix = indexes.get(core)
@@ -29,16 +26,10 @@ function indexOf(core: XtopicsCore): Index {
   const size = new Map<string, number>()
   const byVerse = new Map<number, string[]>()
   for (const [key, list] of Object.entries(core.obsFrames ?? {})) {
+    // Every range is within one chapter (the table's rule), so its verse ids are consecutive
     const seen = new Set<number>()
-    let crossing = 0
-    for (const [a, b] of list) {
-      if (span(a, b) === 1000) {
-        crossing += 1000
-        continue
-      }
-      for (let v = a; v <= b; v++) seen.add(v)
-    }
-    size.set(key, seen.size + crossing)
+    for (const [a, b] of list) for (let v = a; v <= b; v++) seen.add(v)
+    size.set(key, seen.size)
     for (const v of seen) {
       const at = byVerse.get(v)
       if (at === undefined) byVerse.set(v, [key])
@@ -106,10 +97,6 @@ export async function framesAtQuery(reader: PackReader, first: number, last: num
   if (last - first < 200_000) {
     for (let v = first; v <= last; v++) for (const k of ix.byVerse.get(v) ?? []) keys.add(k)
   } else for (const [v, at] of ix.byVerse) if (v >= first && v <= last) for (const k of at) keys.add(k)
-  // Frames whose range crosses chapters are not in byVerse: look at them directly
-  for (const [k, list] of Object.entries(core.obsFrames ?? {})) {
-    if (list.some(([a, b]) => span(a, b) === 1000 && a <= last && b >= first)) keys.add(k)
-  }
   const frames = [...keys]
     .map((k) => ({ ...keyOf(k), verses: ix.size.get(k)! }))
     .sort((x, y) => x.verses - y.verses || x.story - y.story || x.frame - y.frame)

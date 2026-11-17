@@ -259,7 +259,10 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
 
   if (topics !== undefined) {
     for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content'), join(topics, 'bsb_obs')]) {
-      if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new UsageError(`--topics: ${dir} is not a directory`)
+      if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+        const hint = dir.endsWith('bsb_obs') ? ' (a sources folder fetched before the OBS frame map: run fetch-topic-sources again)' : ''
+        throw new UsageError(`--topics: ${dir} is not a directory${hint}`)
+      }
     }
     for (const name of ['events', 'verses', 'people', 'places']) {
       const file = join(topics, 'theographic', `${name}.json`)

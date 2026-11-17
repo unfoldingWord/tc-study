@@ -33,10 +33,11 @@ xtopics-core-tables = {
                                ; Every verse id is of the book of the key. A book whose ULT has no \ts\* has no key
   ? "obs-frames": { * tstr => [+ [verse-id, verse-id]] },  ; optional, v1; core only; the verses each Open Bible Stories frame
                                ; tells, from bible-story-builder (fuentes.md). Key: the frame "N:F", story 1 to 50 and frame 1 to
-                               ; 99, decimal, no leading zeros ("1:3"); keys sorted by code point ("1:10" before "1:2"). Value: its
-                               ; verse ranges in the order of the source, first <= last. A frame that tells no verse has no key.
-                               ; A reader checks the key form and each pair as in "ranges"; the builder also keeps both ends of a
-                               ; range in one book
+                               ; 99, decimal, no leading zeros ("1:3"); the map in the deterministic order of container.md, like every
+                               ; map ("1:2" before "1:10": the shorter encoding first). Value: its
+                               ; verse ranges in the order of the source, first <= last, both in one chapter (the builder splits a
+                               ; range of the source that crosses chapters). A frame that tells no verse has no key. A reader
+                               ; checks the key form, each pair as in "ranges", and that both ends are in one chapter
 }
 
 topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)

@@ -843,6 +843,7 @@ describe('buildCommon: the xtopics unit', () => {
     const resource = (await catalogOf(withFrames.catalog)).resources.find((r) => r.key === OBS_FRAMES_SOURCE.key) as { license?: string; attribution?: string } | undefined
     expect(resource?.license).toBe('MIT')
     expect(resource?.attribution).toContain('Copyright (c) 2024 unfoldingWord Box3')
+    expect(resource?.attribution).toContain('OTHER DEALINGS IN THE SOFTWARE.')
     expect(withFrames.report).toContain('topics: obs-frames: 1 frames tell no verse and are left out: 27:11')
     // every other segment (the xtopics parts too) is the same bytes and inputs as a build without the files
     const rest = (b: { segments: BuiltSegment[] }) => b.segments.filter((s) => !(s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')).map((s) => [s.id, s.inputs, hex(s.bytes)])
