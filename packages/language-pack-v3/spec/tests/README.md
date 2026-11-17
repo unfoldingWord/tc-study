@@ -221,7 +221,7 @@ Piece 0 is the ellipsis, piece 1 is the original word 5, piece 2 is a word the o
 | `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; the argument of an event is the string `seps[arg]`, with **no** `- 1` (the number 0 is a string of `seps` too, and `"close"` has `""` as in a book) | never |
 | `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes (an empty map counts as a node with attributes, as in a book) |
 | `macula` | object | `macula` | the table is not in the file or not read |
-| `macula.v` | integer | the table's version in the header (`tables.macula[0]`): 1 or 2. The output of a v1 table gains `v: 1` too (the reader and the Python reader add it in the tasks that follow) | the table is not in the file or not read |
+| `macula.v` | integer | the table's version in the header (`tables.macula[0]`): 1 or 2. The output of a v1 table gains `v: 1` too | the table is not in the file or not read |
 | `macula.release` | text | `macula.release` | never |
 | `macula.trees`, `.referents` (v1) | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
 | `macula.trees` (v2) | list of `{lo, hi, tree}` | one per sentence, in the file's order: `lo` its lowest word position, `hi` = `lo + span`, `tree` the decoded `nodes` entry | the file lacks `trees` |
@@ -449,10 +449,19 @@ types, these are `E_BODY` too:
     has more than one root; a tree whose root is a word or a piece (the root must be a part), or a part with 0 children;
     `span > n - 1`, or `lo > n - 1 - span` (`n` the number of rows of `words`; so `lo + span` is below `n`, tested without overflow); a word or a piece whose position is outside `lo .. lo + span` or outside the book's words (`0 .. n - 1`).
     A reader does not require `lo` and `span` to be the exact lowest and highest leaf. A node deeper than 64 levels (a
-    part or a leaf counts as a node; the root is level 1).
+    part or a leaf counts as a node; the root is level 1) is `E_BODY`, not `E_LIMIT`: the nodes are uvarint bytes, not
+    CBOR nesting. An empty `nodes` entry and a negative `lo` are `E_BODY` too. A leaf outside `lo .. lo + span` is also
+    outside the book's words when the range check of `lo` and `span` fails, so that part follows from the range check
+    (keep both checks).
+    The tables are checked when the segment is opened: the shapes of `lo`, `span`, `nodes`, `labels` and `pieces`, and the
+    ranges of `lo` and `span`. The bytes of one tree (cut short, leftover bytes, a label or piece out of range, a leaf
+    outside `lo .. lo + span`, a part with 0 children, depth) may be checked when that sentence is read, not when the
+    segment is opened. The conformance output decodes every tree, so the output is the same.
   - `referents`: the columns of `cols` with unequal numbers of rows; an index outside `kinds`, `pieces` or `ents`; a word
     position outside the book's words; `ch` or `vs` equal to 0; `ante` above the number of the book's words (it is a
     position + 1, so the largest allowed is `n`).
+  - A missing key of the v2 tables or a missing column is `E_BODY`. An `ents` entry that is not `[text, text]` is `E_BODY`.
+    An unknown key in `cols` is ignored.
   - A uvarints or deltas column follows the rules of "Columns" above.
 - **`obs`.** A help row whose story is outside 1 to 50 or whose frame is outside 0 to 99; a story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
   table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is

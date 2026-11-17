@@ -159,6 +159,10 @@ macula-v2 = {
 ; "words" (ids.md, Positions in the original).
 ;
 ; Builder rules (a reader checks none of them; it checks only the E_BODY list of tests/README.md).
+;   - Which verse a word is in (trees and referents): the `chapter` and `verse` events of "text" are read in order. A label gives
+;     its number by its leading digits (`13-14` is 13, `1a` is 1). A `chapter` event resets the verse to 0. Words before the
+;     first `verse` event of a chapter are in verse 0: it has no ch:vs, so the targets there are left out (see "What is left
+;     out"). A verse that appears in two runs is the first run: the words of the second run are not found by ch:vs.
 ;   - A row of "referents" is one reference of one word: the word at the position given by the running sum of "word",
 ;     the kind, the piece ("" when the whole word refers) and the entity "ents[ent]" that MACULA names for it. A word with
 ;     several references has several rows, in MACULA's order. Rows follow the book order of the referring word.
@@ -179,15 +183,17 @@ macula-v2 = {
 ;       none, or still several               0: the row is kept and the antecedent is left empty.
 ;     The rows with 0 are counted in the build report, per book. A reader that gets 0 still has "ch", "vs" and the
 ;     entity's form and Strong to show the antecedent.
-;   - "ents" holds each [form, strong] once, in the order of first use. The form is MACULA's text without the marks of the
+;   - "ents" holds each [form, strong] once, in the order the builder first meets them walking the published verses (not the
+;     order of the written rows). The form is MACULA's text without the marks of the
 ;     chant, as v1's "words"; the Strong is a map key as ids.md says: the Hebrew part after the last ":" with its letter
 ;     suffix, the Greek in five digits; a Strong that is neither is "". The other tables ("labels", "pieces", "kinds") are
 ;     sorted most used first, ties by code point, counting every use in the book.
 ;   - What is left out: a tree leaf (a word or a piece) whose place cannot be found in this book's words, and a referring
 ;     word whose place cannot be found. Both are counted in the build report, per book. An antecedent the rule cannot fix is
-;     left empty (0), not left out. A third case (Ruling R8): a referent target whose verse is not valid (exactly one of x, y
+;     left empty (0), not left out. A third case: a referent target whose verse is not valid (exactly one of x, y
 ;     is 0, or the resolved verse has a 0) is left out, and counted in the build report as "N reference(s) with no valid
-;     verse: left out".
+;     verse: left out". A fourth: a sentence whose kept tree is deeper than 64 levels is left out and counted, with the
+;     report line `MACULA trees: N sentence(s) deeper than 64 levels: left out of the trees`.
 ;   - After the leaves are dropped, a part left with no word or piece is dropped too, recursively (a part's children are
 ;     its remaining parts and leaves; a part with none goes), and it is counted with the sentence's dropped leaves. A
 ;     sentence left with no word or piece is dropped and counted. This is done before `lo` and `span` are computed, so a tree

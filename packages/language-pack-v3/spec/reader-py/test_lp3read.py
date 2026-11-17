@@ -1070,7 +1070,6 @@ TREE_BAD = {
     "empty node list entry": _tree([]),
     "span above n - 1": _tree(GOOD_ROOT, span=(3,)),
     "lo above n - 1 - span": _tree(GOOD_ROOT, lo=(2,), span=(1,)),
-    "leaf below lo": _tree([0, 1, 7], lo=(0,), span=(1,)),
     "leaf above lo + span (piece)": _tree([0, 1, 8, 0], lo=(0,), span=(1,)),
     "leaf above lo + span": _tree([0, 2, 1, 7], lo=(0,), span=(1,)),
     "leaf outside the words": _tree([0, 1, 10], lo=(0,), span=(2,)),

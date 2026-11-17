@@ -95,7 +95,7 @@ prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.jso
 | `originals-tit.langpack.zip` | 29 827 | `ee3ca9d4706d7851df503541ab2047554af989d7c345b126019bdbf9f87302c6` | made here by `spec/tests/build-originals-fixture.ts` from the UGNT part: format 1.1 originals pack whose manifest lists no `books`, with a `catalog.json` holding the UGNT's catalog row from `originals/list.json` |
 | `originals-rut.langpack.zip` | 9 504 | `bfbbd091f22ca28e738e36fc89d2b45a6917152b8876b6c8042dabdaa8a61db8` | made by `spec/tests/build-originals-rut-fixture.ts` from the real `originals.langpack.zip` of `prepare-language` (es-419 run of 2026-10-27, `parts-real/originals.langpack.zip` on the maintainer's PC): Ruth 1:1-5 of the UHB and the MACULA Hebrew rows of Ruth |
 
-Total: 1 597 673 bytes in 20 files.
+Total: 1 912 333 bytes in 29 files.
 
 ## Not copied
 
