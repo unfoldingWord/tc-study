@@ -221,8 +221,21 @@ Piece 0 is the ellipsis, piece 1 is the original word 5, piece 2 is a word the o
 | `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; the argument of an event is the string `seps[arg]`, with **no** `- 1` (the number 0 is a string of `seps` too, and `"close"` has `""` as in a book) | never |
 | `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes (an empty map counts as a node with attributes, as in a book) |
 | `macula` | object | `macula` | the table is not in the file or not read |
+| `macula.v` | integer | the table's version in the header (`tables.macula[0]`): 1 or 2. The output of a v1 table gains `v: 1` too | the table is not in the file or not read |
 | `macula.release` | text | `macula.release` | never |
-| `macula.trees`, `.referents` | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
+| `macula.trees`, `.referents` (v1) | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
+| `macula.trees` (v2) | list of `{lo, hi, tree}` | one per sentence, in the file's order: `lo` its lowest word position, `hi` = `lo + span`, `tree` the decoded `nodes` entry | the file lacks `trees` |
+| `macula.referents` (v2) | list of `{word, kind, piece, form, strong, ch, vs, ante?}` | one per row of `referents.cols`, in the file's order | the file lacks `referents` |
+
+**`macula` v2.** All numbers (`lo`, `hi`, positions, `ch`, `vs`, `ante`) are output as integers, never as decimal strings. `tree` is `[label, ...children]`: `label` is the text of `trees.labels` (`"v"`, `"s*"`, `"*"`, `"&"`), a child
+is a tree again, a word is its position (an integer) and a piece of a word is `[position, text]` (`text` from `trees.pieces`).
+A leaf is never confused with a part: a part is a list whose first item is text, a piece is a list whose first item is an
+integer, a word is an integer. In a row, `word` is the referring word's position (the deltas of `cols.word` added up), `kind`
+is the text of `referents.kinds` (`"r"`, `"s"`, `"c"`, `"a"`, `"p"`, `"o"`), `piece` the text of `referents.pieces` (`""` when the
+whole word refers), `form` and `strong` the entity's two texts, `ch` and `vs` the numbers as the file has them, and
+`ante` the antecedent's position, that is `cols.ante - 1`, **absent** when `cols.ante` is 0 (an absent value is an absent
+key). Example, an illustration with the positions of Jonah 1:1 counted from 0 (ויהי 0, דבר 1, יהוה 2, אל 3, יונה 4, בן 5, אמתי 6, לאמר 7): `{"word": 7, "kind": "s", "piece": "", "form": "יוֹנָה", "strong": "H3124", "ch": 1, "vs": 1, "ante": 4}`.
+The root of a `tree` is always a part, and a part always has at least one child (a part with 0 children is `E_BODY`, so `[label]` alone is not output). The reader gives v1 and v2 the way each is stored; it does not turn one into the other.
 
 Example: `{"form": "Παῦλος", "lemma": "Παῦλος", "morph": "Gr,N,,,,,NMS,", "strong": "G39720"}`. The word at position `n` is
 `words[n]`. There is one word piece per word, in order, so `pieces` lists every word's form once.
@@ -429,7 +442,27 @@ types, these are `E_BODY` too:
   `missing` entry that names a piece that does not exist, has a position, or is listed twice (in either list); a `-1`
   position of a quote that is in neither list (every `-1` is in exactly one of `quoteKinds` and `quoteMissing`).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
-  are not as many as the words; `macula.release` that is not text.
+  are not as many as the words; `macula.release` that is not text. A `macula` table of a version other than 1 and 2 is
+  skipped (`container.md`), it is not `E_BODY`. For `macula` v2:
+  - `trees`: `lo`, `span` and `nodes` with different numbers of sentences; an index outside `trees.labels` or `trees.pieces`;
+    a tree that is cut short (the list ends before the children it announced), that has bytes left after its root, or that
+    has more than one root; a tree whose root is a word or a piece (the root must be a part), or a part with 0 children;
+    `span > n - 1`, or `lo > n - 1 - span` (`n` the number of rows of `words`; so `lo + span` is below `n`, tested without overflow); a word or a piece whose position is outside `lo .. lo + span` or outside the book's words (`0 .. n - 1`).
+    A reader does not require `lo` and `span` to be the exact lowest and highest leaf. A node deeper than 64 levels (a
+    part or a leaf counts as a node; the root is level 1) is `E_BODY`, not `E_LIMIT`: the nodes are uvarint bytes, not
+    CBOR nesting. An empty `nodes` entry and a negative `lo` are `E_BODY` too. A leaf outside `lo .. lo + span` is also
+    outside the book's words when the range check of `lo` and `span` fails, so that part follows from the range check
+    (keep both checks).
+    The tables are checked when the segment is opened: the shapes of `lo`, `span`, `nodes`, `labels` and `pieces`, and the
+    ranges of `lo` and `span`. The bytes of one tree (cut short, leftover bytes, a label or piece out of range, a leaf
+    outside `lo .. lo + span`, a part with 0 children, depth) may be checked when that sentence is read, not when the
+    segment is opened. The conformance output decodes every tree, so the output is the same.
+  - `referents`: the columns of `cols` with unequal numbers of rows; an index outside `kinds`, `pieces` or `ents`; a word
+    position outside the book's words; `ch` or `vs` equal to 0; `ante` above the number of the book's words (it is a
+    position + 1, so the largest allowed is `n`).
+  - A missing key of the v2 tables or a missing column is `E_BODY`. An `ents` entry that is not `[text, text]` is `E_BODY`.
+    An unknown key in `cols` is ignored.
+  - A uvarints or deltas column follows the rules of "Columns" above.
 - **`obs`.** A help row whose story is outside 1 to 50 or whose frame is outside 0 to 99; a story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
   table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is
   `flags`, or a `frame` column of another length than `n`.
@@ -502,6 +535,7 @@ The order of the checks between a defect in the container and one in a table is 
 | 20 | `transferencia-catalogo-local` (`local.tcpack`, `local.keys.json`) | A local catalog inside a transfer file, read with keys (`transfer.md`, "Receiving", step 2) | A `full` transfer file whose only catalog is the local catalog of case 13 and which has no other entry; `made` "2026-11-01T10:00:00Z", `by` "build-cases 1"; the keys of case 16 | `E_SIGNATURE` (with no keys the file is accepted; the plain catalog file of case 13 is accepted with the keys) |
 | 21 | `articulos-relacionados` (`art.seg`) | The `related` of tA articles (`art.cddl`) | Four es-419 articles of `ta:translate`: the config of the manual says `figs-exmetaphor` and `bita-part1` depend on `figs-metaphor` (and `figs-exmetaphor` recommends `bita-part1`); the text of `figs-simetaphor` links to `figs-metaphor` | Every tie both ways, sorted: `figs-metaphor` has `bita-part1`, `figs-exmetaphor`, `figs-simetaphor`; `figs-simetaphor` has `figs-metaphor` |
 | 22 | `catalogo-parche` (`catalog.seg`) | A patch catalog (`catalog.md`, "Patch catalogs"): the optional `source` and `review` of a resource | The published catalog `hi-x-aquifer`: one resource `aquifer/hi/tn` with `source: "aquifer"` and `review: "none"`, one book unit `book:tit` (no text, one note) whose only need is `orig:tit`, and `requires` the common catalog | The catalog with the resource's `source` and `review` as written, and the unit `book:tit` with `needs` `["orig:tit"]` (no `map`, no `art:`) |
+| 23 | `macula-v2` (`orig-rut.seg`) | The MACULA trees and referents of `orig`, version 2 (`orig.cddl`, `macula`) | Ruth 1:1-5 of the UHB (`v3.0.0#2026-08-14T18_44_01Z`) with the real MACULA Hebrew rows of Ruth (`3b8aa380e8#2026-10-15T02_19_35.000Z`), trimmed: `data/originals-rut.langpack.zip` (format 1.1 originals pack read by `zipSource`), built by `extractOrig` and `origSegment` | `macula.v` 2, the release stamp, 5 trees (one sentence per verse; no real sentence of the slice crosses a verse), 31 referent rows over verses 1:1 to 1:5: kinds `a`, `r` and `p`, targets in the same verse (`x,y = 0,0` in the source) and in another (1:4 and 1:5 point to 1:3), rows with `ante` and rows without. Both readers give the same output |
 
 Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).
 

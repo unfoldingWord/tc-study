@@ -134,6 +134,11 @@ The maps count Strong numbers by a key made from what the original publishes:
 
 A reader looking up `G5485` also tries `G54850`.
 
+The `macula` table of `orig` (v2, `cddl/orig.cddl`) uses both ideas: every word it names, a leaf of a tree or the word that
+refers, is a position of this book (the section above), not a verse and a place in the verse; and the Strong of the
+entities of its referents is a Strong key made as above. To fix an antecedent, `orig.cddl` compares the number of two
+Strongs (letter and digits, as that file says), not the whole key.
+
 ## Sections of articles
 
 A section id (`sid`) names a section within its article (`es-419_gl/es-419/tw/kt/grace#definition`). It is assigned

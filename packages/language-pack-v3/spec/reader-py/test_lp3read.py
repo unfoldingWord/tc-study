@@ -945,14 +945,14 @@ def orig_fixture(macula: str = "full"):
         "attrs": [[1, {"x": "y"}]],
     }
     if macula != "none":
-        h["tables"]["macula"] = [2 if macula == "unknown" else 1, False]
+        h["tables"]["macula"] = [3 if macula == "unknown" else 1, False]
         expected["h"] = header_h(h)
         if macula == "unknown":
             t["macula"] = {"future": 1}
         else:
             t["macula"] = {"release": "v1.2", "trees": {"b": b"\x01\xff", "a": [1, True, "x", {"k": -3}]},
                            "referents": [b"", 7]}
-            expected["macula"] = {"release": "v1.2", "trees": {"a": [1, True, "x", {"k": -3}], "b": "01ff"},
+            expected["macula"] = {"release": "v1.2", "v": 1, "trees": {"a": [1, True, "x", {"k": -3}], "b": "01ff"},
                                   "referents": ["", 7]}
     return build(h, t), expected, (h, t)
 
@@ -976,8 +976,161 @@ def test_orig_macula_unknown_is_skipped():
 def test_orig_macula_with_only_a_release():
     _, expected, (h, t) = orig_fixture()
     t["macula"] = {"release": "r"}
-    expected["macula"] = {"release": "r"}
+    expected["macula"] = {"release": "r", "v": 1}
     ok(build(h, t), expected)
+
+
+def test_orig_macula_unknown_version_is_skipped_and_segment_opens():
+    b, expected, _ = orig_fixture("unknown")
+    assert "macula" not in read_file(b.data)
+    ok(b, expected)
+
+
+# ---- macula v2 (3 words: positions 0, 1, 2) ----
+
+
+def macula2(**tables):
+    """orig_fixture's segment with a v2 macula table; ``tables`` overrides keys of the table."""
+    _, expected, (h, t) = orig_fixture("none")
+    h["tables"]["macula"] = [2, False]
+    t["macula"] = {"release": "r2"}
+    t["macula"].update(tables)
+    return expected, h, t
+
+
+def good_trees():
+    # labels: 0 "*", 1 "v"; pieces: 0 "ab"
+    # sentence 0: lo 0, span 2:  ["*", ["v", word 0, piece(1,"ab")], word 2]
+    n0 = uv([0, 2, 3, 2, 1, 5, 0, 7])
+    # sentence 1: lo 1, span 0: ["v", word 1]
+    n1 = uv([3, 1, 1])
+    return {"labels": ["*", "v"], "pieces": ["ab"], "lo": dl([0, 1]), "span": uv([2, 0]), "nodes": [n0, n1]}
+
+
+def test_macula_v2_trees_and_referents():
+    expected, h, t = macula2(
+        trees=good_trees(),
+        referents={"ents": [["Θεοῦ", "G23160"], ["x", ""]], "kinds": ["r", "s"], "pieces": ["", "ou"],
+                   "cols": {"word": uv([1, 1]), "kind": uv([0, 1]), "piece": uv([0, 1]), "ent": uv([0, 1]),
+                            "ch": uv([1, 1]), "vs": uv([1, 2]), "ante": uv([3, 0])}})
+    expected["h"] = header_h(h)
+    expected["macula"] = {"release": "r2", "v": 2, "trees": [
+        {"lo": 0, "hi": 2, "tree": ["*", ["v", 0, [1, "ab"]], 2]},
+        {"lo": 1, "hi": 1, "tree": ["v", 1]}],
+        "referents": [
+            {"word": 1, "kind": "r", "piece": "", "form": "Θεοῦ", "strong": "G23160", "ch": 1, "vs": 1, "ante": 2},
+            {"word": 2, "kind": "s", "piece": "ou", "form": "x", "strong": "", "ch": 1, "vs": 2}]}
+    ok(build(h, t), expected)
+
+
+def test_macula_v2_only_release():
+    expected, h, t = macula2()
+    expected["h"] = header_h(h)
+    expected["macula"] = {"release": "r2", "v": 2}
+    ok(build(h, t), expected)
+
+
+def test_macula_v2_empty_tables():
+    expected, h, t = macula2(
+        trees={"labels": [], "pieces": [], "lo": b"", "span": b"", "nodes": []},
+        referents={"ents": [], "kinds": [], "pieces": [], "cols": {c: b"" for c in
+                   ("word", "kind", "piece", "ent", "ch", "vs", "ante")}})
+    expected["h"] = header_h(h)
+    expected["macula"] = {"release": "r2", "v": 2, "trees": [], "referents": []}
+    ok(build(h, t), expected)
+
+
+def _tree(nodes, lo=(0,), span=(2,), labels=("*", "v"), pieces=("ab",)):
+    return {"labels": list(labels), "pieces": list(pieces), "lo": dl(list(lo)), "span": uv(list(span)),
+            "nodes": [uv(nodes)] if nodes is not None else []}
+
+
+GOOD_ROOT = [0, 2, 1, 4]          # ["*", word 0, word 1]
+
+
+def _deep(levels):
+    nodes = []
+    for _ in range(levels - 1):
+        nodes += [0, 1]
+    return nodes + [1]
+
+
+TREE_BAD = {
+    "lo/span/nodes of different lengths": dict(_tree(GOOD_ROOT), span=uv([2, 0])),
+    "label outside labels": _tree([6, 2, 1, 4]),
+    "piece outside pieces": _tree([0, 1, 2, 1]),
+    "tree cut short": _tree([0, 3, 1, 4]),
+    "part count missing": _tree([0]),
+    "bytes left after the root": _tree(GOOD_ROOT + [1]),
+    "second root": _tree(GOOD_ROOT + [0, 1, 1]),
+    "root is a word": _tree([1]),
+    "root is a piece": _tree([2, 0]),
+    "part with 0 children": _tree([0, 0]),
+    "inner part with 0 children": _tree([0, 2, 1, 3, 0]),
+    "empty node list entry": _tree([]),
+    "span above n - 1": _tree(GOOD_ROOT, span=(3,)),
+    "lo above n - 1 - span": _tree(GOOD_ROOT, lo=(2,), span=(1,)),
+    "leaf above lo + span (piece)": _tree([0, 1, 8, 0], lo=(0,), span=(1,)),
+    "leaf above lo + span": _tree([0, 2, 1, 7], lo=(0,), span=(1,)),
+    "leaf outside the words": _tree([0, 1, 10], lo=(0,), span=(2,)),
+    "negative lo": _tree(GOOD_ROOT, lo=(-1,)),
+    "label too deep (65 levels)": _tree(_deep(65), span=(2,)),
+    "pieces not text": dict(_tree(GOOD_ROOT), pieces=[1]),
+    "nodes not bytes": dict(_tree(GOOD_ROOT), nodes=["x"]),
+    "span not minimal": dict(_tree(GOOD_ROOT), span=b"\x82\x00"),
+}
+
+
+@pytest.mark.parametrize("name", list(TREE_BAD))
+def test_macula_v2_trees_defects_are_e_body(name):
+    _, h, t = macula2(trees=TREE_BAD[name])
+    err(build(h, t).data, "E_BODY")
+
+
+def test_macula_v2_tree_of_64_levels_is_valid():
+    expected, h, t = macula2(trees=_tree(_deep(64), span=(0,)))
+    r = read_file(build(h, t).data)
+    assert len(r["macula"]["trees"]) == 1
+
+
+def test_macula_v2_inexact_lo_span_is_valid():
+    expected, h, t = macula2(trees=_tree([0, 1, 4], lo=(0,), span=(2,)))
+    r = read_file(build(h, t).data)
+    assert r["macula"]["trees"][0] == {"lo": 0, "hi": 2, "tree": ["*", 1]}
+
+
+def _refs(**over):
+    cols = {"word": uv([0]), "kind": uv([0]), "piece": uv([0]), "ent": uv([0]), "ch": uv([1]), "vs": uv([1]),
+            "ante": uv([0])}
+    cols.update(over)
+    return {"ents": [["a", "H1"]], "kinds": ["r"], "pieces": [""], "cols": cols}
+
+
+REF_BAD = {
+    "unequal columns": _refs(vs=uv([1, 1])),
+    "kind outside": _refs(kind=uv([1])),
+    "piece outside": _refs(piece=uv([1])),
+    "ent outside": _refs(ent=uv([1])),
+    "word outside the words": _refs(word=uv([3])),
+    "ch 0": _refs(ch=uv([0])),
+    "vs 0": _refs(vs=uv([0])),
+    "ante above n": _refs(ante=uv([4])),
+    "missing column": {k: v for k, v in _refs().items() if k != "cols"},
+    "ents not pairs": dict(_refs(), ents=[["a"]]),
+    "cut short column": _refs(word=b"\x80"),
+}
+
+
+@pytest.mark.parametrize("name", list(REF_BAD))
+def test_macula_v2_referents_defects_are_e_body(name):
+    _, h, t = macula2(referents=REF_BAD[name])
+    err(build(h, t).data, "E_BODY")
+
+
+def test_macula_v2_referent_ante_n_is_valid():
+    expected, h, t = macula2(referents=_refs(ante=uv([3])))
+    r = read_file(build(h, t).data)
+    assert r["macula"]["referents"][0]["ante"] == 2
 
 
 def test_orig_no_attrs_when_the_list_is_empty():

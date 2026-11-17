@@ -300,7 +300,9 @@ export async function buildLanguage(o: {
       continue
     }
     const issues: string[] = []
-    const orig = await extractOrig(source, book)
+    const origIssues: string[] = []
+    const orig = await extractOrig(source, book, origIssues, { macula: o.withOrig === true })
+    if (o.withOrig === true) issues.push(...origIssues)
     origs.set(book, orig)
     // The rows `extractBook` reads are the ones the inputs name: they are read once.
     const read: RowKey[] = []
@@ -558,8 +560,11 @@ export async function buildCommon(o: {
   const used = new Set<string>()
   const origs: OrigModel[] = []
   const origRows = new Map<string, RowKey[]>()
+  const origReport: string[] = []
   for (const book of books) {
-    const orig = await extractOrig(o.source, book)
+    const bookIssues: string[] = []
+    const orig = await extractOrig(o.source, book, bookIssues)
+    origReport.push(...bookIssues.map((line) => `book ${book}: ${line}`))
     origs.push(orig)
     const having = refs.filter((ref) => ref.books.includes(book))
     const rows: RowKey[] = []
@@ -571,7 +576,7 @@ export async function buildCommon(o: {
     for (const ref of having) used.add(ref.key)
   }
 
-  const report: string[] = []
+  const report: string[] = [...origReport]
   const listed = [...refs]
   const lang = o.mapLang
   if (lang !== undefined && origs.length === 0) report.push(`no original was built, so the xmap of ${lang} is not built: the publisher needs the originals`)

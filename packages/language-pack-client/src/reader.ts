@@ -247,7 +247,13 @@ export function makeReader(o: ReaderInput): PackReader {
 
   async function single<T>(unit: string, view: (seg: Segment) => T): Promise<T | undefined> {
     const seg = (await segments(unit))?.[0]
-    return seg === undefined ? undefined : viewOf(unit, 0, seg, view)
+    const v = seg === undefined ? undefined : viewOf(unit, 0, seg, view)
+    // A book or an original is cached as its view only: the segment's bytes are not held twice. A later `segments(unit)` reads again.
+    if (v !== undefined && (unit.startsWith('book:') || unit.startsWith('orig:'))) {
+      unitSegments.delete(unit)
+      segCache.delete(`${unit.split(':')[0]}:${activeIds.get(unit)![0]}`)
+    }
+    return v
   }
 
   const VIEWS = { xmap: xmapView, map: mapView, xtopics: xtopicsView, topics: topicsView } as const

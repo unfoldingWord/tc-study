@@ -362,7 +362,9 @@ describe('tables a reader does not know (case 9)', () => {
     expect(Object.keys(KNOWN.lex)).toEqual(['entries'])
     expect(Object.keys(KNOWN.obs).sort()).toEqual(['links', 'notes', 'questions', 'stories', 'strings', 'study-notes', 'study-questions'])
     expect(Object.keys(KNOWN.catalog).sort()).toEqual(['about', 'complements', 'requires', 'resources', 'segments', 'units'])
-    for (const versions of Object.values(KNOWN).flatMap((tables) => Object.values(tables))) expect(versions).toEqual([1])
+    for (const [cls, tables] of Object.entries(KNOWN)) {
+      for (const [name, versions] of Object.entries(tables)) expect(versions).toEqual(cls === 'orig' && name === 'macula' ? [1, 2] : [1])
+    }
   })
 })
 
@@ -702,8 +704,8 @@ describe('the sample (es-419 Titus)', () => {
     seg.h.tables.macula = [1, false]
     seg.t.macula = { release: 'r1', trees: { 9: new Uint8Array([1, 255]), 10: [2], b: { z: true } } }
     const result = await out((await writeSegment(seg)).bytes)
-    expect(result.macula).toEqual({ release: 'r1', trees: { 9: '01ff', 10: [2], b: { z: true } } })
-    expect(canonicalJson(result.macula)).toBe('{"release":"r1","trees":{"10":[2],"9":"01ff","b":{"z":true}}}')
+    expect(result.macula).toEqual({ release: 'r1', v: 1, trees: { 9: '01ff', 10: [2], b: { z: true } } })
+    expect(canonicalJson(result.macula)).toBe('{"release":"r1","trees":{"10":[2],"9":"01ff","b":{"z":true}},"v":1}')
   })
 
   test('a segment of a class the reader does not read is E_TABLE in a transfer file, even when all its tables are optional', async () => {
