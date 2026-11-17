@@ -1,7 +1,7 @@
 ; Format 3: the Open Bible Stories pictures. One segment per story, in the catalog "zxx-obsimg" (catalog.md, "Catalogs with no
 ; linguistic content"). The pictures are the same for every language, so the header names the catalog and no resource. A reader never
 ; decodes an image: it hands the bytes and the media type on. Each segment carries the credit, so that one story read alone has it.
-; The image bytes barely compress; the segment is still deflate-raw like every segment (a story is about 100 to 600 KB).
+; The image bytes barely compress; the segment is still deflate-raw like every segment (a story is about 200 to 700 KB).
 
 obsimg-segment = body<obsimg-header, obsimg-tables>
 
