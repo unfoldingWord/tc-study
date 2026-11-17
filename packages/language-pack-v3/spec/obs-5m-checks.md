@@ -1,6 +1,6 @@
 # OBS Five Movements: build checks (draft, phase 0)
 
-Status: draft for review. Nothing builds these tables yet. The tables are in `cddl/obs.cddl` ("DRAFT: OBS Five
+Status: draft for review. Nothing builds these tables yet. The format rules (order, columns, ids) are in `cddl/obs.cddl`. The tables are in `cddl/obs.cddl` ("DRAFT: OBS Five
 Movements"). Measured against `unfoldingWord/en_obs-tf` v4 and `unfoldingWord/en_obs` v9 on 16 Nov 2026.
 
 ## Sources of truth
@@ -9,7 +9,7 @@ Movements"). Measured against `unfoldingWord/en_obs-tf` v4 and `unfoldingWord/en
   the images.
 - The OBS Theological Formation resource (OBS-TF) supplies only its own content, keyed by frame (story × 100 + frame).
   Every question is kept, also those that match OBS tQ.
-- Frame text from OBS-TF goes in `tf-frames` only for a frame the `obs` resource lacks. It names its origin there.
+- Frame text from OBS-TF goes in `tf-frames` only for a frame the `obs` resource lacks. The table's `res` names the resource it comes from.
 
 ## What the build reads
 
@@ -48,25 +48,25 @@ differently keeps the published label in `refText` (for example `43-03, 44-04, �
 ## Checks
 
 Fail the build (an error):
-1. A story's frame headers, after the correspondence, are not the frames of the `obs` story, in the same order. The
+1. A story's frame headers, after the correspondence, are not the frames of the `obs` story, in the same order. A label may cover several OBS frames (story 21: the header `21-13` covers OBS 13 and 14): the frames it covers are taken in order, and the text under that header is compared as one text with the joined text of those frames. The
    exception is the approved fallback: a story or a frame that the `obs` resource lacks entirely goes in `tf-frames`
-   with its origin, and is not a mismatch. A frame that `obs` has under another number is a mismatch, never a fallback.
+   (its `res` is the OBS-TF resource), and is not a mismatch. A frame that `obs` has under another number is a mismatch, never a fallback.
 2. A question, term or discourse reference names a frame that is neither in the `obs` story nor in `tf-frames`.
 3. A transclusion names a file or heading that does not exist.
 4. A heading that starts a part is unknown.
 
 Warn (the build goes on and the report lists each one):
-5. **Frame text.** Compare after normalizing quotes, dashes and white space. Report the count and the first difference
+5. **Frame text.** (The counts in 5 to 8 are results on v4, not limits.) Compare after normalizing quotes, dashes and white space. Report the count and the first difference
    per frame. v4 against v9: 62 frames with this normalization. The 07-10 typo «again., so» is one of them.
 6. **Titles and references.** Compare the same way. v4: story 32 has «and» where OBS has «&», story 34 has
    «13:18-21;18:9-14» and story 36 has «Luke9:28-36».
-7. **A missing part or list.** v4: story 33 has no drafting transclusion and no Personal Reflection (m3). Story 14 has
+7. **A missing part or list.** Every part is expected in every story, none is required to build. v4: story 33 has no drafting transclusion and no Personal Reflection (m3). Story 14 has
    an m3 heading but no Journal Reflection.
 8. **A term not found in its frame** (after normalizing). It is a hint only, not proof. v4: 11 terms. Each one matches
    its own frame better than any other, so none comes from a wrong frame. Most are ellipses or paraphrases («the older
    son...the younger son»); some are transcription slips worth reporting upstream: `38:8/4` repeats «all the sheep», and
    `48:9/1` runs two clauses together.
-9. **Versions.** The catalog lists both releases (`obs` v9, `obs-tf` v4). Warn when the `obs` release is newer than the
+9. **Versions.** The catalog lists both releases (`obs` v9, `obs-tf` v4). Warn when the `obs` release is newer (compare the integer after `v`: `v9` is 9, `en 9` is 9) than the
    `obs` version that OBS-TF's manifest gives as its source (`source: obs en 9`). Note that the manifest of the v4
    release says `version: '3'`.
 
@@ -76,3 +76,17 @@ Warn (the build goes on and the report lists each one):
   55 shared blocks: checking, M4, M5 and the conclusion in all 50 stories, drafting in 49 (not story 33), and 50
   devotional sections.
 - With the correspondence above: no errors, and the warnings listed in 5–8.
+
+## Reading the source (to be written in phase 1)
+
+How the build parses the Markdown (the heading match, where a `#heading` section of a transclusion ends, nested
+transclusions, what "minimal markdown" strips, how a question is told from its answer) is the behavior of the phase 0
+reference reader (`fase0/scripts/tf5m.ts` of the planning folder). Phase 1 writes it here from that script before the
+builder is called done. The reader matches the English headings of `en_obs-tf`; `id_obs-tf` has translated headings and
+would need a heading table per language, which is out of scope until it has a release.
+
+## Decisions
+
+- The tables stay in the `obs` segment (about 338 KB compressed for en, with OBS about 550 KB, under Mini's 3 MB
+  rule). If a client should not have to download them, an optional unit can carry them later (catalog.md, the `aligned`
+  pattern); the format of the tables would not change.
