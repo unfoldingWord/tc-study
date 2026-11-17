@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Event, OrigWord, Piece } from '../../model'
-import { buildMaculaReferents, maculaReferentIssues, referentKey, strongNumber } from './referents'
+import { buildMaculaReferents, entityStrong, maculaReferentIssues, referentKey, strongNumber } from './referents'
 
 type W = [form: string, strong: string]
 
@@ -200,14 +200,38 @@ describe('buildMaculaReferents', () => {
   test('two words with the entity Strong and the form rule leaves exactly one: that one', () => {
     const b = book({ 1: { 1: [['λέγει', 'G30040'], ['ἄνθρωπος', 'G04440'], ['ἄνθρωπος', 'G04440'], ['θεός', 'G04440']] } })
     const one = { words: [['θεοῦ', 'G444']], verses: { '1:1': [[referentKey('λέγει'), 0, [['r', '', 0, 0, 0]]]] } }
-    // key θεου: contained by none of the keys of the first two and not equal to θεοσ... use a form that fits only the third.
     const fits = { words: [['θεός', 'G444']], verses: { '1:1': [[referentKey('λέγει'), 0, [['r', '', 0, 0, 0]]]] } }
     expect(build(b, one).referents.ante).toEqual([0])
     expect(build(b, fits).referents.ante).toEqual([4])
   })
 
+  test('a referring word that is not found still has its targets shape-checked', () => {
+    const missing = referentKey('οὐκέστιν')
+    expect(() => build(ruth, { words: [], verses: { '2:3': [[missing, 0, [['s', '', 0, 'x', 0]]]] } })).toThrow()
+    expect(() => build(ruth, { words: [], verses: { '2:3': [[missing, 0, [['s', 0, 0, 0, 0]]]] } })).toThrow()
+    expect(() => build(ruth, { words: [], verses: { '2:3': [[missing, 0, [['s', '', 0, 0]]]] } })).toThrow()
+    const { counts } = build(ruth, { words: [], verses: { '2:3': [[missing, 0, [['s', '', 0, 0, 7]]]] } })
+    expect(counts).toEqual({ words: 1, rows: 1, kept: 0, open: 0, badTargets: 0 })
+  })
+
+  test('a bad n throws even when the verse of the target is not a verse', () => {
+    expect(() => build(ruth, { words: [], verses: { '2:3': [[referentKey('וַתֵּלֶךְ'), 0, [['s', '', 0, 2, 3]]]] } })).toThrow()
+  })
+
   test('a value that is not the published shape throws', () => {
     expect(() => build(ruth, { words: [] })).toThrow()
     expect(() => build(ruth, { words: [], verses: { '2:3': [[referentKey('וַתֵּלֶךְ'), 0, [['s', '', 0, 0, 3]]]] } })).toThrow()
+  })
+})
+
+describe('entityStrong', () => {
+  test('a Greek Strong of four digits gets the fifth, a Hebrew one is kept, anything else is empty', () => {
+    expect(entityStrong('G5485')).toBe('G54850')
+    expect(entityStrong('G54850')).toBe('G54850')
+    expect(entityStrong('H7327')).toBe('H7327')
+    expect(entityStrong('H1234a')).toBe('H1234a')
+    expect(entityStrong('x')).toBe('')
+    expect(entityStrong('')).toBe('')
+    expect(entityStrong(undefined)).toBe('')
   })
 })

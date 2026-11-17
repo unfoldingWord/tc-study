@@ -301,7 +301,7 @@ export async function buildLanguage(o: {
     }
     const issues: string[] = []
     const origIssues: string[] = []
-    const orig = await extractOrig(source, book, origIssues)
+    const orig = await extractOrig(source, book, origIssues, { macula: o.withOrig === true })
     if (o.withOrig === true) issues.push(...origIssues)
     origs.set(book, orig)
     // The rows `extractBook` reads are the ones the inputs name: they are read once.

@@ -123,11 +123,13 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
  *   stamp is the release tag of the resource (`v0.34` of `v0.34#2023-09-27T02_19_31Z`: `ids.md` names the tag, with no date).
  * - MACULA rows `{resource}/trees/{BOOK}` become the `macula` v2 trees of the book ({@link buildMaculaTrees}), and `release`
  *   is the stamp of the MACULA resource. What the trees leave out is a line in `issues`. The referents become columns too ({@link buildMaculaReferents}); what they leave out, or leave without an antecedent, is a line too.
+ * - `options.macula: false` skips the MACULA conversion (no `macula` in the model, no line in `issues`): for a caller that will not write
+ *   the orig, so that a malformed MACULA row cannot abort its build. Default: it converts.
  *
  * Throws `Error` when the source has no text of the book, has it from two resources, or has rows that are not what
  * format 2.0 writes.
  */
-export async function extractOrig(source: RowSource, book: string, issues?: string[]): Promise<OrigModel> {
+export async function extractOrig(source: RowSource, book: string, issues?: string[], options: { macula?: boolean } = {}): Promise<OrigModel> {
   const upper = book.toUpperCase()
   let resource: string | undefined
   let listed: number[] | undefined
@@ -191,7 +193,7 @@ export async function extractOrig(source: RowSource, book: string, issues?: stri
 
   const ordered = [...chunks.entries()].sort(([a], [b]) => a - b).map(([, chunk]) => chunk)
   const model: OrigModel = { book, key: resource, stamp, ...readDocument(ordered) }
-  if (macula.resource !== undefined) {
+  if (options.macula !== false && macula.resource !== undefined) {
     model.macula = { release: refOf(macula.resource).stamp, v: 2 }
     if (macula.trees !== undefined) {
       const { trees, counts } = buildMaculaTrees(macula.trees, model.pieces, model.events)

@@ -102,6 +102,48 @@ describe('licenseId', () => {
   })
 })
 
+describe('buildLanguage: MACULA of the originals', () => {
+  const MACULA = 'Biblica/el-x-koine/macula'
+  /** The sample with a MACULA resource of Titus and these values for its trees and referents. */
+  async function withMacula(trees: unknown, referents: unknown): Promise<RowSource> {
+    const base = await sample()
+    return {
+      async resources(lang) {
+        const list = await base.resources(lang)
+        return lang === ORIGINALS ? [...list, { key: MACULA, stamp: '3b8aa380e8#2026-10-15T02_19_35.000Z', kind: 'Original', books: ['tit'] }] : list
+      },
+      async *rows(f) {
+        yield* base.rows(f)
+        if (f.lang === ORIGINALS && f.book === 'tit' && (f.layer === undefined || f.layer === 'sot')) {
+          yield { layer: 'sot', key: `${MACULA}/trees/TIT`, value: trees }
+          yield { layer: 'sot', key: `${MACULA}/referents/TIT`, value: referents }
+        }
+      },
+    }
+  }
+  const trees = { sentences: [['*', ['s', 1001001, 9009001]], ['*', ['s', 7007001]]] }
+  const referents = { words: [['x', 'y']], verses: { '1:1': [['nowhere', 0, [['s', '', 0, 0, 0]]]] } }
+
+  test('with withOrig the tree and referent lines are in the report of the book', async () => {
+    const built = await buildLanguage({ source: await withMacula(trees, referents), lang: ES, books: ['tit'], withOrig: true, registry: registry(), about })
+    for (const line of [
+      "book tit: MACULA trees: 2 word(s) whose place is not in this book's words: left out of the trees",
+      'book tit: MACULA trees: 1 sentence(s) left with no word: left out of the trees',
+      'book tit: MACULA referents: 1 referring word(s) not found in their verse, with 1 reference(s): left out',
+    ]) {
+      expect(built.report).toContain(line)
+    }
+  })
+
+  test('without withOrig a malformed MACULA row does not abort the build and leaves no line', async () => {
+    const source = await withMacula({ sentences: 'nope' }, 5)
+    const built = await buildLanguage({ source, lang: ES, books: ['tit'], registry: registry(), about })
+    expect(byClass(built.segments, 'book')).toHaveLength(1)
+    expect(built.report.some((line) => line.includes('MACULA'))).toBe(false)
+    await expect(buildLanguage({ source, lang: ES, books: ['tit'], withOrig: true, registry: registry(), about })).rejects.toThrow()
+  })
+})
+
 describe('buildLanguage: es-419 Titus and the common parts', () => {
   let first: Awaited<ReturnType<typeof buildLanguage>>
   let second: Awaited<ReturnType<typeof buildLanguage>>

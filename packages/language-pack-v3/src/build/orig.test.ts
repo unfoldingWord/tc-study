@@ -878,6 +878,16 @@ describe('MACULA', () => {
     ])
   })
 
+  test('options.macula false skips the MACULA conversion: a malformed row does not abort, and there is no table and no line', async () => {
+    const issues: string[] = []
+    const broken = { ...treesRow, value: { sentences: 'nope' } }
+    await expect(extractOrig(fake(tit(broken), refs), 'tit')).rejects.toThrow()
+    const m = await extractOrig(fake(tit(broken, { ...referentsRow, value: 5 }), refs), 'tit', issues, { macula: false })
+    expect(m.macula).toBeUndefined()
+    expect(issues).toEqual([])
+    expect(m.words).toEqual((await extractOrig(fake(tit(), refs), 'tit')).words)
+  })
+
   test('without a trees row the table has the release and the referents', async () => {
     expect(Object.keys((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula!).sort()).toEqual(['referents', 'release', 'v'])
     expect((await extractOrig(fake(tit(), refs), 'tit')).macula).toBeUndefined()

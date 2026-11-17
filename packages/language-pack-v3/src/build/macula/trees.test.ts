@@ -52,7 +52,7 @@ describe('buildMaculaTrees', () => {
       words: { '2:3': 5 },
     }
     const { trees, counts } = buildMaculaTrees(published, b.pieces, b.events)
-    expect(counts).toEqual({ leaves: 0, parts: 0, sentences: 0 })
+    expect(counts).toEqual({ leaves: 0, parts: 0, sentences: 0, deep: 0 })
     expect(trees.lo).toEqual([5])
     expect(trees.span).toEqual([4])
     expect(sentenceTree(trees, 0, b.words)).toEqual([
@@ -111,13 +111,56 @@ describe('buildMaculaTrees', () => {
     }
     const { trees, counts } = buildMaculaTrees(published, b.pieces, b.events)
     // Dropped leaves: 9009001, 1001003 (verse 1 has 2 words), 1002003, [1007001,'x'], 5001001, 1001000 (word 0 is none).
-    expect(counts).toEqual({ leaves: 6, parts: 2, sentences: 1 })
+    expect(counts).toEqual({ leaves: 6, parts: 2, sentences: 1, deep: 0 })
     expect(trees.lo).toEqual([0, 1])
     expect(sentenceTree(trees, 0, b.words)).toEqual(['*', ['s', 0], ['v', 3]])
     expect(sentenceTree(trees, 1, b.words)).toEqual(['*', ['s', 1]])
     expect(trees.pieces).toEqual([])
     expect(maculaTreeIssues(counts)).toHaveLength(3)
-    expect(maculaTreeIssues({ leaves: 0, parts: 0, sentences: 0 })).toEqual([])
+    expect(maculaTreeIssues({ leaves: 0, parts: 0, sentences: 0, deep: 0 })).toEqual([])
+  })
+
+  test('a sentence of 64 levels is kept and reads back; one of 65 is left out and counted', () => {
+    const b = book({ 1: [2] })
+    // A chain of parts ending in a leaf: the root is level 1 and the leaf is the last level.
+    const chain = (levels: number, leaf: number): unknown => (levels === 1 ? leaf : ['p', chain(levels - 1, leaf)])
+    const published = { sentences: [chain(64, 1001001), chain(65, 1001002), ['*', ['s', 1001002]]] }
+    const { trees, counts } = buildMaculaTrees(published, b.pieces, b.events)
+    expect(counts).toEqual({ leaves: 0, parts: 0, sentences: 0, deep: 1 })
+    expect(trees.lo).toEqual([0, 1])
+    const read = sentenceTree(trees, 0, b.words)
+    let levels = 1
+    for (let n: unknown = read; Array.isArray(n) && typeof n[0] === 'string'; n = n[1]) levels++
+    expect(levels).toBe(64)
+    expect(sentenceTree(trees, 1, b.words)).toEqual(['*', ['s', 1]])
+    expect(maculaTreeIssues(counts)).toEqual(['MACULA trees: 1 sentence(s) deeper than 64 levels: left out of the trees'])
+  })
+
+  test('the depth is of the kept tree: leaves dropped make a deep sentence shallow', () => {
+    const b = book({ 1: [1] })
+    const chain = (levels: number): unknown => (levels === 1 ? 9009001 : ['p', chain(levels - 1)])
+    const { counts } = buildMaculaTrees({ sentences: [['*', chain(70), 1001001]] }, b.pieces, b.events)
+    expect(counts.deep).toBe(0)
+  })
+
+  test('a bridged verse (13-14): the words of the bridge are found through verse 13', () => {
+    // The verse event label is "13-14": the verse number is the leading one.
+    const pieces: Piece[] = [['a', true], [' ', false], ['b', true], [' ', false], ['c', true]]
+    const events: Event[] = [[0, 'chapter', '1'], [0, 'verse', '13-14'], [4, 'verse', '15']]
+    const { trees, counts } = buildMaculaTrees({ sentences: [['*', ['s', 1013001, 1013002, 1013003], ['o', 1014001]]] }, pieces, events)
+    expect(counts).toEqual({ leaves: 2, parts: 1, sentences: 0, deep: 0 })
+    expect(sentenceTree(trees, 0, 3)).toEqual(['*', ['s', 0, 1]])
+  })
+
+  test('a verse that comes in two runs uses the first', () => {
+    const b = book({ 1: [1, 1] })
+    // Verse 1, then 2, then a stray run of verse 1 again: its words are not the verse's.
+    const pieces: Piece[] = [...b.pieces, ['x', true]]
+    const events: Event[] = [...b.events, [b.pieces.length, 'verse', '1']]
+    expect(verseSpans(pieces, events).get('1:1')).toEqual({ first: 0, words: 1 })
+    const { trees, counts } = buildMaculaTrees({ sentences: [['*', ['s', 1001001, 1001002]]] }, pieces, events)
+    expect(counts.leaves).toBe(1)
+    expect(sentenceTree(trees, 0, 3)).toEqual(['*', ['s', 0]])
   })
 
   test('a value that is not the published shape throws', () => {

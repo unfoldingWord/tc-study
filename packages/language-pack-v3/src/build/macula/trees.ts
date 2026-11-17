@@ -13,7 +13,12 @@ export type MaculaTreeCounts = {
   parts: number
   /** Sentences left with no word or piece. */
   sentences: number
+  /** Sentences whose kept tree is deeper than 64 levels (the reader's limit): left out. */
+  deep: number
 }
+
+/** The deepest a tree may go, as the reader counts it: the root is level 1, a part or a leaf is a level. */
+const MAX_DEPTH = 64
 
 /** A verse of the book: the position of its first word and its number of words. */
 export type VerseSpan = { first: number; words: number }
@@ -25,7 +30,7 @@ function leading(label: string): number {
 
 /**
  * The verses of a book by `"C:V"` (the numbers of the book's own `chapter` and `verse` events; a label starts with its number),
- * with the first word position and the number of words of the first run of words in that verse. Verses with no word are absent.
+ * with the first word position and the number of words of the first run of words in that verse (a verse that comes again later, in a second run, keeps the first). Verses with no word are absent.
  */
 export function verseSpans(pieces: Piece[], events: Event[]): Map<string, VerseSpan> {
   const spans = new Map<string, VerseSpan>()
@@ -52,6 +57,7 @@ export function verseSpans(pieces: Piece[], events: Event[]): Map<string, VerseS
       closed.add(openKey)
       open = undefined
     }
+    // A verse already in `spans` (a second run of the same verse) is not opened again: the first run is the one used.
     if (open === undefined && !closed.has(key) && !spans.has(key)) {
       open = { first: word, words: 0 }
       openKey = key
@@ -71,13 +77,13 @@ const isPart = (node: unknown): node is [string, ...unknown[]] => Array.isArray(
  * Turns the published v1 value `{sentences: [tree, ...], words}` into `MaculaTrees` of this book, and counts what it left out.
  * A leaf id `CCCVVVWWW` becomes the position of word `WWW` (from 1) of verse `C:V`; `[id, text]` becomes a piece of that word.
  * A leaf whose verse is not in the book, or whose word is past the verse's words, is dropped; so is a part left with no leaf,
- * and a sentence left with none. Sentences stay in published order. Throws `Error` for a value that is not the published shape.
+ * and a sentence left with none; a sentence whose kept tree is deeper than 64 levels is left out too. Sentences stay in published order. Throws `Error` for a value that is not the published shape.
  */
 export function buildMaculaTrees(published: unknown, pieces: Piece[], events: Event[]): { trees: MaculaTrees; counts: MaculaTreeCounts } {
   const sentences = (published as { sentences?: unknown } | null)?.sentences
   if (!Array.isArray(sentences)) throw new Error('macula trees: the published value has no list of sentences')
   const verses = verseSpans(pieces, events)
-  const counts: MaculaTreeCounts = { leaves: 0, parts: 0, sentences: 0 }
+  const counts: MaculaTreeCounts = { leaves: 0, parts: 0, sentences: 0, deep: 0 }
 
   const position = (id: unknown): number | undefined => {
     if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 0) throw new Error(`macula trees: ${JSON.stringify(id)} is not a leaf id`)
@@ -122,6 +128,11 @@ export function buildMaculaTrees(published: unknown, pieces: Piece[], events: Ev
     const root = keep(sentence, true)
     if (root === undefined) {
       counts.sentences++
+      continue
+    }
+    const depth = (n: Kept): number => (typeof n === 'number' || Array.isArray(n) ? 1 : 1 + Math.max(...n.children.map(depth)))
+    if (depth(root) > MAX_DEPTH) {
+      counts.deep++
       continue
     }
     let lo = Infinity
@@ -171,5 +182,6 @@ export function maculaTreeIssues(counts: MaculaTreeCounts): string[] {
   if (counts.leaves > 0) lines.push(`MACULA trees: ${counts.leaves} word(s) whose place is not in this book's words: left out of the trees`)
   if (counts.parts > 0) lines.push(`MACULA trees: ${counts.parts} part(s) left with no word: left out of the trees`)
   if (counts.sentences > 0) lines.push(`MACULA trees: ${counts.sentences} sentence(s) left with no word: left out of the trees`)
+  if (counts.deep > 0) lines.push(`MACULA trees: ${counts.deep} sentence(s) deeper than ${MAX_DEPTH} levels: left out of the trees`)
   return lines
 }

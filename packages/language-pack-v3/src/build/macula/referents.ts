@@ -45,7 +45,7 @@ export function strongNumber(strong: string): string {
 }
 
 /** The Strong of an entity as a map key (ids.md): the Hebrew as published, the Greek in five digits; `''` when it is neither. */
-function entityStrong(strong: unknown): string {
+export function entityStrong(strong: unknown): string {
   if (typeof strong !== 'string') return ''
   const key = strongKey(strong)
   if (/^G\d{4}$/.test(key)) return key + '0'
@@ -143,15 +143,21 @@ export function buildMaculaReferents(
           }
         }
       }
+      const shaped = (target: unknown): [string, string, number, number, number] => {
+        if (!Array.isArray(target) || target.length !== 5 || typeof target[0] !== 'string' || typeof target[1] !== 'string') throw bad(target)
+        const [, , x, y] = target as [string, string, number, number, number]
+        if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) throw bad(target)
+        return target as [string, string, number, number, number]
+      }
       if (word < 0) {
+        for (const target of targets) shaped(target)
         counts.words++
         counts.rows += targets.length
         continue
       }
       for (const target of targets) {
-        if (!Array.isArray(target) || target.length !== 5 || typeof target[0] !== 'string' || typeof target[1] !== 'string') throw bad(target)
-        const [kind, piece, x, y, n] = target as [string, string, number, number, number]
-        if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) throw bad(target)
+        const [kind, piece, x, y, n] = shaped(target)
+        const ent = entOf(n)
         if ((x === 0) !== (y === 0)) {
           counts.badTargets++
           continue
@@ -161,7 +167,6 @@ export function buildMaculaReferents(
           counts.badTargets++
           continue
         }
-        const ent = entOf(n)
         const at = ante(`${tc}:${tv}`, n)
         counts.kept++
         if (at === 0) counts.open++
