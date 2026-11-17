@@ -3,7 +3,8 @@
  * the one unit `obsimg` of the catalog `zxx-obsimg`. The images are given as the bytes of the files (converted by the caller); nothing
  * here decodes them.
  */
-import { hex, type Segment } from '../codec/container'
+import type { Segment } from '../codec/container'
+import { sha256, toHex } from '../codec/sha256'
 import type { ObsImageFrame, ObsImagesMeta } from '../model'
 import { type BuiltSegment, builtSegment } from './catalog'
 
@@ -55,9 +56,7 @@ export function obsimgSegments(images: ObsImageInput[], meta: ObsImagesMeta, sha
   })
 }
 
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
-}
+const sha256Hex = (bytes: Uint8Array): string => toHex(sha256(bytes))
 
 /**
  * {@link obsimgSegments} written, each with the fingerprint of what it was built from: the SHA-256 over the story, the `n`, `media`,
@@ -69,9 +68,9 @@ export async function builtObsimgSegments(images: ObsImageInput[], meta: ObsImag
     segments.map(async (seg) => {
       const lines = [`obsimg 1 ${seg.h.group}`, JSON.stringify([meta.license, meta.credit, meta.changes, meta.source])]
       for (const frame of (seg.t as unknown as { frames: ObsImageFrame[] }).frames) {
-        lines.push(`${frame.n} ${JSON.stringify(frame.media)} ${frame.w} ${frame.h} ${await sha256Hex(frame.data)}`)
+        lines.push(`${frame.n} ${JSON.stringify(frame.media)} ${frame.w} ${frame.h} ${sha256Hex(frame.data)}`)
       }
-      return builtSegment(seg, await sha256Hex(new TextEncoder().encode(lines.join('\n'))))
+      return builtSegment(seg, sha256Hex(new TextEncoder().encode(lines.join('\n'))))
     }),
   )
 }
