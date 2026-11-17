@@ -63,19 +63,20 @@ describe('parseObsFrames', () => {
   test('a piece whose verses do not hold is left out and reported, and the frame keeps its other pieces', () => {
     const report: string[] = []
     const out = parseObsFrames(
-      source({ '1:1': '[[ref:GEN 1:32, GEN 1:2]]', '1:2': '[[ref:GEN 1:5-2]]', '1:3': '[[ref:REV 1:20-2:3]]', '1:4': '[[ref:REV 3]]' }),
+      source({ '1:1': '[[ref:GEN 1:32, GEN 1:2]]', '1:2': '[[ref:GEN 1:5-2]]', '1:3': '[[ref:REV 1:20-2:3]]', '1:4': '[[ref:REV 3]]', '1:5': '[[ref:REV 1:1000]]' }),
       report,
       lastVerse,
     )
     expect(out.get('1:1')).toEqual([[1_001_002, 1_001_002]])
-    for (const k of ['1:2', '1:3', '1:4']) expect(out.has(k)).toBe(false)
+    for (const k of ['1:2', '1:3', '1:4', '1:5']) expect(out.has(k)).toBe(false)
     const left = report.filter((l) => l.startsWith('obs-frames: left out: '))
-    expect(left.length).toBe(4)
+    expect(left.length).toBe(5)
+    expect(left[4]).toContain('rev 1:1000 is not a verse')
     expect(left[0]).toContain('gen 1:32 is past the end of the chapter (31)')
     expect(left[1]).toContain('runs backwards')
     expect(left[2]).toContain('crosses the end of rev 1')
     expect(left[3]).toContain('the whole chapter rev 3 needs its length')
-    expect(report).toContain('obs-frames: 3 frames tell no verse and are left out: 1:2, 1:3, 1:4')
+    expect(report).toContain('obs-frames: 4 frames tell no verse and are left out: 1:2, 1:3, 1:4, 1:5')
   })
   test('what fails the build: a change of the source shape', () => {
     const fails = (over: Record<string, string>, files?: Map<string, string>) => expect(() => parseObsFrames(files ?? source(over), [], lastVerse)).toThrow()

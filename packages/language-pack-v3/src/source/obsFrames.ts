@@ -155,7 +155,7 @@ function rangesOf(
       to = [c2, last]
     }
     for (const [c, v] of [from, to]) {
-      if (c < 1 || v < 1) {
+      if (c < 1 || v < 1 || c > 999 || v > 999) {
         dropped.push(`${where}: ${book} ${c}:${v} is not a verse`)
         continue pieces
       }
