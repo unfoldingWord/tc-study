@@ -20,7 +20,7 @@ Movements"). Measured against `unfoldingWord/en_obs-tf` v4 and `unfoldingWord/en
 - Transclusions `![[name]]` and `![[file#heading]]` from `transclusions/`. Each block is stored once in `tf-shared`.
   From the devotionals, only the sections that a story names, read from the unit files (`obs-devotionals-unit-N.md`),
   never from `obs-devotionals-master.md`.
-- Not read: images (`![[imageN.jpeg]]`), `<!-- page break -->`, `transclusions/overview.md` (license not confirmed),
+- Not read: images (`![[imageN.jpeg]]`), `<!-- page break -->`, `transclusions/overview.md` only as the optional framing text of `tf-framework` (license cleared 2026-11-17),
   and the other transclusion files that no story names.
 - A heading anchor matches the heading text exactly. Otherwise it matches with runs of white space collapsed, with a
   warning. It happens once in v4: story 9 names `…between the Flesh…`, and unit 5 has a double space there.

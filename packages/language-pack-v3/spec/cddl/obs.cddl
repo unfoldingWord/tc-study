@@ -102,6 +102,9 @@ tf-parts = {
 
 ; One row per question, ordered by story, then part, then k. The id of a row is "{story}/{part}/{k}" ("1/m1/3"): k counts
 ; the questions of the part from 1, in the order of the source, across its lists (m2: discourse first, then theology).
+; The ids are positional and valid only for the release in "res" (decided 2026-11-17): a release that inserts a question
+; renumbers the ones after it, and the build then makes a new pack with a new "res" release; a client never mixes ids of
+; two releases, because it saves a note with the pack's release next to the id.
 tf-questions = {
   "res": res-index,
   "codes": strtab,
@@ -149,12 +152,13 @@ tf-frames = {
 }
 
 ; The five movements: code (m1-m5) and name, from the headings of the source. The framing text of the method
-; (transclusions/overview.md) is not here until its license is confirmed.
+; (transclusions/overview.md, CC BY-SA 4.0 like the manual; Abel cleared the license on 2026-11-17) goes in "text": one
+; row per movement, and the general framing text in the row of code "overview".
 tf-framework = {
   "res": res-index,
   "codes": strtab,
   "n": uint,
   "code": uvarints,
   "name": column,              ; texts
-  ? "text": column,            ; texts with "has": the purpose of each movement, once its source is licensed
+  ? "text": column,            ; texts with "has": the purpose of each movement, and the framing text of the method
 }
