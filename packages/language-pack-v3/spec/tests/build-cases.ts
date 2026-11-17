@@ -28,7 +28,7 @@ import { extractObs, obsSegment } from '../../src/build/obs'
 import { buildMap } from '../../src/build/map/build'
 import { mapSegment } from '../../src/build/map/segment'
 import { versesOf } from '../../src/build/maps/verses'
-import { extractOrig } from '../../src/build/orig'
+import { extractOrig, origSegment } from '../../src/build/orig'
 import { buildXmap } from '../../src/build/xmap/build'
 import { xmapSegment } from '../../src/build/xmap/segment'
 import { topicsSegment } from '../../src/build/topics/segment'
@@ -41,6 +41,7 @@ import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
 import { type Json, readerOutput, sortKeys } from '../../src/read/output'
+import { zipSource } from '../../src/source/zipSource'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../../src/source/rows'
 import { keyId, publicKeyOf, signCatalog } from '../../src/sign'
 import { writeTransfer } from '../../src/transfer'
@@ -570,6 +571,14 @@ async function integerOutOfRange(): Promise<{ header: Uint8Array; body: Uint8Arr
   }
 }
 
+// Case 23: the MACULA trees and referents of Ruth 1:1-5 (`orig` with `macula` of version 2)
+
+/** The segment of case 23: Ruth 1:1-5 of the UHB with its MACULA, built from `data/originals-rut.langpack.zip` (real rows, trimmed; see `data/README.md`). */
+async function maculaV2(): Promise<Uint8Array> {
+  const orig = await extractOrig(await zipSource(bytesOf(join(DATA, 'originals-rut.langpack.zip'))), 'rut')
+  return (await writeSegment(origSegment(orig))).bytes
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -606,6 +615,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('transferencia-catalogo-local/local.tcpack', writeTransfer({ mode: 'full', catalogs: [local], entries: [], made: MADE, by: BY }))
   out.set('transferencia-catalogo-local/local.keys.json', signedFiles.get('catalog-signed/catalog.keys.json')!)
   const outOfRange = await integerOutOfRange()
+  out.set('macula-v2/orig-rut.seg', await maculaV2())
   out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
   out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out
