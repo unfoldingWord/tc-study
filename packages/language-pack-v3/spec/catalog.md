@@ -4,13 +4,16 @@ The catalog is where reading starts. It says which segments a language has, whic
 on, and which licenses apply. It is a segment of class `catalog` (`container.md`), small, and the only one that is
 signed. Its schema is `cddl/catalog.cddl`.
 
-There are two kinds:
+There are three kinds:
 
-- a **language catalog** (`lang` set), for one language's segments;
+- a **language catalog** (`lang` is the language tag), for one language's segments;
 - the **common catalog** (no `lang`), for the original and the common map, which every language needs and nobody
-  downloads twice.
+  downloads twice;
+- a **catalog with no linguistic content** (`zxx-{name}`, `lang` is the catalog name), for content that is the same for
+  every language: see "Catalogs with no linguistic content" below.
 
-A language catalog names the common catalog revision it was built against (`requires`).
+A language catalog names the common catalog revision it was built against (`requires`). A catalog with no linguistic
+content requires nothing, and no catalog requires it.
 
 ## Revisions
 

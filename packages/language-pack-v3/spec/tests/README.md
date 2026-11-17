@@ -472,7 +472,7 @@ types, these are `E_BODY` too:
   `flags`, or a `frame` column of another length than `n`.
 - **`art`.** An article with an empty `id`; an article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
   article; an `id` twice in the group.
-- **`obsimg`.** A `group` that is not two digits from `01` to `50`; no frame; a frame whose `n` is not above the one before (out of order or twice); a `w` or `h` of 0; empty `data` or `data` that is not a byte string; a `media` or a `meta` field that is not text; a `meta` that does not have exactly one row. The header needs `lang` and `group`; it has no `res`.
+- **`obsimg`.** A `group` that is not two digits from `01` to `50`; no frame; a frame whose `n` is 0 or not above the one before (out of order or twice); a `w` or `h` of 0; empty `data` or `data` that is not a byte string; a `media` or a `meta` field that is not text; a `meta` that does not have exactly one row. The header needs `lang` and `group`; it has no `res`. A reader does not check that `lang` is `zxx-obsimg`, that `book`, `part`, `orig` and `res` are absent, or the value of `media` (it is passed through).
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
 - **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part without `book` is valid; a part whose `book` differs from its `part` is E_BODY; a core with a `book`; a

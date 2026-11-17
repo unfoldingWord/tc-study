@@ -9,9 +9,9 @@ obsimg-header = {
   "class": "obsimg",
   "v": 1,
   "tables": { * table-name => [uint, bool] },
-  "lang": tstr,                ; always the name of the catalog: "zxx-obsimg"
+  "lang": tstr,                ; the name of the catalog: "zxx-obsimg" as built; a reader does not check the value
   "group": obsimg-story,       ; the story, as two digits
-}                              ; no "book", "part", "orig" or "res": a builder writes none, and a reader does not read them
+}                              ; no "book", "part", "orig" or "res": a builder writes none, and a reader neither reads nor checks their absence
 
 obsimg-story = tstr            ; "01" to "50"
 
@@ -21,8 +21,8 @@ obsimg-tables = {
 }
 
 obsimg-frame = {
-  "n": uint,                   ; the frame number in the story (1 to the last frame)
-  "media": tstr,               ; "image/webp" as built; a reader passes it through and never decodes
+  "n": uint,                   ; the frame number in the story, at least 1 (a reader rejects 0 with E_BODY)
+  "media": tstr,               ; "image/webp" as built; a reader does not check it, passes it through and never decodes
   "w": uint,                   ; width in pixels, at least 1
   "h": uint,                   ; height in pixels, at least 1
   "data": bstr,                ; the bytes of the image file, as published; not empty

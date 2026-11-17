@@ -1273,7 +1273,7 @@ def _decode_obsimg(p: Segment) -> dict:
     for f in frames_in:
         if type(f) is not dict:
             _bad()
-        n = _need(f, "n", is_uint)
+        n = _need(f, "n", lambda x: is_uint(x) and x > 0)
         if n <= last:
             _bad()
         last = n

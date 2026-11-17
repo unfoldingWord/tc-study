@@ -3,7 +3,7 @@
  * accepted, back into an {@link ObsImagesModel}, the output the conformance cases expect (`tests/README.md`, "Reader output").
  *
  * It checks the tables against the schema and rejects the segment with `E_BODY` at the first defect: a group that is not a
- * story number, a frame whose number is out of order or twice, a size that is not a positive integer, a picture with no
+ * story number, a frame whose number is 0, out of order or twice, a size that is not a positive integer, a picture with no
  * bytes, a `meta` with other than one row. It imports no builder code and no Node module.
  */
 import type { Segment } from '../codec/container'
@@ -52,7 +52,7 @@ export function obsimgView(seg: Segment): ObsImagesModel {
   const frames = t.frames.map((value, i): ObsImageFrame => {
     const what = `frames[${i}]`
     const fields = map(value, what)
-    if (!isUint(fields.n)) bad(`${what}.n is not an integer from 0 to 2^53 - 1`)
+    if (!isUint(fields.n) || fields.n === 0) bad(`${what}.n is not an integer from 1 to 2^53 - 1`)
     if (fields.n <= last) bad(`${what}.n (${fields.n}) is not above the frame before`)
     last = fields.n
     if (!(fields.data instanceof Uint8Array) || fields.data.length === 0) bad(`${what}.data is not a byte string with at least one byte`)

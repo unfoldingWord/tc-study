@@ -1265,6 +1265,7 @@ def test_obsimg_is_a_class_name_and_the_frozen_case_is_read():
 OBSIMG_MUTATIONS = {
     "frames out of order": lambda h, t: t["frames"].reverse(),
     "frame twice": lambda h, t: t["frames"][1].update(n=1),
+    "n zero": lambda h, t: t["frames"][0].update(n=0),
     "w zero": lambda h, t: t["frames"][0].update(w=0),
     "empty data": lambda h, t: t["frames"][0].update(data=b""),
     "data as text": lambda h, t: t["frames"][0].update(data="abc"),

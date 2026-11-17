@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { CLASS_NAMES, readSegment } from '../codec/container'
+import { CLASS_NAMES, readSegment, writeSegment } from '../codec/container'
 import { OBSIMG_TABLES, obsimgView } from '../read/obsimg'
 import { readerOutput } from '../read/output'
 import { type BuiltSegment, builtSegment, unitsOf } from './catalog'
@@ -95,5 +95,15 @@ describe('unitsOf and the class', () => {
     const out = (await readerOutput(seg.bytes)) as Record<string, any>
     expect(out.frames[0]).toEqual({ n: 1, media: 'image/webp', w: 640, h: 360, data: '010203' })
     expect(out.meta).toEqual(META)
+  })
+})
+
+describe('the reader and a frame number of 0', () => {
+  test('a frame with n = 0 is E_BODY', async () => {
+    const h = { class: 'obsimg', v: 1, tables: { frames: [1, true], meta: [1, true] }, lang: 'zxx-obsimg', group: '01' } as never
+    const frames = [{ n: 0, media: 'image/webp', w: 640, h: 360, data: Uint8Array.from([1, 2, 3]) }]
+    const { bytes } = await writeSegment({ h, t: { frames, meta: [META] } } as never)
+    const { seg } = await readSegment(bytes, { known: OBSIMG_TABLES })
+    expect(() => obsimgView(seg)).toThrow(/obsimg segment is malformed.*frames\[0\]\.n/)
   })
 })
