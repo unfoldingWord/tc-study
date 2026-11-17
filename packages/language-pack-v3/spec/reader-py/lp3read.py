@@ -80,6 +80,8 @@ REQUIRED_MAP_CORE = {"map": {"books", "names", "coverage"}, "xmap": {"coverage",
                      "xtopics": {"coverage", "topics", "occurrences"}, "topics": {"names", "coverage"}}
 REQUIRED_MAP_PART = {"map": set(), "xmap": {"strong"}, "xtopics": {"occurrences"}, "topics": set()}
 KNOWN_VERSION = 1
+# Tables a reader knows at more than version 1 (a table not listed is known at KNOWN_VERSION only).
+KNOWN_VERSIONS = {("orig", "macula"): (1, 2)}
 
 _TABLE_NAME = re.compile(r"[a-z][a-z0-9-]*")
 _BOOK_CODE = re.compile(r"[0-9a-z]{3}")
@@ -524,7 +526,7 @@ def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str |
     schema_required = required_tables(cls, h)
     skip = set()
     for name, (version, required) in h["tables"].items():
-        known = name in KNOWN_TABLES[cls] and version == KNOWN_VERSION
+        known = name in KNOWN_TABLES[cls] and version in KNOWN_VERSIONS.get((cls, name), (KNOWN_VERSION,))
         if known:
             continue
         if required or name in schema_required:
@@ -946,14 +948,108 @@ def _decode_orig(p: Segment) -> dict:
         if attrs:
             out["attrs"] = attrs
     if p.has("macula"):
-        m = p.t["macula"]
-        if type(m) is not dict or not is_str(m.get("release")):
-            _bad()
-        mo = {"release": m["release"]}
+        out["macula"] = _decode_macula(p, nwords_total=nwords)
+    return out
+
+
+def _decode_macula(p: Segment, nwords_total: int) -> dict:
+    m = p.t["macula"]
+    version = p.h["tables"]["macula"][0]
+    if type(m) is not dict or not is_str(m.get("release")):
+        _bad()
+    mo = {"release": m["release"], "v": version}
+    if version == 1:
         for key in ("trees", "referents"):
             if key in m:
                 mo[key] = jsonable(m[key])
-        out["macula"] = mo
+        return mo
+    if "trees" in m:
+        mo["trees"] = _macula_trees(m["trees"], nwords_total)
+    if "referents" in m:
+        mo["referents"] = _macula_referents(m["referents"], nwords_total)
+    return mo
+
+
+def _macula_trees(tr, n: int) -> list:
+    if type(tr) is not dict:
+        _bad()
+    labels, pieces = _strtab(tr.get("labels")), _strtab(tr.get("pieces"))
+    lo = deltas(_need(tr, "lo", is_bytes))
+    span = uvarints(_need(tr, "span", is_bytes))
+    nodes = _need(tr, "nodes", lambda x: type(x) is list and all(is_bytes(b) for b in x))
+    if not len(lo) == len(span) == len(nodes):
+        _bad()
+    out = []
+    for lo_i, span_i, raw in zip(lo, span, nodes):
+        if span_i > n - 1 or lo_i > n - 1 - span_i:
+            _bad()
+        hi_i = lo_i + span_i
+        nums = uvarints(raw)
+        pos = 0
+
+        def take():
+            nonlocal pos
+            if pos >= len(nums):
+                _bad()                      # cut short
+            pos += 1
+            return nums[pos - 1]
+
+        def node(level: int):
+            if level > MAX_DEPTH:
+                _bad()
+            t = take()
+            kind, k = t % 3, t // 3
+            if kind == 0:
+                if k >= len(labels):
+                    _bad()
+                count = take()
+                if count == 0:
+                    _bad()
+                return [labels[k]] + [node(level + 1) for _ in range(count)]
+            if level == 1:
+                _bad()                      # the root must be a part
+            position = lo_i + k
+            if position > hi_i:
+                _bad()
+            if kind == 1:
+                return position
+            idx = take()
+            if idx >= len(pieces):
+                _bad()
+            return [position, pieces[idx]]
+
+        if not nums:
+            _bad()
+        tree = node(1)
+        if pos != len(nums):
+            _bad()                          # bytes left: a second root or leftovers
+        out.append({"lo": lo_i, "hi": hi_i, "tree": tree})
+    return out
+
+
+def _macula_referents(rf, n: int) -> list:
+    if type(rf) is not dict:
+        _bad()
+    ents = _need(rf, "ents", lambda x: type(x) is list and all(is_pair_strs(e) for e in x))
+    kinds, pieces = _strtab(rf.get("kinds")), _strtab(rf.get("pieces"))
+    cols_in = _need(rf, "cols", lambda x: type(x) is dict)
+    cols = {c: uvarints(cols_in.get(c)) for c in ("word", "kind", "piece", "ent", "ch", "vs", "ante")}
+    rows = len(cols["word"])
+    if any(len(c) != rows for c in cols.values()):
+        _bad()
+    out, word = [], 0
+    for i in range(rows):
+        word += cols["word"][i]
+        kind, piece, ent = cols["kind"][i], cols["piece"][i], cols["ent"][i]
+        ch, vs, ante = cols["ch"][i], cols["vs"][i], cols["ante"][i]
+        if (word >= n or kind >= len(kinds) or piece >= len(pieces) or ent >= len(ents)
+                or ch == 0 or vs == 0 or ante > n):
+            _bad()
+        row = {"word": word, "kind": kinds[kind], "piece": pieces[piece], "form": ents[ent][0],
+               "strong": ents[ent][1], "ch": ch, "vs": vs}
+        if ante:
+            row["ante"] = ante - 1
+        out.append(row)
     return out
 
 
