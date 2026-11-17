@@ -108,7 +108,7 @@ Measured on the real build, Genesis, warm, one PC (`task-M7a-report.md`).
 
 - Open time of the Genesis `orig`: 0.36 to 0.50 of the `f98a0aa6` build. The gate is at most half. It is met, with little margin.
 - One verse's trees and referents: under 5 ms (the largest was 2.3 ms).
-- Size of the Genesis body: 704 437 bytes, 69.2 % of 1 017 315. The gate is 60 %. It is **not met**. The macula table is about 252 kB; the words and the text are unchanged. Compressed, it is 77.9 %. The decision is pending with Abel.
+- Size of the Genesis body: 704 437 bytes, 69.2 % of 1 017 315. The gate is 60 %. It is **not met**. The macula table is about 252 kB; the words and the text are unchanged. Compressed, it is 77.9 %. Abel accepted it on 2026-11-17 (the speed gate, the reason for the size gate, is met).
 - The antecedent is fixed for 195 018 of 222 489 rows in the 66 books.
 - 1 155 rows are left out because the referring word was not found.
 
