@@ -182,3 +182,69 @@ describe('language-packs.yml format 3 step: language and time limit', () => {
     expect(step.run).toContain('--lang "${LANGUAGE,,}"')
   })
 })
+
+describe('language-packs.yml obs_images', () => {
+  const jobs = (doc as unknown as { jobs: Record<string, { if?: string; environment?: string; steps: Step[] }> }).jobs
+  const job = jobs['obs-images']
+  const stepNamed = (n: string): Step => job.steps.find((s) => s.name === n) as Step
+
+  test('the input is a boolean off by default', () => {
+    expect(inputs.obs_images.type).toBe('boolean')
+    expect(inputs.obs_images.default).toBe(false)
+  })
+
+  test('the packs job is skipped with it, and its steps are the 2.0 and format 3 ones as before', () => {
+    expect(jobs.packs.if).toBe('${{ !inputs.obs_images }}')
+    expect(job.if).toBe('${{ inputs.obs_images }}')
+    expect(Object.keys(jobs)).toEqual(['packs', 'obs-images'])
+    // the existing "text is unchanged" test compares every packs step with the base; here only that none mentions the new job
+    expect(JSON.stringify(steps)).not.toContain('obs-images')
+    expect(JSON.stringify(steps)).not.toContain('obs_images')
+  })
+
+  test('guards: the language must be zxx-obsimg and the target staging, before anything is built or uploaded', () => {
+    const check = stepNamed('Check inputs')
+    expect(job.steps[0]).toBe(check)
+    expect(check.run).toContain('if [ "$LANGUAGE" != zxx-obsimg ]; then')
+    expect(check.run).toContain('if [ "$TARGET" != staging ]; then')
+    expect((check.run ?? '').match(/exit 1/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(job.environment).toBe('packs-staging')
+    expect(JSON.stringify(job)).not.toContain('production')
+  })
+
+  test('it installs with the frozen lockfile and runs publish-obs-images with the R2 names of the v3 publish', () => {
+    expect(stepNamed('Install').run).toBe('bun install --frozen-lockfile')
+    const publish = stepNamed('Build and publish the OBS images')
+    expect(publish.run).toContain('bun packages/resource-pipeline/cli/publish-obs-images.ts')
+    const v3Env = find('Build and publish format 3').env ?? {}
+    for (const name of ['R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'PACKS_V3_SIGNING_KEY']) {
+      expect(publish.env?.[name]).toBe(v3Env[name])
+    }
+    expect(publish.run).toContain('if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi')
+  })
+
+  test('an upload without the signing key fails before the build; the key is written with umask 077 and removed by an always() step', () => {
+    const run = stepNamed('Build and publish the OBS images').run as string
+    expect(run.indexOf('[ -z "$PACKS_V3_SIGNING_KEY" ]')).toBeGreaterThan(-1)
+    expect(run.indexOf('[ -z "$PACKS_V3_SIGNING_KEY" ]')).toBeLessThan(run.indexOf('publish-obs-images.ts'))
+    expect(run).toContain('umask 077')
+    expect(run).toContain('stop-commands')
+    expect(run).toContain('if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi')
+    const names2 = job.steps.map((s) => s.name)
+    const remove = stepNamed('Remove the signing key')
+    expect(names2.indexOf('Remove the signing key')).toBeGreaterThan(names2.indexOf('Build and publish the OBS images'))
+    expect(remove.if).toBe('always()')
+    expect(remove.run).toMatch(/shred -u|rm -f/)
+    expect(remove.run).toContain('$RUNNER_TEMP/sign.pem')
+    expect(remove.env).toBeUndefined()
+  })
+
+  test('no secret is echoed and nothing traces', () => {
+    for (const s of job.steps) {
+      const run = s.run ?? ''
+      expect(run).not.toMatch(/set\s+-\w*x/)
+      expect(run).not.toMatch(/echo[^\n]*PACKS_V3_SIGNING_KEY/)
+      expect(run).not.toMatch(/(echo|printf)[^\n]*R2_SECRET_ACCESS_KEY/)
+    }
+  })
+})
