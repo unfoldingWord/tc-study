@@ -253,6 +253,28 @@ export type ObsModel = {
   links?: ObsHelpTable
   studyNotes?: ObsHelpTable
   studyQuestions?: ObsHelpTable
+  /** The Five Movements session manual (`obs.cddl`, "OBS Five Movements"); its `res` is a key of this model's `res`. */
+  tf?: ObsTfModel
+}
+
+/** A block of a story's session (`tf-parts`): the heading row of a part (no `list`) or of a list, or a shared block (`shared` is its key). */
+export type ObsTfBlock = { story: number; part: string; list?: string; title?: string; text?: string; shared?: string }
+/** A question (`tf-questions`); `k` counts from 1 within the part; `refText` is the frame label as the source wrote it, when corrected. */
+export type ObsTfQuestion = { story: number; part: string; list: string; k: number; frames: number[]; q: string; a?: string; refText?: string }
+/** A translation term (`tf-terms`); `k` counts from 1 within the frame. */
+export type ObsTfTerm = { frame: number; k: number; term?: string; text: string; refText?: string }
+/** A block the stories share (`tf-shared`), stored once. */
+export type ObsTfShared = { key: string; title: string; text?: string }
+/** The Five Movements tables of one language (`tf-parts`, `tf-questions`, `tf-terms`, `tf-shared`, `tf-frames`, `tf-framework`), as rows in table order. */
+export type ObsTfModel = {
+  res: string
+  stories: number[]
+  parts: ObsTfBlock[]
+  questions: ObsTfQuestion[]
+  terms: ObsTfTerm[]
+  shared: ObsTfShared[]
+  frames: { frame: number; text: string }[]
+  framework: { code: string; name?: string; text?: string }[]
 }
 
 /**

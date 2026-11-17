@@ -21,7 +21,7 @@ obs-tables = {
   ? "study-questions": obs-helps,   ; optional, v1 (OBS SQ)
   ; DRAFT (OBS 5M, phase 0; not built, not in any reader yet): the Five Movements session manual (OBS Theological Formation).
   ; All optional, so a reader that does not know them skips them (container.md). They never use the table "strings": with
-  ; them or without them, every other table of the segment has the same bytes. The rules are in the block
+  ; them or without them, every other table of the segment has the same bytes (the header's "res" lists one resource more). The rules are in the block
   ; "OBS Five Movements" at the end of this file.
   ? "tf-parts": tf-parts,      ; optional, v1: the parts of each story's session, in order; the coverage
   ? "tf-questions": tf-questions,   ; optional, v1: observation, discourse, theology and journal questions
@@ -75,8 +75,9 @@ obs-helps = {
 ; when a row of tf-parts has "shared", tf-frames when a frame is missing from "stories", and tf-questions or tf-terms when
 ; the source has rows for them.
 ;
-; Header "res". The resource of the 5M set is added at the end of the header's "res", so the indexes of "stories" and its
-; helps do not move. Every tf-* table has "res" and all of them carry the same value: a different one is E_BODY.
+; Header "res". The resource of the 5M set is listed in the header's "res" like every other resource of the segment, and the
+; build lists them in the order of their keys. Every tf-* table has "res" and all of them carry the same value: a different
+; one is E_BODY.
 ;
 ; Columns. The tf-* tables never use the encoding "strings" (E_BODY if a column does) and never "flags". Text columns are
 ; "texts"; number columns are "uints". Each column below says whether it has "has". A "has" bit is 1 only for a non-empty

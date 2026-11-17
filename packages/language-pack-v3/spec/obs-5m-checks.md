@@ -77,13 +77,39 @@ Warn (the build goes on and the report lists each one):
   devotional sections.
 - With the correspondence above: no errors, and the warnings listed in 5–8.
 
-## Reading the source (to be written in phase 1)
+## Reading the source
 
-How the build parses the Markdown (the heading match, where a `#heading` section of a transclusion ends, nested
-transclusions, what "minimal markdown" strips, how a question is told from its answer) is the behavior of the phase 0
-reference reader (`fase0/scripts/tf5m.ts` of the planning folder). Phase 1 writes it here from that script before the
-builder is called done. The reader matches the English headings of `en_obs-tf`; `id_obs-tf` has translated headings and
-would need a heading table per language, which is out of scope until it has a release.
+The reference reader is `src/source/obsTf.ts` (`parseObsTf`); it reads no disk and no network, and the same files give the
+same model. It reads the English headings of `en_obs-tf` (`id_obs-tf` has translated headings and would need a heading
+table per language: out of scope until it has a release).
+
+- **Files.** `obs_story_{N}.md` for each story present (the coverage is the stories read), `transclusions/{name}.md`, and
+  optionally `transclusions/overview.md`. The front matter and the `<!-- -->` comments are dropped.
+- **Parts by heading.** `## Introduction` (with its `###` blocks: the intro text), `### Open Bible Story: {title}` (then
+  the frames, `#########` headings of the form `NN-FF`), `## Biblical Interpretation…` (m1), `## Theological Dialogue…`
+  (m2), `## Personal Reflection…` (m3). Lists: `### Observation Questions` and `### Translation Questions` (m1),
+  `### Discourse Questions` and `### Theological Questions` (m2), `### Journal Reflection` (m3). A heading that starts a
+  part and is not one of these is an error; a heading matches when it starts with the text above.
+- **Questions.** Observation: under `#### {frame}`, one question per paragraph; the first line is the question and the rest
+  is the answer. Discourse: a `#####` heading is the question and ends with `(frames)`, the body is the answer.
+  Theological and journal: a numbered list; a question has no answer.
+- **Terms.** Under `#### {frame}`, one row per paragraph; the term is the first `**bold**` span (a paragraph without one
+  warns and keeps its row with no term); the text is the whole paragraph.
+- **Frame labels** are read with commas or spaces between them (`08-10 08-11`) and one-digit frames (`14-1`), after the
+  reviewed correspondence and fixes above; a label that cannot be read is an error.
+- **Transclusions** `![[name]]` (shared blocks: `movement_2_drafting`, `movement_3_checking`, `movement_4`, `movement_5`,
+  `conclusion` and `obs-devotionals-unit-N#Community Study…`) become a row with `shared`. `![[file#heading]]` takes the
+  section from that heading up to the next heading of the same or a higher level, with nested sections included, and its
+  first heading is the block's title; a heading that matches only with white space collapsed gives a warning and the key
+  keeps the heading as the file writes it. Transclusions are not nested. Images (`![[imageN.jpeg]]`) are not read.
+- **Frame text.** The manual's frame text is read only to compare with `obs` and, for a frame `obs` lacks, to fill
+  `tf-frames`.
+- **Order.** Rows are sorted as `obs.cddl` says (stories, parts in the fixed order, a part's heading row before its lists;
+  stable inside a part and list). The shared blocks follow the order of first use. A story with no `obs` story takes its title
+  from `### Open Bible Story:` on its `frames` heading row.
+- **The framework.** The names of m1 to m5 come from the heading of the part (m1 to m3) or of the shared block (m4, m5),
+  from the first story that has one. `overview.md`, without its front matter and its `# ` title, is the text of the row
+  `overview`.
 
 ## Decisions
 

@@ -32,6 +32,7 @@ import type { ObsHelpRow, ObsHelpTable, ObsModel, ObsStory } from '../model'
 import type { ResourceRef, Row, RowSource } from '../source/rows'
 import { columnPlans, encodeColumn, resIndexOf, type TablePart } from './book'
 import { type HelpsKind, helpColumns, sourceRows, uniqueIds } from './bookHelps'
+import { obsTfPart } from './obsTf'
 
 const STORIES_SUBJECT = 'Open Bible Stories'
 const HELPS_SUBJECTS: Record<HelpsKind, string[]> = {
@@ -375,6 +376,7 @@ export function obsSegment(m: ObsModel): Segment {
     const table = m[key]
     if (table !== undefined) parts.push(helpsPart(name, table, resIndex))
   }
+  if (m.tf !== undefined) parts.push(obsTfPart(m.tf, resIndex))
 
   const strings = stringTable(parts.flatMap((part) => part.uses))
   const tables: Record<string, [number, boolean]> = { strings: [1, true], stories: [1, true] }
