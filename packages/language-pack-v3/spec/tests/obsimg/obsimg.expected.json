@@ -1,0 +1,41 @@
+{
+  "frames": [
+    {
+      "data": "524946460001",
+      "h": 360,
+      "media": "image/webp",
+      "n": 1,
+      "w": 640
+    },
+    {
+      "data": "ff007f",
+      "h": 360,
+      "media": "image/webp",
+      "n": 2,
+      "w": 640
+    }
+  ],
+  "h": {
+    "class": "obsimg",
+    "group": "01",
+    "lang": "zxx-obsimg",
+    "tables": {
+      "frames": [
+        1,
+        true
+      ],
+      "meta": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "a21cea2fd77f059c759e9b686f2ac83cbdcc2d839d1f1ee7cf3537c0ec6bd667",
+  "meta": {
+    "changes": "converted to WebP quality 75",
+    "credit": "Illustrations © Sweet Publishing, https://sweetpublishing.com",
+    "license": "CC BY-SA 3.0",
+    "source": "https://cdn.door43.org/obs/jpg/obs-images-360px.zip"
+  }
+}

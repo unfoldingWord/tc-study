@@ -1236,6 +1236,62 @@ def test_art_tables_that_do_not_match_their_schema(name):
     err(build(h, t).data, "E_BODY")
 
 
+# ---- obsimg ----
+
+
+def obsimg_fixture():
+    meta = {"license": "CC BY-SA 3.0", "credit": "Illustrations © Sweet Publishing, https://sweetpublishing.com",
+            "changes": "converted to WebP quality 75", "source": "https://cdn.door43.org/obs/jpg/obs-images-360px.zip"}
+    h = {"class": "obsimg", "v": 1, "tables": {"frames": [1, True], "meta": [1, True]}, "lang": "zxx-obsimg",
+         "group": "01"}
+    frames = [{"n": 1, "media": "image/webp", "w": 640, "h": 360, "data": bytes([0x52, 0x49, 0x46, 0x46, 0, 1])},
+              {"n": 2, "media": "image/webp", "w": 640, "h": 360, "data": bytes([0xFF, 0, 0x7F])}]
+    expected = {"h": header_h(h), "frames": [dict(f, data=f["data"].hex()) for f in frames], "meta": meta}
+    return build(h, {"frames": frames, "meta": [meta]}), expected, (h, {"frames": frames, "meta": [meta]})
+
+
+def test_obsimg_story_with_two_frames():
+    b, expected, _ = obsimg_fixture()
+    ok(b, expected)
+
+
+def test_obsimg_is_a_class_name_and_the_frozen_case_is_read():
+    assert "obsimg" in lp3read.CLASSES
+    case = HERE.parent / "tests" / "obsimg"
+    got = read_file((case / "obsimg.seg").read_bytes())
+    assert canon(got) == canon(json.loads((case / "obsimg.expected.json").read_text(encoding="utf8")))
+
+
+OBSIMG_MUTATIONS = {
+    "frames out of order": lambda h, t: t["frames"].reverse(),
+    "frame twice": lambda h, t: t["frames"][1].update(n=1),
+    "n zero": lambda h, t: t["frames"][0].update(n=0),
+    "w zero": lambda h, t: t["frames"][0].update(w=0),
+    "empty data": lambda h, t: t["frames"][0].update(data=b""),
+    "data as text": lambda h, t: t["frames"][0].update(data="abc"),
+    "media missing": lambda h, t: t["frames"][0].pop("media"),
+    "no frames": lambda h, t: t.update(frames=[]),
+    "two meta rows": lambda h, t: t["meta"].append(dict(t["meta"][0])),
+    "meta without credit": lambda h, t: t["meta"][0].pop("credit"),
+    "header without group": lambda h, t: h.pop("group"),
+    "group not two digits": lambda h, t: h.update(group="1"),
+    "story 51": lambda h, t: h.update(group="51"),
+    "header without lang": lambda h, t: h.pop("lang"),
+}
+
+
+@pytest.mark.parametrize("name", list(OBSIMG_MUTATIONS))
+def test_obsimg_tables_that_do_not_match_their_schema(name):
+    _, _, (h, t) = obsimg_fixture()
+    OBSIMG_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+def test_a_class_that_is_not_a_class_is_e_body():
+    _, _, (h, t) = obsimg_fixture()
+    err(build(dict(h, **{"class": "zzz"}), t).data, "E_BODY")
+
+
 # ---- lex ----
 
 

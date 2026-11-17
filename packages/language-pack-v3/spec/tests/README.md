@@ -123,7 +123,7 @@ required table it does not know is `E_TABLE`.
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
 **What a phase 1 reader knows.** Every table of `cddl/<class>.cddl`, at version 1, for the classes `book`, `orig`, `art`,
-`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
+`lex`, `obs` and `catalog` (a current reader also knows those of `obsimg`; a phase 1 reader does not know that class, which is `E_BODY`). For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
 "`map`, `xmap`" below), so **a segment of
 these classes is `E_TABLE`** for a phase 1 reader, even if its tables are all optional, once the checks of `container.md` up to
 `E_HMISMATCH` have passed. The same holds for a segment inside a transfer file (below).
@@ -256,6 +256,10 @@ Example: `{"form": "Παῦλος", "lemma": "Παῦλος", "morph": "Gr,N,,,,
 A section has `sid`, `level` (integer), `role` and `lang` and `md` (text), and, when the file has them, `title` (text) and
 `aliases` (list of text). Example: `{"sid": "definition", "level": 2, "role": "definition", "title": "Definición", "lang": "es-419",
 "md": "…"}`. The group and the language are in `h` (`group`, `lang`), not repeated.
+
+### `obsimg`
+
+`frames`: the list of the table, in its order (by `n`). Each frame has `n`, `w`, `h` (integers), `media` (text) and `data` (the bytes of the image file as lowercase hex, like every byte string of the output). `meta`: the one row of the table as an object with `license`, `credit`, `changes` and `source` (text). The story is `h.group` and the language `h.lang`, not repeated.
 
 ### `lex`
 
@@ -468,6 +472,7 @@ types, these are `E_BODY` too:
   `flags`, or a `frame` column of another length than `n`.
 - **`art`.** An article with an empty `id`; an article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
   article; an `id` twice in the group.
+- **`obsimg`.** A `group` that is not two digits from `01` to `50`; no frame; a frame whose `n` is 0 or not above the one before (out of order or twice); a `w` or `h` of 0; empty `data` or `data` that is not a byte string; a `media` or a `meta` field that is not text; a `meta` that does not have exactly one row. The header needs `lang` and `group`; it has no `res`. A reader does not check that `lang` is `zxx-obsimg`, that `book`, `part`, `orig` and `res` are absent, or the value of `media` (it is passed through).
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
 - **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part without `book` is valid; a part whose `book` differs from its `part` is E_BODY; a core with a `book`; a
@@ -536,6 +541,7 @@ The order of the checks between a defect in the container and one in a table is 
 | 21 | `articulos-relacionados` (`art.seg`) | The `related` of tA articles (`art.cddl`) | Four es-419 articles of `ta:translate`: the config of the manual says `figs-exmetaphor` and `bita-part1` depend on `figs-metaphor` (and `figs-exmetaphor` recommends `bita-part1`); the text of `figs-simetaphor` links to `figs-metaphor` | Every tie both ways, sorted: `figs-metaphor` has `bita-part1`, `figs-exmetaphor`, `figs-simetaphor`; `figs-simetaphor` has `figs-metaphor` |
 | 22 | `catalogo-parche` (`catalog.seg`) | A patch catalog (`catalog.md`, "Patch catalogs"): the optional `source` and `review` of a resource | The published catalog `hi-x-aquifer`: one resource `aquifer/hi/tn` with `source: "aquifer"` and `review: "none"`, one book unit `book:tit` (no text, one note) whose only need is `orig:tit`, and `requires` the common catalog | The catalog with the resource's `source` and `review` as written, and the unit `book:tit` with `needs` `["orig:tit"]` (no `map`, no `art:`) |
 | 23 | `macula-v2` (`orig-rut.seg`) | The MACULA trees and referents of `orig`, version 2 (`orig.cddl`, `macula`) | Ruth 1:1-5 of the UHB (`v3.0.0#2026-08-14T18_44_01Z`) with the real MACULA Hebrew rows of Ruth (`3b8aa380e8#2026-10-15T02_19_35.000Z`), trimmed: `data/originals-rut.langpack.zip` (format 1.1 originals pack read by `zipSource`), built by `extractOrig` and `origSegment` | `macula.v` 2, the release stamp, 5 trees (one sentence per verse; no real sentence of the slice crosses a verse), 31 referent rows over verses 1:1 to 1:5: kinds `a`, `r` and `p`, targets in the same verse (`x,y = 0,0` in the source) and in another (1:4 and 1:5 point to 1:3), rows with `ante` and rows without. Both readers give the same output |
+| 24 | `obsimg` (`obsimg.seg`) | The pictures of an OBS story (`obsimg.cddl`): frames with bytes, and the credit row | Story `01` with two frames (640 by 360, `image/webp`, 6 and 3 made-up bytes; the reader does not decode them) and the `meta` of the real catalog (CC BY-SA 3.0, Sweet Publishing), built by `obsimgSegments` | `h.lang` `zxx-obsimg`, `h.group` `01`, no `res`; `frames` with `data` as hex (`524946460001`, `ff007f`) and the `meta` object. Both readers give the same output |
 
 Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).
 

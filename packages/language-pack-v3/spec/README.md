@@ -1,7 +1,7 @@
 # Language packs, format 3: specification
 
 Status: **phase 1 is implemented**: the TypeScript reader and builders (`packages/language-pack-v3`), an independent Python reader
-(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). **Phase 2 part B is implemented** (topics, people, places, events, stories, sections and relations: TIPNR, Theographic, English OBS and the tN outlines in `xtopics`; the language's names from its alignment and outlines in `topics`; two fixed queries). **Phase 2 part C is implemented** (the aligned-phrase index: class `aligned`, optional catalog units `aligned:{group}`, a phrase query, `build-v3 --aligned`). **`macula` v2 (MACULA in columns) is implemented** (plan "macula v2"); one gate is not met (see "Deviations of macula v2"). Phase 3 (signatures) is not, and nor are the images and the basemap.
+(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). **Phase 2 part B is implemented** (topics, people, places, events, stories, sections and relations: TIPNR, Theographic, English OBS and the tN outlines in `xtopics`; the language's names from its alignment and outlines in `topics`; two fixed queries). **Phase 2 part C is implemented** (the aligned-phrase index: class `aligned`, optional catalog units `aligned:{group}`, a phrase query, `build-v3 --aligned`). **`macula` v2 (MACULA in columns) is implemented** (plan "macula v2"); one gate is not met (see "Deviations of macula v2"). Phase 3 (signatures) is not, and nor is the basemap. The OBS pictures are implemented (class `obsimg`, catalog `zxx-obsimg`).
 
 Format 3 is the next major version of the tc-language-packs. Format 2.0 (`packages/language-pack`, parts per book)
 keeps being published, frozen, until each app version that reads it has a retirement date. Format 3 keeps what 2.0
@@ -29,7 +29,7 @@ num, ecc, ezk and frt.
 
 ## The pieces
 
-A language is published as a **catalog** and segments of twelve classes (the last, `gen`, is reserved). The original and the common map are the same
+A language is published as a **catalog** and segments of thirteen classes (`gen` is reserved; `obsimg`, the last, holds the OBS pictures). The original and the common map are the same
 for every language and are published once.
 
 | Class | What it holds | Scope |
@@ -45,6 +45,7 @@ for every language and are published once.
 | `art` | Word (tW) and Academy (tA) articles, in sections with stable ids | One language, one group of articles |
 | `lex` | Lexicon entries for a range of Strong numbers | One language, one group |
 | `obs` | Open Bible Stories with their frames, notes, questions, word links and study notes and questions | One language |
+| `obsimg` | The pictures of the Open Bible Stories frames, one segment per story, with their credit. Language independent: only in the catalog `zxx-obsimg` | One story |
 | `gen` | Reserved for text a model generated, with its provenance. Not built now | — |
 
 Complements (question classifiers, vectors, number words) are not part of the format. They travel through the same

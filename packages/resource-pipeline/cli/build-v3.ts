@@ -49,6 +49,7 @@ import {
   catalogView,
   hex,
   KNOWN,
+  OBSIMG_CATALOG,
   signCatalog,
   readHeader,
   readSegment,
@@ -65,6 +66,9 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
+import { buildObsImages } from '../src/obsImages/build'
+import { convertAll, type Converter, encoderName, sharpConverter } from '../src/obsImages/convert'
+import { fetchObsImagesZip, OBS_IMAGES_ZIP, readObsJpegs } from '../src/obsImages/source'
 import { readTaConfigs, readTaTocs } from '../src/language/taConfig'
 import { pins, sourcesProblem, type TopicSource } from './fetch-topic-sources'
 
@@ -94,6 +98,8 @@ export const USAGE =
   '               of the configs (without it, the ties of the links of the texts alone)\n' +
   '  --role-hints a folder with segments/*.seg of the map language (the published `art` segments): the sections whose heading the language\n' +
   '               does not know take the role of the same section of the English article with the same id (publish-v3 gives it)\n' +
+  '  --obs-images (no value) builds only the catalog zxx-obsimg (the OBS pictures: downloaded, checked against the pin, converted to WebP): needs --out and takes\n' +
+  '               only --sign-key, --revision (default 1), --previous, --built, --publisher and --cache (a folder that keeps the downloaded zip)\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -122,10 +128,14 @@ type Options = {
   signKey?: string
   taConfig?: string
   roleHints?: string
+  /** `--obs-images`: build only the catalog `zxx-obsimg`; `list`, `originals` and `parts` are then empty. */
+  obsImages?: boolean
+  previous?: Uint8Array
+  cache?: string
 }
 
-const BOOLEAN_FLAGS = ['aligned']
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints']
+const BOOLEAN_FLAGS = ['aligned', 'obs-images']
+const VALUE_FLAGS = ['previous', 'cache', 'list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -149,6 +159,29 @@ function flagsOf(argv: string[]): Map<string, string> {
   return flags
 }
 
+/** The options of `--obs-images`: only --out is required, and a flag of the language build is refused rather than ignored. */
+function obsImagesOptions(flags: Map<string, string>, need: (name: string) => string): Options {
+  const allowed = ['obs-images', 'out', 'sign-key', 'revision', 'previous', 'built', 'publisher', 'cache']
+  for (const name of flags.keys()) if (!allowed.includes(name)) throw new UsageError(`--${name} does not apply to --obs-images`)
+  const out = need('out')
+  const revisionText = flags.get('revision') ?? '1'
+  const revision = Number(revisionText)
+  if (!/^[0-9]+$/.test(revisionText) || !Number.isSafeInteger(revision)) throw new UsageError(`--revision ${JSON.stringify(revisionText)} is not a whole number`)
+  const previousText = flags.get('previous')
+  if (previousText !== undefined && !/^[0-9a-f]{64}$/.test(previousText)) throw new UsageError(`--previous ${JSON.stringify(previousText)} is not an id (64 lowercase hex digits)`)
+  const built = flags.get('built') ?? new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+  if (!RFC3339.test(built)) throw new UsageError(`--built ${JSON.stringify(built)} is not an RFC 3339 date and time (2026-11-01T10:00:00Z)`)
+  const publisher = flags.get('publisher') ?? 'unfoldingWord'
+  if (publisher === '') throw new UsageError('--publisher is empty')
+  const signKey = flags.get('sign-key')
+  if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
+  return {
+    list: '', originals: '', parts: '', out, revision, revisionCommon: revision, revisionLang: revision, built, publisher, mapLang: 'en', aligned: false, signKey,
+    obsImages: true, cache: flags.get('cache'),
+    previous: previousText === undefined ? undefined : Uint8Array.from(previousText.match(/../g)!, (pair) => parseInt(pair, 16)),
+  }
+}
+
 export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins()): Options {
   const flags = flagsOf(argv)
   const need = (name: string): string => {
@@ -156,6 +189,9 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     if (value === undefined) throw new UsageError(`--${name} is missing`)
     return value
   }
+  if (flags.has('obs-images')) return obsImagesOptions(flags, need)
+  // A language build has --previous-common and --previous-lang: a bare --previous (or --cache) would be ignored without a word.
+  for (const name of ['previous', 'cache']) if (flags.has(name)) throw new UsageError(`--${name} applies only to --obs-images`)
   const list = need('list')
   const originals = need('originals')
   const parts = need('parts')
@@ -383,7 +419,56 @@ async function readPublished(dir: string, books: string[], needMap: boolean, nee
   return { segments: [], catalogId: read.id, revision: model.about.revision, report: [], published: true, core }
 }
 
-async function build(o: Options, io: Io): Promise<void> {
+/** What `--obs-images` needs from outside, so a test runs without the network and without sharp. */
+export type ObsImagesDeps = {
+  fetch: (url: string) => Promise<{ ok: boolean; status: number; arrayBuffer(): Promise<ArrayBuffer> }>
+  /** The converter and the name of its encoder; the default is sharp's. */
+  converter?: () => Promise<{ convert: Converter; encoder: string }>
+  /** The pin of the zip (the real one by default). */
+  pin?: typeof OBS_IMAGES_ZIP
+}
+
+async function buildObsImagesFolder(o: Options, io: Io, deps: ObsImagesDeps): Promise<void> {
+  const t0 = Date.now()
+  const zip = await fetchObsImagesZip(deps.fetch, o.cache, deps.pin)
+  const jpegs = await readObsJpegs(zip)
+  const { convert, encoder } = deps.converter === undefined ? { convert: await sharpConverter(), encoder: await encoderName() } : await deps.converter()
+  const images = await convertAll(jpegs, convert)
+  const about = { format: '3.0' as const, publisher: o.publisher, origin: 'published' as const, revision: o.revision, ...(o.previous === undefined ? {} : { previous: o.previous }), built: o.built }
+  const built = await buildObsImages({ images, encoder, about, source: (deps.pin ?? OBS_IMAGES_ZIP).url })
+
+  let key: SigningKey | undefined
+  if (o.signKey !== undefined) {
+    key = await readSigningKey(o.signKey)
+    built.catalog = { ...built.catalog, bytes: await signCatalog(built.catalog.bytes, key.pkcs8) }
+  }
+
+  await rm(join(o.out, 'segments'), { recursive: true, force: true })
+  await mkdir(join(o.out, 'segments'), { recursive: true })
+  for (const segment of built.segments) await writeFile(join(o.out, 'segments', `${segment.id}.seg`), segment.bytes)
+  await writeFile(join(o.out, `catalog-${OBSIMG_CATALOG}.seg`), built.catalog.bytes)
+  const largest = built.segments.reduce((a, b) => (b.bytes.length > a.bytes.length ? b : a))
+  const segmentBytes = built.segments.reduce((sum, s) => sum + s.bytes.length, 0)
+  const seconds = ((Date.now() - t0) / 1000).toFixed(1)
+  const summary = [
+    `images: ${images.length}`,
+    `segments: ${built.segments.length}, ${segmentBytes} bytes (${(segmentBytes / 1048576).toFixed(2)} MiB)`,
+    `catalog: ${built.catalog.bytes.length} bytes, id ${built.catalog.id}`,
+    `largest segment: story ${largest.seg.h.group}, ${largest.bytes.length} bytes`,
+    `encoder: ${encoder}`,
+    `signed: ${key === undefined ? 'no' : `key ${key.keyId}`}`,
+    `wall time: ${seconds} s`,
+  ]
+  await writeFile(join(o.out, 'report.txt'), `${['language-pack-v3 build report', `built: ${o.built}`, `catalog: ${OBSIMG_CATALOG}, revision ${o.revision}`, ...summary].join('\n')}\n`)
+  for (const line of summary) io.log(line)
+  io.log(`written in ${o.out}`)
+}
+
+async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
+  if (o.obsImages === true) {
+    await buildObsImagesFolder(o, io, deps ?? { fetch: (url) => fetch(url) })
+    return
+  }
   const lang = await languageOf(o.list)
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(lang)) throw new Error(`${o.list}: the language ${JSON.stringify(lang)} cannot name a file`)
   const originalsLanguage = await languageOf(o.originals)
@@ -517,7 +602,7 @@ async function build(o: Options, io: Io): Promise<void> {
 }
 
 /** The command: its exit code (0, 1 for a usage error, 2 for a build error). `io` takes what it prints. */
-export async function main(argv: string[], io: Io = { log: console.log, error: console.error }, sources: TopicSource[] = pins()): Promise<number> {
+export async function main(argv: string[], io: Io = { log: console.log, error: console.error }, sources: TopicSource[] = pins(), deps?: ObsImagesDeps): Promise<number> {
   let options: Options
   try {
     options = optionsFromArgs(argv, sources)
@@ -528,7 +613,7 @@ export async function main(argv: string[], io: Io = { log: console.log, error: c
     return 1
   }
   try {
-    await build(options, io)
+    await build(options, io, deps)
     return 0
   } catch (error) {
     io.error(`Error: ${error instanceof Error ? error.message : String(error)}`)

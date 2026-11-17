@@ -97,6 +97,9 @@ function unitIdOf(seg: Segment): string {
       return `aligned:${need(group, 'group')}`
     case 'obs':
       return 'obs'
+    case 'obsimg':
+      need(group, 'group')
+      return 'obsimg'
     case 'map':
     case 'xmap':
     case 'xtopics':
@@ -108,27 +111,32 @@ function unitIdOf(seg: Segment): string {
 }
 
 /**
- * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map`, `xmap`, `xtopics`, `topics` and `aligned` (one per part, id `aligned:{group}`, `optional: true`, no `needs`), ordered by id by
+ * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `obsimg` (all the `obsimg` segments, one per story `group`), `map`, `xmap`, `xtopics`, `topics` and `aligned` (one per part, id `aligned:{group}`, `optional: true`, no `needs`), ordered by id by
  * code point. A unit's `segments` are indexes in `segments`, ascending. `needs(segment)` gives the ids of the units a segment needs;
  * the unit's `needs` are the sorted union over its segments, left out when empty.
  *
  * Throws `Error` for a segment of class `catalog` or `gen`, two segments that give the same unit id (the core of a `map` or an `xmap`
- * and its parts are one unit, but a part twice is an error) a `needs` that is not a list of text, a segment whose `needs` lists an `aligned` unit, and an `aligned` segment with `needs`.
+ * and its parts are one unit, but a part twice is an error; so are the stories of `obsimg`, and a story twice is an error) a `needs` that is not a list of text, a segment whose `needs` lists an `aligned` unit, and an `aligned` segment with `needs`.
  */
 export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => string[]): Unit[] {
-  const units = new Map<string, { indexes: number[]; needs: Set<string>; parts: Set<string | undefined> }>()
+  const units = new Map<string, { indexes: number[]; needs: Set<string>; parts: Set<string | undefined>; groups: Set<string> }>()
   segments.forEach((built, index) => {
     const id = unitIdOf(built.seg)
     let unit = units.get(id)
     if (unit === undefined) {
-      unit = { indexes: [], needs: new Set(), parts: new Set() }
+      unit = { indexes: [], needs: new Set(), parts: new Set(), groups: new Set() }
       units.set(id, unit)
-    } else if (id !== 'map' && id !== 'xmap' && id !== 'xtopics' && id !== 'topics') {
+    } else if (id !== 'map' && id !== 'xmap' && id !== 'xtopics' && id !== 'topics' && id !== 'obsimg') {
       throw new Error(`The segments ${built.id} and ${segments[unit.indexes[0]].id} are both the unit ${id}`)
     }
-    const { part } = built.seg.h
-    if (unit.parts.has(part)) throw new Error(`The segment ${built.id} repeats the part ${JSON.stringify(part)} of the unit ${id}`)
-    unit.parts.add(part)
+    const { part, group } = built.seg.h
+    if (id === 'obsimg') {
+      if (unit.groups.has(group!)) throw new Error(`The segment ${built.id} repeats the story ${JSON.stringify(group)} of the unit ${id}`)
+      unit.groups.add(group!)
+    } else {
+      if (unit.parts.has(part)) throw new Error(`The segment ${built.id} repeats the part ${JSON.stringify(part)} of the unit ${id}`)
+      unit.parts.add(part)
+    }
     unit.indexes.push(index)
 
     const wanted = needs(built)

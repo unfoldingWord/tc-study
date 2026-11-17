@@ -25,6 +25,7 @@ import { bookSegment } from '../../src/build/book'
 import { type BuiltSegment, buildCatalog, builtSegment, needsOfBook } from '../../src/build/catalog'
 import { BUILDER, buildCommon, buildLanguage, type LanguageBuild } from '../../src/build/language'
 import { extractObs, obsSegment } from '../../src/build/obs'
+import { obsimgSegments } from '../../src/build/obsimg'
 import { buildMap } from '../../src/build/map/build'
 import { mapSegment } from '../../src/build/map/segment'
 import { versesOf } from '../../src/build/maps/verses'
@@ -579,6 +580,21 @@ async function maculaV2(): Promise<Uint8Array> {
   return (await writeSegment(origSegment(orig))).bytes
 }
 
+// Case 24: the pictures of an Open Bible Stories story (`obsimg`)
+
+/** The segment of case 24: story 1 with two frames of a few bytes each (the reader does not decode them) and the credit of the real catalog. */
+async function obsPictures(): Promise<Uint8Array> {
+  const frame = (n: number, bytes: number[]) => ({ story: 1, frame: n, bytes: Uint8Array.from(bytes), media: 'image/webp', w: 640, h: 360 })
+  const meta = {
+    license: 'CC BY-SA 3.0',
+    credit: 'Illustrations © Sweet Publishing, https://sweetpublishing.com',
+    changes: 'converted to WebP quality 75',
+    source: 'https://cdn.door43.org/obs/jpg/obs-images-360px.zip',
+  }
+  const [seg] = obsimgSegments([frame(1, [0x52, 0x49, 0x46, 0x46, 0x00, 0x01]), frame(2, [0xff, 0x00, 0x7f])], meta, [2])
+  return (await writeSegment(seg)).bytes
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -616,6 +632,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('transferencia-catalogo-local/local.keys.json', signedFiles.get('catalog-signed/catalog.keys.json')!)
   const outOfRange = await integerOutOfRange()
   out.set('macula-v2/orig-rut.seg', await maculaV2())
+  out.set('obsimg/obsimg.seg', await obsPictures())
   out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
   out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out

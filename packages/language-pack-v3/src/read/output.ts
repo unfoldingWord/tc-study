@@ -20,6 +20,7 @@ import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, 
 import { checkSignatures } from '../sign'
 import { readTransfer } from '../transfer'
 import { ART_TABLES, artView } from './art'
+import { OBSIMG_TABLES, obsimgView } from './obsimg'
 import { BOOK_TABLES, bookView } from './book'
 import { CATALOG_TABLES, catalogView } from './catalog'
 import { ALIGNED_TABLES, alignedView } from './aligned'
@@ -58,6 +59,7 @@ export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   topics: { ...TOPICS_TABLES },
   aligned: { ...ALIGNED_TABLES },
   gen: {},
+  obsimg: { ...OBSIMG_TABLES },
 })
 
 // JSON data
@@ -251,6 +253,10 @@ function bodyOut(seg: Segment): Record<string, unknown> {
         'study-notes': obsHelpsOut(m.studyNotes),
         'study-questions': obsHelpsOut(m.studyQuestions),
       }
+    }
+    case 'obsimg': {
+      const m = obsimgView(seg)
+      return { frames: m.frames, meta: m.meta }
     }
     case 'catalog': {
       const m = catalogView(seg)

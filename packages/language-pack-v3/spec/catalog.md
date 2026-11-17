@@ -4,13 +4,16 @@ The catalog is where reading starts. It says which segments a language has, whic
 on, and which licenses apply. It is a segment of class `catalog` (`container.md`), small, and the only one that is
 signed. Its schema is `cddl/catalog.cddl`.
 
-There are two kinds:
+There are three kinds:
 
-- a **language catalog** (`lang` set), for one language's segments;
+- a **language catalog** (`lang` is the language tag), for one language's segments;
 - the **common catalog** (no `lang`), for the original and the common map, which every language needs and nobody
-  downloads twice.
+  downloads twice;
+- a **catalog with no linguistic content** (`zxx-{name}`, `lang` is the catalog name), for content that is the same for
+  every language: see "Catalogs with no linguistic content" below.
 
-A language catalog names the common catalog revision it was built against (`requires`).
+A language catalog names the common catalog revision it was built against (`requires`). A catalog with no linguistic
+content requires nothing, and no catalog requires it.
 
 ## Revisions
 
@@ -34,6 +37,7 @@ A **unit** is what a device installs or replaces at once:
 | `art:tw:kt`, `art:ta:translate`… | A group of articles |
 | `lex:G5`… | A group of lexicon entries |
 | `aligned:a-am`, `aligned:ar-b`, `aligned:other`… | One part of the language's index of aligned phrases (`aligned`, language catalog), named by its range of keys (prefixes of 1 to 6 characters; `cddl/aligned.cddl`). Optional: a device installs it only when asked. Needs nothing, and no unit needs it |
+| `obsimg` | The pictures of the Open Bible Stories frames (catalog `zxx-obsimg` only): all the `obsimg` segments of the catalog, one per story (`group`). Needs nothing (unlike `obs`, it does not need `map`) and is not optional-flagged, but no client adds it with the default units: a person asks for it. A segment is about 200 to 700 KB (the largest, story 16, was 705 430 bytes in the first build), far below the limit of 64 MiB (`container.md`) |
 | `obs` | Open Bible Stories. Needs the language map (`needs: "map"`: the names of the books are there; the titles of the stories come from the topics and their ranges from the common topics, which the obs unit does not need) |
 
 Each unit lists the units it needs (`needs`). A unit may carry `optional: true`: a device installs it only when asked. Every `aligned:{part}` unit must carry it (with the value `true`) and no other unit may; no unit lists an optional unit in `needs`, and an optional unit lists no `needs` (rules of the builder; a reader does not check them). The part of an `aligned:{part}` id must be a group (`cddl/aligned.cddl`), or the catalog is `E_BODY`. A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
@@ -138,6 +142,10 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
    without keys.
 - **Going back.** A reader MUST NOT replace an installed catalog with a lower revision of the same publisher and
   catalog, unless the person confirms it. An old SD card must not undo an update without asking.
+
+## Catalogs with no linguistic content
+
+A catalog named `zxx-{name}` (`zxx` is the ISO 639 code for "no linguistic content") holds content that is the same for every language; today only `zxx-obsimg`, the Open Bible Stories pictures. Its header `lang` equals `about.catalog`, like any language catalog, and it has the name's path form (`serving.md`). **No catalog `requires` it**, and it requires nothing: a client fetches it by name when a person asks for it. A reader that does not know its class never sees it, because a client fetches only the catalogs it is asked for and those in `requires`; a reader that met an unknown class would reject that whole catalog (`container.md`), which is why such content never goes in `common` or in a catalog a language requires. The one way an older reader meets it is a `.tcpack` of it, which that reader refuses whole before writing anything (`transfer.md`).
 
 ## Patch catalogs
 
