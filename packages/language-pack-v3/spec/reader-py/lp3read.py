@@ -40,7 +40,7 @@ MAX_HEADER = 65536
 MAX_LEN = 67108864
 MAX_DEPTH = 64
 
-CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "aligned", "book", "orig", "art", "lex", "obs", "gen")
+CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "aligned", "book", "orig", "art", "lex", "obs", "gen", "obsimg")
 KINDS = ("chapter", "verse", "open", "close")
 BOOKS = (
     "gen exo lev num deu jos jdg rut 1sa 2sa 1ki 2ki 1ch 2ch ezr neh est job psa pro ecc sng isa jer lam ezk dan hos "
@@ -59,6 +59,7 @@ KNOWN_TABLES = {
     "art": {"articles"},
     "lex": {"entries"},
     "obs": {"strings", "stories", "notes", "questions", "links", "study-notes", "study-questions"},
+    "obsimg": {"frames", "meta"},
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
@@ -72,6 +73,7 @@ REQUIRED_TABLES = {
     "art": {"articles"},
     "lex": {"entries"},
     "obs": {"strings", "stories"},
+    "obsimg": {"frames", "meta"},
     "catalog": {"about", "resources", "segments", "units"},
     "aligned": {"keys", "strongs", "data"},
 }
@@ -1252,6 +1254,40 @@ def _decode_obs(p: Segment) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# obsimg
+# ---------------------------------------------------------------------------------------------------------------
+
+
+def _decode_obsimg(p: Segment) -> dict:
+    _header_needs(p, "lang", "group")
+    for key in REQUIRED_TABLES["obsimg"]:
+        if key not in p.h["tables"]:
+            _bad()
+    group = p.h["group"]
+    if not (len(group) == 2 and group.isascii() and group.isdigit()) or not 1 <= int(group) <= 50:
+        _bad()
+    frames_in, meta_in = p.t["frames"], p.t["meta"]
+    if type(frames_in) is not list or len(frames_in) == 0 or type(meta_in) is not list or len(meta_in) != 1:
+        _bad()
+    frames, last = [], -1
+    for f in frames_in:
+        if type(f) is not dict:
+            _bad()
+        n = _need(f, "n", is_uint)
+        if n <= last:
+            _bad()
+        last = n
+        data = _need(f, "data", lambda x: type(x) is bytes and len(x) > 0)
+        frames.append({"n": n, "media": _need(f, "media", is_str), "w": _need(f, "w", lambda x: is_uint(x) and x > 0),
+                       "h": _need(f, "h", lambda x: is_uint(x) and x > 0), "data": data.hex()})
+    row = meta_in[0]
+    if type(row) is not dict:
+        _bad()
+    meta = {key: _need(row, key, is_str) for key in ("license", "credit", "changes", "source")}
+    return {"frames": frames, "meta": meta}
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # catalog
 # ---------------------------------------------------------------------------------------------------------------
 
@@ -1864,7 +1900,7 @@ def _decode_aligned(p: Segment, ranges: list[tuple[str, str]] | None = None) -> 
 
 
 _DECODERS = {"aligned": _decode_aligned, "xtopics": _decode_xtopics, "topics": _decode_topics, "book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
-             "obs": _decode_obs, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
+             "obs": _decode_obs, "obsimg": _decode_obsimg, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
 
 
 def decode_segment(p: Segment, as_class: str | None = None, aligned_ranges: list | None = None) -> dict:

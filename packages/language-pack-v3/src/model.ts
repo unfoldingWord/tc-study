@@ -447,3 +447,12 @@ export type AlignedModel = {
   res: [string, string][]
   entries: Map<string, Map<string, Map<string, [verses: number, occurrences: number]>>>
 }
+
+/** A picture of the Open Bible Stories segment `obsimg` (`obsimg.cddl`, `frame`): the image file's bytes, as published. `media` is passed through, never decoded. */
+export type ObsImageFrame = { n: number; media: string; w: number; h: number; data: Uint8Array }
+
+/** The credit every `obsimg` segment carries (`obsimg.cddl`, `meta-row`). */
+export type ObsImagesMeta = { license: string; credit: string; changes: string; source: string }
+
+/** One story of the OBS pictures: the frames sorted by `n`, and the credit (`obsimg.cddl`). */
+export type ObsImagesModel = { story: number; frames: ObsImageFrame[]; meta: ObsImagesMeta }
