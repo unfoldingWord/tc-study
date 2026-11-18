@@ -63,6 +63,8 @@ import {
   type TipnrRecord,
   xtopicsView,
   type XtopicsCore,
+  type AcaiPerson,
+  parseAcai,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
@@ -340,6 +342,8 @@ function topicTexts(dir: string) {
     theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') },
     obs,
     frames,
+    // ACAI's people, trimmed by fetch-topic-sources (`acai/people.json`): gender, same-as (common) and the people table (language)
+    acai: text(join(dir, 'acai', 'people.json')),
   }
 }
 
@@ -545,7 +549,7 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
       throw new Error(`Cannot read the book names ${o.bookNames}: ${(error as Error).message}`)
     }
   }
-  let topics: { xtopics: XtopicsCore; records: TipnrRecord[] } | undefined
+  let topics: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; release: string } } | undefined
   if (topicSources !== undefined) {
     const core = published !== undefined ? { seg: published.core! } : common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
     if (core === undefined) throw new Error('--topics: the common part has no xtopics core (no originals were built?)')
@@ -553,7 +557,8 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
     const issues: string[] = []
     const records = parseTipnr(topicSources.tipnr, issues)
     for (const line of issues) if (!common.report.includes(`topics: ${line}`)) common.report.push(`topics: ${line}`)
-    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records }
+    const acai = parseAcai(topicSources.acai)
+    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records, acai: { people: acai.people, release: acai.commit.slice(0, 8) } }
   }
   // Without --ta-config the related of the tA articles comes from the links alone (a log line says so).
   const taKeys = (await source.resources(lang)).filter((ref) => ref.kind === 'Translation Academy').map((ref) => ref.key)

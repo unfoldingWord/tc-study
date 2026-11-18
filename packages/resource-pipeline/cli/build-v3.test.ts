@@ -474,6 +474,8 @@ describe('build-v3: --topics', () => {
     mkdirSync(join(dir, 'tipnr'))
     cpSync(join(TOPICS, 'tipnr-subset.txt'), join(dir, 'tipnr', 'TIPNR.txt'))
     cpSync(join(TOPICS, 'theographic-subset'), join(dir, 'theographic'), { recursive: true })
+    mkdirSync(join(dir, 'acai'))
+    cpSync(join(TOPICS, 'acai-people.json'), join(dir, 'acai', 'people.json'))
     const content = join(dir, 'en_obs', 'obs-repo', 'content')
     mkdirSync(content, { recursive: true })
     let n = 0
@@ -520,14 +522,21 @@ describe('build-v3: --topics', () => {
     expect(result.out.some((line) => /^topics\s+es-419\s/.test(line))).toBe(true)
     // the xtopics core has the frame map of the bible-story-builder files
     let frameKeys = 0
+    let gender: Record<string, number> | undefined
+    let people: { names: Record<string, string> } | undefined
     for (const name of Object.keys(files(withTopics))) {
       const bytes = read(join(withTopics, name))
       const h = readHeader(bytes).header.h as { class?: unknown; part?: unknown }
+      if (h.class === 'topics' && h.part === 'core') people = ((await readerOutput(bytes)) as { people?: typeof people }).people
       if (h.class !== 'xtopics' || h.part !== 'core') continue
-      const out = (await readerOutput(bytes)) as { 'obs-frames'?: Record<string, unknown> }
+      const out = (await readerOutput(bytes)) as { 'obs-frames'?: Record<string, unknown>; gender?: Record<string, number> }
       frameKeys = Object.keys(out['obs-frames'] ?? {}).length
+      gender = out.gender
     }
     expect(frameKeys).toBe(598)
+    // ACAI: the gender of the TIPNR people it joins, and the es-419 names the pack cannot derive (Sara, not "Sarah")
+    expect(gender).toMatchObject({ 'per:abraham': 1, 'per:isaac': 1, 'per:sarah': 2 })
+    expect(people?.names['per:sarah']).toBe('Sara')
     const before = files(plain)
     const after = files(withTopics)
     for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
