@@ -388,6 +388,7 @@ export async function buildLanguage(o: {
   const obsIssues: string[] = []
   const obs = await extractObs(source, lang, obsIssues)
   report.push(...obsIssues.map((line) => `obs: ${line}`))
+  if (obs === null && o.obsTf !== undefined) throw new Error(`The OBS 5M manual ${o.obsTf.key} was given, and ${lang} has no Open Bible Stories for it to go with`)
   if (obs !== null) {
     const keys = obs.res.map(([key]) => key)
     const rows: RowKey[] = []

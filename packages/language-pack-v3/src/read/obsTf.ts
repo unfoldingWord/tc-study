@@ -181,6 +181,7 @@ export function readObsTf(t: Record<string, unknown>, res: [string, string][], s
     frame.forEach((id, i) => {
       if (i > 0 && id <= frame[i - 1]) bad('tf-frames is not in ascending frames, without repeats')
       if (!inCoverage.has(Math.floor(id / 100))) bad(`tf-frames names the frame ${id}, of a story outside the coverage`)
+      if (known.has(id)) bad(`tf-frames names the frame ${id}, which "stories" already has`)
       frames.push({ frame: id, text: body[i]! })
       known.add(id)
     })

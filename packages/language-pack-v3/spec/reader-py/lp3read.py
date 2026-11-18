@@ -1377,6 +1377,8 @@ def _decode_obs_tf(p: Segment, stories: list):
         for i, f in enumerate(fr):
             if (i > 0 and f <= fr[i - 1]) or f // 100 not in cov:
                 _bad()
+            if f in known:
+                _bad()                      # the frame is in "stories" already
             frames.append({"frame": f, "text": ftext[i]})
             known.add(f)
     questions = []

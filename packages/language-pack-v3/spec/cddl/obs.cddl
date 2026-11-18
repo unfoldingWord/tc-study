@@ -95,7 +95,8 @@ obs-helps = {
 ; table does not use is not listed. A part code and a list code never coincide:
 ;   parts: intro, frames, community, m1, m2, drafting, m3, checking, m4, m5, conclusion
 ;   lists: observation, terms, discourse, theology, journal
-; Codes are fixed and never translated. A reader skips a row whose code it does not know, and only that row.
+; Codes are fixed and never translated. A "codes" list with a code that is not fixed is E_BODY (the tables are version 1: a new code
+; would be a new version of the table).
 ;
 ; Order of rows. tf-parts: stories ascending, then the parts in the order above; a part's first row is its heading row (no
 ; "list"), then one row per list of the part in the order of the list codes. The coverage ("stories" of tf-parts, not the segment's table of that name) is ascending, with no repeats. A row
@@ -107,8 +108,13 @@ obs-helps = {
 ; list it, or it has a version the reader does not know) shows that row's heading and no body, and it is not an error: no
 ; tf-shared (rows with "shared"), no tf-frames (a frame missing from "stories"), no tf-questions or tf-terms (a list with no
 ; rows). A "shared" value that is not a row of tf-shared, a "refText" row that is not a row of its table, or a res index outside the
-; header's "res", is E_BODY. A frame that is neither in the segment's table "stories" nor in tf-frames is E_BODY when the
-; reader has tf-frames; when it does not, that frame shows its number and no text.
+; header's "res", is E_BODY. A frame that is neither in the segment's table "stories" nor in tf-frames is E_BODY.
+;
+; What a reader checks. The readers are strict about what a row says on its own (columns, "has", codes, ranges, res, k, refText,
+; the coverage, the order of rows by story, part and k, the keys of tf-shared, the references above). They do not check what only
+; the builder promises: that tf-shared follows the order of first use, that each of its rows is used, that a part has one heading
+; row and its lists in order, that the row of the part "frames" has no title or text, and that the frames of a question have no
+; repeats. A client never relies on those.
 ;
 ; Heading rows. A row with "shared" shows that block of tf-shared: its tf-parts "title" and "text" are not written (no
 ; "has" bit), and the title is the block's. The row of the part "frames" has no title and no text: the app shows the story's
@@ -173,7 +179,7 @@ tf-shared = {
 }
 
 ; Frames that the language's OBS resource lacks (a whole story, or one frame), with the text of the manual instead (the
-; approved hybrid). The text is the table's "res" resource's, and an app marks it as manual text. Absent when no frame needs
+; approved hybrid), and only those: a frame that "stories" has is never in this table (E_BODY). The text is the table's "res" resource's, and an app marks it as manual text. Absent when no frame needs
 ; it, which is the case of en and id today.
 tf-frames = {
   "res": res-index,
