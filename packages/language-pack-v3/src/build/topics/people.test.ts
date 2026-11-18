@@ -198,7 +198,7 @@ describe('buildPeople: an alias that names its person rarely and another person 
       ...people,
       own('person:Saul', 'Saul@1Sa.9.2-Act', 'Saul', 'Saúl'),
       own('person:Paul', 'Paul@Act.7.58-2Pe', 'Paul', 'Pablo'),
-      alias('person:Saul.2', 'person:Paul', 'Saul (Paul)', 'Saulo (Pablo)'),
+      alias('person:Abel.2', 'person:Paul', 'Saul (Paul)', 'Saulo (Pablo)'),
     ]
     expect(buildPeople({ lang: 'en', xtopics: sp, mapNames: {}, acai: acaiSp, records: recs, report: [] })!.aliases.Saul).toBeUndefined()
     // control: the same build without TIPNR records keeps it
