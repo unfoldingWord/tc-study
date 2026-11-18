@@ -157,4 +157,19 @@ describe('buildPeople: an alias that names its person rarely and another person 
       expect(report.some((l) => l.includes('«David» → per:judah'))).toBe(true)
     })
   }
+  test('the rule needs evidence: without records, without an English name, or against a person in no verse, the alias stays', () => {
+    const run = (o: Partial<Parameters<typeof buildPeople>[0]>) => buildPeople({ lang: 'en', xtopics: core, mapNames: {}, acai: people, records, report: [], ...o })!
+    expect(run({ records: undefined }).aliases.David).toEqual(['per:judah'])
+    const noEnglish = people.map((p) => (p.id === 'person:David.2' ? { ...p, labels: { spa: 'David (Judá)' } } : p))
+    expect(buildPeople({ lang: 'es-419', xtopics: core, mapNames: {}, acai: noEnglish, records, report: [] })!.aliases.David).toEqual(['per:judah'])
+    const davidInNoVerse = { ...core, occurrences: new Map([...core.occurrences!].filter(([id]) => id !== 'per:david')) }
+    expect(run({ xtopics: davidInNoVerse }).aliases.David).toEqual(['per:judah'])
+  })
+  test('the boundary: dropped when the calls are exactly a tenth of the other person\'s verses', () => {
+    const exact = { ...core, occurrences: new Map([...core.occurrences!, ['per:david', occ(10)]]) }
+    // Judah (1022) has more than a tenth of David's 10, and TIPNR calls Judah «David» in 1 verse: 1 × 10 <= 10
+    expect(buildPeople({ lang: 'en', xtopics: exact, mapNames: {}, acai: people, records, report: [] })!.aliases.David).toBeUndefined()
+    const above = { ...core, occurrences: new Map([...core.occurrences!, ['per:david', occ(9)]]) }
+    expect(buildPeople({ lang: 'en', xtopics: above, mapNames: {}, acai: people, records, report: [] })!.aliases.David).toEqual(['per:judah'])
+  })
 })

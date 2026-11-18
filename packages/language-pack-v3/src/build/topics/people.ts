@@ -132,14 +132,16 @@ export function buildPeople(o: {
     const known = new Set([nameOf(per), o.xtopics.topics.get(per)?.title ?? '', ...(tw.get(per) ?? []).map((c) => o.mapNames[c]?.[0] ?? '')])
     if (known.has(name)) continue
     if (o.records !== undefined && o.xtopics.occurrences !== undefined) {
+      // No evidence to weigh (no English name, no TIPNR record of its person): the alias stays
       const english = splitLabel(nfc(person.labels.eng ?? ''))[0]
       const mine = versesOf(per)
       // the person the name mostly means: of those it finds, the one in the most verses (ties: the first by id)
       const other = [...(foundBy.get(name) ?? [])]
         .filter((q) => q !== per)
         .sort((a, b) => versesOf(b) - versesOf(a) || compareCodePoints(a, b))[0]
-      if (other !== undefined && callsBy(per, english, other) * 10 <= versesOf(other) && mine * 10 > versesOf(other)) {
-        leftOut.push(`«${name}» → ${per} (${callsBy(per, english, other)} verses by that name; ${other} ${versesOf(other)})`)
+      const weigh = english !== '' && recordOf.has(per) && other !== undefined && versesOf(other) > 0
+      if (weigh && callsBy(per, english, other!) * 10 <= versesOf(other!) && mine * 10 > versesOf(other!)) {
+        leftOut.push(`«${name}» → ${per} (${callsBy(per, english, other!)} verses by that name; ${other} ${versesOf(other!)})`)
         continue
       }
     }
@@ -165,7 +167,9 @@ export function buildPeople(o: {
     for (const c of tw.get(id) ?? []) hold(o.mapNames[c]?.[0] ?? '', id)
   }
   for (const [name, ids] of Object.entries(people.aliases)) for (const id of ids) hold(name, id)
-  if (leftOut.length > 0) o.report.push(`people: ${o.lang}: ${leftOut.length} aliases left out, mostly another person's name: ${[...new Set(leftOut)].join('; ')}`)
+  if (o.records === undefined || o.xtopics.occurrences === undefined) o.report.push(`people: ${o.lang}: no TIPNR records or no counts: no alias is weighed against another person's name`)
+  const out = [...new Set(leftOut)].sort(compareCodePoints)
+  if (out.length > 0) o.report.push(`people: ${o.lang}: ${out.length} aliases left out, mostly another person's name: ${out.join('; ')}`)
   for (const [per, note] of [...noteOf].sort((a, b) => compareCodePoints(a[0], b[0]))) {
     if ((holders.get(nameOf(per))?.size ?? 0) > 1) people.notes[per] = note
   }
