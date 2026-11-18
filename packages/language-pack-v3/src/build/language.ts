@@ -398,7 +398,7 @@ export async function buildLanguage(o: {
     if (o.obsTf !== undefined) {
       // The manual is the segment's own: `obs` (for the map and the inputs of the rows) stays as the source gave it.
       const tf = o.obsTf
-      const parsed = parseObsTf(tf.files, tf.key, obs.stories)
+      const parsed = parseObsTf(tf.files, tf.key, obs.stories, lang)
       report.push(...parsed.warnings.map((line) => `obs-tf: ${line}`))
       if (parsed.errors.length > 0) throw new Error(`The OBS 5M manual ${tf.key} ${tf.release} has errors:\n${parsed.errors.join('\n')}`)
       if (obs.res.some(([key]) => key === tf.key)) throw new Error(`${tf.key} is also a resource of the source`)

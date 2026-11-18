@@ -80,8 +80,11 @@ Warn (the build goes on and the report lists each one):
 ## Reading the source
 
 The reference reader is `src/source/obsTf.ts` (`parseObsTf`); it reads no disk and no network, and the same files give the
-same model. It reads the English headings of `en_obs-tf` (`id_obs-tf` has translated headings and would need a heading
-table per language: out of scope until it has a release).
+same model. The headings are those of the language: `OBS_TF_HEADINGS` has the English ones (`en_obs-tf`) and the Indonesian ones
+(`id_obs-tf`, a conversion of PDFs: some headings come in two wordings, with another case or hyphenation, and a title split in two
+by the conversion is joined). A heading matches a text when it starts with it, ignoring case, accents, hyphens and spacing. A
+language with no table of headings is an error, not a guess. The rest of this section is written for the English manual; the
+Indonesian one differs only where it says so.
 
 - **Files.** `obs_story_{N}.md` for each story present (the coverage is the stories read), `transclusions/{name}.md`, and
   optionally `transclusions/overview.md`. The front matter and the `<!-- -->` comments are dropped.
@@ -97,6 +100,14 @@ table per language: out of scope until it has a release).
   warns and keeps its row with no term); the text is the whole paragraph.
 - **Frame labels** are read with commas or spaces between them (`08-10 08-11`) and one-digit frames (`14-1`), after the
   reviewed correspondence and fixes above; a label that cannot be read is an error.
+- **Blocks of the story itself (a language whose manual does not transclude them).** In the Indonesian manual the community study,
+the checking, the ministry practice, the mission outreach, the drafting and the conclusion may be first-level sections of the story
+file (`# Studi Komunitas…`, `# Pemeriksaan Tim`, `# Praktik Pelayanan…`, `# Penjangkauan Misi…`, `# Naskah Awal Terjemahan`,
+`# Kesimpulan`) instead of `![[…]]` lines. Such a section runs from its heading to the next heading of the first or second level, with
+the sections below it; it becomes a row with `shared` whose `tf-shared` key is `obs_story_N.md#{its heading}`, so each story has its
+own. A second-level heading that no part uses, right after such a heading, is the rest of a split title and stays in the block. A
+first-level heading that no block of the language uses is an error. A transclusion that follows such a section is a row of its own
+and is not left in the block text. The check that every transclusion became a row counts only the `![[…]]` lines.
 - **Transclusions** `![[name]]` (shared blocks: `movement_2_drafting`, `movement_3_checking`, `movement_4`, `movement_5`,
   `conclusion` and `obs-devotionals-unit-N#Community Study…`) become a row with `shared`. `![[file#heading]]` takes the
   section from that heading up to the next heading of the same or a higher level, with nested sections included, and its

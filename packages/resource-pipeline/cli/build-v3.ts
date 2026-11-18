@@ -101,7 +101,7 @@ export const USAGE =
   '  --obs-images (no value) builds only the catalog zxx-obsimg (the OBS pictures: downloaded, checked against the pin, converted to WebP): needs --out and takes\n' +
   '               only --sign-key, --revision (default 1), --previous, --built, --publisher and --cache (a folder that keeps the downloaded zip)\n' +
   '  --obs-tf     the folder of an unpacked release of the OBS Theological Formation manual (en_obs-tf: obs_story_N.md and transclusions/): the Five Movements\n' +
-  '               tables go in the obs segment, and the resource in the catalog. English only today. A manual with errors stops the build. Needs --obs-tf-release;\n' +
+  '               tables go in the obs segment, and the resource in the catalog. English (en) and Indonesian (id) today. A manual with errors stops the build. Needs --obs-tf-release;\n' +
   '               without it every segment is the same bytes\n' +
   '  --obs-tf-release   the release tag of that folder (v4): the manual says a wrong one in its own manifest, so it is given\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
@@ -288,11 +288,14 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
   if (obsTfDir !== undefined) {
     if (!existsSync(obsTfDir) || !statSync(obsTfDir).isDirectory()) throw new UsageError(`--obs-tf: ${obsTfDir} is not a directory`)
     if (!readdirSync(obsTfDir).some((f) => /^obs_story_\d+\.md$/.test(f))) throw new UsageError(`--obs-tf: ${obsTfDir} has no obs_story_N.md file`)
-    if (!/^v[0-9]+$/.test(obsTfRelease!)) throw new UsageError(`--obs-tf-release ${JSON.stringify(obsTfRelease)} is not a release tag (v4)`)
+    if (!/^v[0-9]+(\.[0-9]+)*$/.test(obsTfRelease!)) throw new UsageError(`--obs-tf-release ${JSON.stringify(obsTfRelease)} is not a release tag (v4, v0.1.0)`)
   }
 
   return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig, roleHints, ...(obsTfDir === undefined ? {} : { obsTf: { dir: obsTfDir, release: obsTfRelease! } }) }
 }
+
+/** The credit of the Indonesian manual: the unfoldingWord conversion of the Indonesian PDFs into Door43 markdown (its manifest says CC BY-SA 4.0). */
+const ID_OBS_TF_ATTRIBUTION = 'unfoldingWord and Formation Stories. Indonesian text: unfoldingWord/id_obs-tf (Indonesian Five Movements PDFs converted to Door43 markdown), CC BY-SA 4.0'
 
 /** The files of the OBS Theological Formation manual in `dir` that the reader uses: `obs_story_N.md` and `transclusions/*.md`. */
 function obsTfFiles(dir: string): Map<string, string> {
@@ -505,7 +508,6 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
     return
   }
   const lang = await languageOf(o.list)
-  if (o.obsTf !== undefined && lang !== 'en') throw new UsageError(`--obs-tf: the manual is English, and this language is ${JSON.stringify(lang)}`)
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(lang)) throw new Error(`${o.list}: the language ${JSON.stringify(lang)} cannot name a file`)
   const originalsLanguage = await languageOf(o.originals)
   if (originalsLanguage !== ORIGINALS) throw new Error(`${o.originals} is not the list of the originals: its language is ${JSON.stringify(originalsLanguage)}`)
@@ -586,7 +588,7 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
             title: 'OBS Theological Formation',
             license: 'CC-BY-SA-4.0',
             rights: 'unfoldingWord',
-            attribution: 'unfoldingWord and Formation Stories',
+            attribution: lang === 'id' ? ID_OBS_TF_ATTRIBUTION : 'unfoldingWord and Formation Stories',
             files: obsTfFiles(o.obsTf.dir),
           },
   })
