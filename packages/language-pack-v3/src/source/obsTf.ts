@@ -160,6 +160,7 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         if (sharedBlock(key, where)) blocks.push({ story: n, part, shared: key })
       }
     }
+    const withoutTransclusions = (body: string): string => body.replace(/!\[\[[^\]]+\]\]/g, '')
     const lead = (body: string): string | undefined => {
       const text = paras(body.replace(/!\[\[[^\]]+\]\]/g, '')).join('\n\n')
       return text === '' ? undefined : text
@@ -230,7 +231,8 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
       }
       if (s.level === 4 && mode === 'm1:observation') {
         const { ids, corrected } = mapFrames(h)
-        for (const p of paras(s.body)) {
+        takeTransclusions(s.body)
+        for (const p of paras(withoutTransclusions(s.body))) {
           const [q, ...a] = p.split(/ {2}\n|\n/)
           const answer = a.join('\n').trim()
           questions.push({ story: n, part: 'm1', list: 'observation', k: nextK('m1'), frames: ids, q: q.trim(), ...(answer === '' ? {} : { a: answer }), ...(corrected ? { refText: h } : {}) })
@@ -239,7 +241,8 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
       }
       if (s.level === 4 && mode === 'm1:terms') {
         const { ids, corrected } = mapFrames(h)
-        for (const p of paras(s.body)) {
+        takeTransclusions(s.body)
+        for (const p of paras(withoutTransclusions(s.body))) {
           const term = /^\*\*(.+?)\*\*/.exec(p)?.[1]
           if (term === undefined) warnings.push(`${where} ${h}: a translation paragraph without a bold term`)
           const frame = ids[0]
@@ -254,7 +257,8 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         const q = m ? m[1] : h
         const mapped = m ? m[2].split(/[,\s]+/).filter((x) => x !== '').map((l) => mapFrames(l)) : []
         const ids = [...new Set(mapped.flatMap((x) => x.ids))]
-        const answer = paras(s.body).join('\n\n')
+        takeTransclusions(s.body)
+        const answer = paras(withoutTransclusions(s.body)).join('\n\n')
         questions.push({ story: n, part: 'm2', list: 'discourse', k: nextK('m2'), frames: ids, q, ...(answer === '' ? {} : { a: answer }), ...(m && mapped.some((x) => x.corrected) ? { refText: m[2].trim() } : {}) })
         continue
       }

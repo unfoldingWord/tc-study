@@ -45,6 +45,7 @@ import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOfBook } from './catalog'
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
+import { parseObsTf } from '../source/obsTf'
 import { extractText } from './bookTexts'
 import { extractOrig, OrigIndex, origSegment } from './orig'
 import { buildAligned, isBridgeText } from './aligned/build'
@@ -103,6 +104,21 @@ async function originalRowKeys(source: RowSource, book: string): Promise<RowKey[
 // Resources
 
 const tagOf = (stamp: string): string => stamp.split('#')[0]
+
+/**
+ * The Five Movements manual of a language (`obs.cddl`, "OBS Five Movements") as `buildLanguage` takes it: the files of the release of
+ * the OBS Theological Formation resource (`obs_story_{N}.md`, `transclusions/{name}.md`), and what the catalog says of the resource.
+ * `key` is the resource key (`unfoldingWord/en/obs-tf`) and `release` its tag (`v4`).
+ */
+export type ObsTfInput = {
+  key: string
+  release: string
+  title: string
+  license: string
+  rights?: string
+  attribution: string
+  files: ReadonlyMap<string, string>
+}
 
 /** The license texts a catalog knows by their SPDX id, by the text without case, spaces, hyphens and underscores. */
 const SPDX: ReadonlyMap<string, string> = new Map([
@@ -255,6 +271,8 @@ export async function buildLanguage(o: {
   partial?: boolean
   topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
   aligned?: boolean
+  /** The Five Movements manual: the tables `tf-*` of the `obs` segment. Off by default: without it every segment is the same bytes. The build throws when the manual has errors (`obs-5m-checks.md`). */
+  obsTf?: ObsTfInput
   withOrig?: boolean
   taConfigs?: TaConfigs
   /** The text of the `toc.yaml` of each manual of each tA resource: its titles are more names of the articles. */
@@ -366,6 +384,7 @@ export async function buildLanguage(o: {
   }
 
   // Open Bible Stories
+  let obsTfResource: CatalogResource | undefined
   const obsIssues: string[] = []
   const obs = await extractObs(source, lang, obsIssues)
   report.push(...obsIssues.map((line) => `obs: ${line}`))
@@ -373,8 +392,25 @@ export async function buildLanguage(o: {
     const keys = obs.res.map(([key]) => key)
     const rows: RowKey[] = []
     for (const resource of keys) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
+    let model = obs
+    let stamps = stampsOf(keys)
+    if (o.obsTf !== undefined) {
+      // The manual is the segment's own: `obs` (for the map and the inputs of the rows) stays as the source gave it.
+      const tf = o.obsTf
+      const parsed = parseObsTf(tf.files, tf.key, obs.stories)
+      report.push(...parsed.warnings.map((line) => `obs-tf: ${line}`))
+      if (parsed.errors.length > 0) throw new Error(`The OBS 5M manual ${tf.key} ${tf.release} has errors:\n${parsed.errors.join('\n')}`)
+      if (obs.res.some(([key]) => key === tf.key)) throw new Error(`${tf.key} is also a resource of the source`)
+      const res = [...obs.res, [tf.key, tf.release] as [string, string]].sort((a, b) => compareCodePoints(a[0], b[0]))
+      model = { ...obs, res, tf: parsed.model }
+      for (const [name, text] of [...tf.files].sort((a, b) => compareCodePoints(a[0], b[0]))) rows.push({ layer: 'obs-tf', key: `${name}|${sha256Hex(text)}` })
+      stamps = [...stamps, { key: tf.key, stamp: tf.release }]
+      const resource: CatalogResource = { key: tf.key, title: tf.title, subject: 'OBS Theological Formation', release: tf.release, license: tf.license, attribution: tf.attribution, books: bookSet([]) }
+      if (tf.rights !== undefined) resource.rights = tf.rights
+      obsTfResource = resource
+    }
     // The stories are shown with the titles and book names of the map: the unit needs it.
-    const built = await add(obsSegment(obs), inputsOf(rows, stampsOf(keys)), keys)
+    const built = await add(obsSegment(model), inputsOf(rows, stamps), keys)
     needs.set(built.id, ['map'])
   }
 
@@ -455,7 +491,7 @@ export async function buildLanguage(o: {
   segments.sort(compareSegments)
   const catalog = await buildCatalog({
     about: { ...o.about, catalog: lang },
-    resources: [...catalogResources(refs, used), ...catalogResources(originals, usedOriginals)],
+    resources: [...catalogResources(refs, used), ...catalogResources(originals, usedOriginals), ...(obsTfResource === undefined ? [] : [obsTfResource])],
     segments,
     requires: o.requires,
     needs: (built) => needs.get(built.id) ?? [],

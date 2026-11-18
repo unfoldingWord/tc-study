@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import JSZip from 'jszip'
 import { hex, readHeader, readSegment } from '../codec/container'
 import type { About, CatalogModel, TopicsPart, XtopicsCore } from '../model'
+import { OBS_TABLES, obsView } from '../read/obs'
 import { topicsView, xtopicsView } from '../read/topics'
 import type { TipnrRecord } from '../source/tipnr'
 import { partsSource } from '../node/partsSource'
@@ -431,6 +432,41 @@ describe('buildLanguage: a language with Open Bible Stories and a lexicon, and n
       },
       changes,
     )
+
+  test('the OBS 5M manual (obsTf): off, every segment is the same bytes; on, the tf tables, the resource, the inputs; errors stop the build', async () => {
+    const TF = 'unfoldingWord/en/obs-tf'
+    const story =
+      '## Introduction\n\n### Key\nIdea.\n\n### Open Bible Story: The plagues\n\n######### 10-01\n\nGod sent plagues.\n\n*A Bible story from: Exodus 5-14*\n\n' +
+      '## Biblical Interpretation: M1\n\n### Observation Questions\n\n#### 10-01\n\nWho sent them?  \nGod.\n\n![[movement_4]]\n'
+    const files = new Map([
+      ['obs_story_10.md', story],
+      ['transclusions/movement_4.md', '# Movement 4\n\nApply it.\n'],
+    ])
+    const input = (f = files) => ({ key: TF, release: 'v4', title: 'OBS Theological Formation', license: 'CC-BY-SA-4.0', rights: 'unfoldingWord', attribution: 'unfoldingWord and Formation Stories', files: f })
+    const off = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about })
+    const on = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input() })
+    const again = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input() })
+    const obsOf = (b: typeof off) => b.segments.find((s) => s.seg.h.class === 'obs')!
+    // every other segment keeps its id; the obs segment changes, and the build is reproducible
+    expect(off.segments.filter((s) => s.seg.h.class !== 'obs').map((s) => s.id)).toEqual(on.segments.filter((s) => s.seg.h.class !== 'obs').map((s) => s.id))
+    expect(obsOf(on).id).not.toBe(obsOf(off).id)
+    expect(obsOf(on).id).toBe(obsOf(again).id)
+    const view = (await readSegment(obsOf(on).bytes, { known: { ...OBS_TABLES } })).seg
+    expect(obsView(view).tf!.stories).toEqual([10])
+    expect(obsView(view).res).toEqual([[OBS, 'v12'], [TF, 'v4']])
+    const cat = await catalogOf(on.catalog)
+    expect(cat.resources.find((r) => r.key === TF)).toEqual({ key: TF, title: 'OBS Theological Formation', subject: 'OBS Theological Formation', release: 'v4', license: 'CC-BY-SA-4.0', rights: 'unfoldingWord', attribution: 'unfoldingWord and Formation Stories', books: new Uint8Array(9) })
+    expect(cat.resources.filter((r) => r.key !== TF)).toEqual((await catalogOf(off.catalog)).resources)
+    // another text of the manual is another input
+    const other = new Map(files)
+    other.set('transclusions/movement_4.md', '# Movement 4\n\nApply it now.\n')
+    expect(obsOf(await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input(other) })).id).not.toBe(obsOf(on).id)
+    // an error of the manual stops the build; a warning does not
+    const broken = new Map(files)
+    broken.delete('transclusions/movement_4.md')
+    await expect(buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input(broken) })).rejects.toThrow('transclusion movement_4: the file does not exist')
+    expect(on.report.some((line) => line.startsWith('obs-tf: story 10: no part'))).toBe(true)
+  })
 
   test('builds an obs segment and one lexicon segment per group, with the scopes of the report', async () => {
     const built = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about })
