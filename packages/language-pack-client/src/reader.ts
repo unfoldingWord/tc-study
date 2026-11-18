@@ -27,6 +27,7 @@ import {
   topicsView,
   xmapView,
   xtopicsView,
+  type XtopicsPart,
 } from '@bt-synergy/language-pack-v3'
 import { type ArticleData, articleQuery, type ContextData, contextQuery } from './query/article'
 import type { Answer } from './query/envelope'
@@ -39,6 +40,7 @@ import { type SectionsData, sectionsQuery } from './query/sections'
 import { type FramesAtData, framesAtQuery, type FrameVersesData, frameVersesQuery } from './query/obsFrames'
 import { obsPartOf, obsSessionOf, type TfPartData, type TfSessionData } from './query/obsTf'
 import { searchQuery } from './query/search'
+import { type FamilyData, familyQuery, type PersonEntry, peopleQuery } from './query/family'
 import { memoryIndex } from './search/memory'
 import type { Hit, SearchFilters, SearchIndex } from './search/types'
 import { type RenderingsData, renderingsQuery } from './query/renderings'
@@ -141,6 +143,18 @@ export interface PackReader {
    * that tells no verse).
    */
   frameVerses(story: number, frame: number): Promise<Answer<FrameVersesData | null>>
+  /**
+   * The family of a person (`per:` id): parents, children, partners and siblings with their names in the language, gender and the
+   * verses that show each relation (derived, `ids.md`). `data: null` when `xtopics` is not installed or the id is not a person of it.
+   */
+  family(id: string): Promise<Answer<FamilyData | null>>
+  /** Every person with the names a client may find it by (`ids.md`, "Names of people"); `data: null` without `xtopics`. */
+  people(): Promise<Answer<PersonEntry[] | null>>
+  /**
+   * Only the `xtopics` parts of the books named (a part missing or bad is left out), without decoding the others; `undefined` when the
+   * unit is not active. Added with `family`: a hand-made reader may lack it, and `family` then reads the whole unit.
+   */
+  xtopicsParts?(books: readonly string[]): Promise<Map<string, XtopicsPart> | undefined>
   /** The frames that tell any verse of `first`..`last` (verse ids of one book), most specific first (fewest verses, then story order). */
   framesAt(first: number, last?: number): Promise<Answer<FramesAtData | null>>
   /**
@@ -354,6 +368,32 @@ export function makeReader(o: ReaderInput): PackReader {
     const v = seg === undefined ? undefined : viewOf(unit, at, seg, VIEWS[unit] as (s: Segment) => Part)
     return v === undefined || v.part !== 'core' ? undefined : { core: v, parts: new Map() }
   }
+  /**
+   * Only the parts of the books named of one map unit (by `part`, from the catalogs), each read once and cached like any segment: a query
+   * that needs a few books does not decode the 66. A part that is missing or bad is left out. When the unit was read whole already, or a
+   * catalog does not say which segment is which part, the parts come from the whole unit.
+   */
+  async function mapParts(unit: keyof typeof VIEWS, books: readonly string[]): Promise<Map<string, Part> | undefined> {
+    const ids = activeIds.get(unit)
+    if (ids === undefined) return undefined
+    const wanted = new Set(books)
+    const pick = (parts: Map<string, Part>): Map<string, Part> => new Map([...parts].filter(([book]) => wanted.has(book)))
+    if (mapUnits.has(unit) || ids.some((id) => partOf.get(id) === undefined)) {
+      const whole = (await mapUnit(unit)) as { parts: Map<string, Part> } | undefined
+      return whole === undefined ? undefined : pick(whole.parts)
+    }
+    const out = new Map<string, Part>()
+    await Promise.all(
+      ids.map(async (id, i) => {
+        const part = partOf.get(id)!
+        if (!wanted.has(part)) return
+        const seg = await readOne(id, unit)
+        const v = seg === undefined ? undefined : viewOf(unit, i, seg, VIEWS[unit] as (s: Segment) => Part)
+        if (v !== undefined && v.part === part) out.set(part, v)
+      }),
+    )
+    return out
+  }
   const cores = new Map<string, Promise<unknown>>()
   function mapCore(unit: MapUnit): Promise<unknown> {
     if (unit === 'aligned' || mapUnits.has(unit)) return mapUnit(unit)
@@ -473,6 +513,9 @@ export function makeReader(o: ReaderInput): PackReader {
     sections: (book) => sectionsQuery(reader, book),
     frameVerses: (story, frame) => frameVersesQuery(reader, story, frame),
     framesAt: (first, last) => framesAtQuery(reader, first, last),
+    xtopicsParts: (books) => mapParts('xtopics', books) as Promise<Map<string, XtopicsPart> | undefined>,
+    family: (id) => familyQuery(reader, id),
+    people: () => peopleQuery(reader),
   }
   return reader
 }

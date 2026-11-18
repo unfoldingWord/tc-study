@@ -14,6 +14,12 @@
  * catalog another id). The ids differ, so it compares what the old client sees and reads (`semantic`: refresh names, failures, units,
  * problems, OBS, Titus, the stories of Titus 1:1 and the sections of Titus), not the dumps. PASS = identical `semantic`.
  *   bun packages/language-pack-client/scripts/old-clients.ts --frames [ref ...]
+ *
+ * With `--kin` it checks the people tables of ACAI the same way: the "with" sample's common xtopics core has `gender` and the ACAI
+ * `same-as`, and its es-419 topics core has `people` (`buildSample({ acai: true })`); the other is the sample as it is. An old client must
+ * install and read both alike (it skips the two optional tables it does not know). PASS = identical `semantic`, which also lists the map
+ * units the old client reads (`maps`).
+ *   bun packages/language-pack-client/scripts/old-clients.ts --kin [ref ...]
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -25,7 +31,8 @@ import { buildObsimgFixture } from '../test/obsimg'
 import { buildSample, type Sample } from '../test/sample'
 
 const frames = process.argv.includes('--frames')
-const given = process.argv.slice(2).filter((a) => a !== '--frames')
+const kin = process.argv.includes('--kin')
+const given = process.argv.slice(2).filter((a) => a !== '--frames' && a !== '--kin')
 const refs = given.length > 0 ? given : ['569b88a6', '302631d4']
 
 function run(cmd: string, args: string[], cwd: string): { code: number; out: string } {
@@ -85,7 +92,9 @@ const out = {
 const safe = async (f) => { try { return await f() } catch (e) { return 'error: ' + (e && e.message) } }
 const stories = await safe(async () => (await r.stories('tit 1:1')).data)
 const sections = await safe(async () => (r.sections ? (await r.sections('tit')).data : 'no sections query'))
+const maps = await safe(async () => Object.keys(await r.maps()).filter((k) => k !== 'revision').sort())
 out.semantic = {
+  maps,
   refresh: out.refresh.names,
   failed: out.failed,
   units: Object.keys(out.state.units).sort(),
@@ -115,8 +124,22 @@ async function main(): Promise<number> {
   const withDir = join(tmp, 'packs-with')
   const withoutDir = join(tmp, 'packs-without')
   // with --frames: the "with" folder is a sample whose common xtopics core has obs-frames (its own keys)
-  const withSample = frames ? await buildSample({ frames: framesFixture() }) : sample
-  if (frames) {
+  const withSample = frames ? await buildSample({ frames: framesFixture() }) : kin ? await buildSample({ acai: true }) : sample
+  if (kin) {
+    // the control: the "with" sample has gender in the common xtopics core and people in the es-419 topics core, the other has neither
+    const tablesOf = (smp: Sample): string[] => {
+      const out: string[] = []
+      for (const bytes of smp.segments.values()) {
+        const h = readHeader(bytes).header.h as { class?: unknown; part?: unknown; tables?: Record<string, unknown> }
+        if ((h.class === 'xtopics' || h.class === 'topics') && h.part === 'core') for (const t of ['gender', 'people']) if (h.tables?.[t] !== undefined) out.push(`${h.class}.${t}`)
+      }
+      return out.sort()
+    }
+    const [w, wo] = [tablesOf(withSample), tablesOf(sample)]
+    if (w.join() !== 'topics.people,xtopics.gender' || wo.length !== 0) throw new Error(`the samples are not what they should be: ${w.join() || 'none'} and ${wo.join() || 'none'}`)
+    console.log(`control: the "with" sample has ${w.join(' and ')}, the other none`)
+    writePacks(withDir, withSample)
+  } else if (frames) {
     // the control: the "with" sample's common xtopics core has the table, the other's does not
     const keysOf = async (smp: Sample): Promise<number> => {
       for (const bytes of smp.segments.values()) {
@@ -133,7 +156,7 @@ async function main(): Promise<number> {
   }
   else writePacks(withDir, sample, await buildObsimgFixture(sample))
   writePacks(withoutDir, sample)
-  console.log(`packs: ${withDir} (with ${frames ? 'obs-frames' : 'zxx-obsimg'}), ${withoutDir} (without)`)
+  console.log(`packs: ${withDir} (with ${frames ? 'obs-frames' : kin ? 'gender and people' : 'zxx-obsimg'}), ${withoutDir} (without)`)
 
   let failures = 0
   for (const ref of refs) {
@@ -150,11 +173,11 @@ async function main(): Promise<number> {
         continue
       }
       const semantic = (out: string) => JSON.stringify((JSON.parse(out) as { semantic: unknown }).semantic)
-      if (frames ? semantic(a.out) === semantic(b.out) : a.out === b.out) {
+      if (frames || kin ? semantic(a.out) === semantic(b.out) : a.out === b.out) {
         const d = JSON.parse(a.out) as { state: { units: object }; read: unknown }
         console.log(`  units: ${Object.keys(d.state.units).join(', ')}\n  read: ${JSON.stringify(d.read)}`)
-        if (frames) console.log(`  semantic: ${semantic(a.out).slice(0, 600)}`)
-        console.log(`PASS ${ref}: identical ${frames ? 'reads with and without obs-frames' : 'dumps with and without zxx-obsimg'} (${a.out.length} chars)`)
+        if (frames || kin) console.log(`  semantic: ${semantic(a.out).slice(0, 600)}`)
+        console.log(`PASS ${ref}: identical ${frames ? 'reads with and without obs-frames' : kin ? 'reads with and without gender and people' : 'dumps with and without zxx-obsimg'} (${a.out.length} chars)`)
       } else {
         failures++
         console.log(`FAIL ${ref}: the dumps differ\n--- with:\n${a.out.slice(0, 1500)}\n--- without:\n${b.out.slice(0, 1500)}`)
