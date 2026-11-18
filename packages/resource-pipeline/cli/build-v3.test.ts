@@ -823,15 +823,16 @@ describe('build-v3: --obs-tf', () => {
     expect(() => optionsFromArgs(sample(temp(), ['--obs-tf-release', 'v4']))).toThrow('go together')
     expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', temp(), '--obs-tf-release', 'v4']))).toThrow('has no obs_story_N.md')
     expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', '4']))).toThrow('not a release tag')
+    expect(optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', 'v0.1.0'])).obsTf?.release).toBe('v0.1.0')
     expect(optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', 'v4'])).obsTf?.release).toBe('v4')
     expect(optionsFromArgs(sample(temp())).obsTf).toBeUndefined()
   })
 
-  test('a language that is not English is refused: the manual is English', async () => {
+  test('a language with no Open Bible Stories is refused: the manual goes with them', async () => {
     const dir = folder()
     const r = await run(sample(temp(), ['--obs-tf', dir, '--obs-tf-release', 'v4']))
     expect(r.code).toBe(2)
-    expect(r.err.join('\n')).toContain('the manual is English')
+    expect(r.err.join('\n')).toContain('no Open Bible Stories')
   })
 
   test('the usage text describes --obs-tf', () => {

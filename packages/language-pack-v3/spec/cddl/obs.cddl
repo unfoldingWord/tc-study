@@ -169,7 +169,7 @@ tf-terms = {
 ; The blocks the stories transclude, each once: drafting, checking, M4, M5, the conclusion, and the Community Study
 ; sections of the devotional units that a story names. "key" is the transclusion as the source resolves it: the file name,
 ; and for a section "file#heading" with the heading exactly as the file writes it (story 9 names it with one space and unit 5
-; writes two: the key has two).
+; writes two: the key has two). A language whose manual has the block inside the story file (id) writes the key as "obs_story_N.md#heading".
 tf-shared = {
   "res": res-index,
   "n": uint,

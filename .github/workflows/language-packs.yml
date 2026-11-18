@@ -71,7 +71,7 @@ on:
         type: boolean
         default: false
       obs_5m:
-        description: With parts, obs and v3, English only, add the OBS Five Movements manual (en_obs-tf v4) to the obs segment of format 3 (off by default)
+        description: With parts, obs and v3, for en or id, add the OBS Five Movements manual (en_obs-tf v4, id_obs-tf v0.1.0) to the obs segment of format 3 (off by default)
         required: false
         type: boolean
         default: false
@@ -356,15 +356,21 @@ jobs:
         continue-on-error: true
         run: bun packages/resource-pipeline/cli/fetch-topic-sources.ts --out "$RUNNER_TEMP/topics" --work "$RUNNER_TEMP/packs-v3-work"
 
-      # The OBS Five Movements manual (en_obs-tf; only for language en with obs, parts, v3 and staging: any other combination leaves it unfetched and the format 3 step skips), at the commit its tag v4 points to: a moved tag fails the step instead of changing the pack.
+      # The OBS Five Movements manual of the language (en_obs-tf v4, id_obs-tf v0.1.0; only for those languages with obs, parts, v3 and staging: any other combination leaves it unfetched and the format 3 step skips), at the commit its tag points to: a moved tag fails the step instead of changing the pack.
       - name: OBS 5M manual (format 3)
         id: obs5m
-        if: inputs.obs_5m && inputs.language == 'en' && inputs.obs && inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
+        if: inputs.obs_5m && (inputs.language == 'en' || inputs.language == 'id') && inputs.obs && inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
         continue-on-error: true
         run: |
           set -e
-          git clone --quiet --depth 1 --branch v4 https://git.door43.org/unfoldingWord/en_obs-tf.git "$RUNNER_TEMP/obs-tf"
-          test "$(git -C "$RUNNER_TEMP/obs-tf" rev-parse HEAD)" = 59f74b7cc87815bd2991aa0db8b42a9606c5ce13
+          case "$LANGUAGE" in
+            en) repo=en_obs-tf; tag=v4; pin=59f74b7cc87815bd2991aa0db8b42a9606c5ce13 ;;
+            id) repo=id_obs-tf; tag=v0.1.0; pin=f0219a721f9d9a4ac093936307ab816afb78af74 ;;
+            *) echo "no OBS 5M manual for $LANGUAGE" >&2; exit 1 ;;
+          esac
+          git clone --quiet --depth 1 --branch "$tag" "https://git.door43.org/unfoldingWord/$repo.git" "$RUNNER_TEMP/obs-tf"
+          test "$(git -C "$RUNNER_TEMP/obs-tf" rev-parse HEAD)" = "$pin"
+          printf '%s\n' "$tag" > "$RUNNER_TEMP/obs-tf.tag"
           test -f "$RUNNER_TEMP/obs-tf/obs_story_1.md"
 
       - name: Build and publish format 3
@@ -424,7 +430,7 @@ jobs:
           # publish-v3 wants the tag in lowercase; the 2.0 files above keep the value as given.
           args=(--lang "${LANGUAGE,,}" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
           args+=(--topics "$RUNNER_TEMP/topics")
-          if [ "$OBS_5M" = true ]; then args+=(--obs-tf "$RUNNER_TEMP/obs-tf" --obs-tf-release v4); fi
+          if [ "$OBS_5M" = true ]; then args+=(--obs-tf "$RUNNER_TEMP/obs-tf" --obs-tf-release "$(cat "$RUNNER_TEMP/obs-tf.tag")"); fi
           # The related of the tA articles needs the config.yaml of each manual, from the release the list names: without it the
           # build would lose those ties and say nothing, so a failed fetch fails this step (nothing was uploaded).
           if ! bun packages/resource-pipeline/cli/fetch-ta-config.ts --list "$list" --out "$RUNNER_TEMP/ta-config" >&2; then

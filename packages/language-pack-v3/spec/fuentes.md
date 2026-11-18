@@ -156,7 +156,8 @@ The sample also lists other resources (Berean Standard Bible `Worldview/en/bsb`,
 
 | Source | Version or release | License | What it gives | Table | Status |
 | --- | --- | --- | --- | --- | --- |
-| OBS-TF (`unfoldingWord/en_obs-tf`) | v4 (Door43 production, 50 stories) | CC BY-SA 4.0 | The Five Movements session of each story: questions, translation terms, shared blocks, framing text | `tf-parts`, `tf-questions`, `tf-terms`, `tf-shared`, `tf-frames`, `tf-framework` | draft (phase 0) |
+| OBS-TF (`unfoldingWord/en_obs-tf`) | v4 (Door43 production, 50 stories) | CC BY-SA 4.0 | The Five Movements session of each story: questions, translation terms, shared blocks, framing text | `tf-parts`, `tf-questions`, `tf-terms`, `tf-shared`, `tf-frames`, `tf-framework` | built (staging) |
+| OBS-TF Indonesian (`unfoldingWord/id_obs-tf`) | v0.1.0 (tag; commit `f0219a72`; 16 of 50 stories) | CC BY-SA 4.0 (its manifest) | The same, converted from Indonesian PDFs into Door43 markdown; the frames, titles and images are the `obs` unit's (`bahtraku/id_obs`) | the same | draft |
 
 The credit line is «unfoldingWord and Formation Stories». The method's framing text (`overview.md`) follows the license
 of the manual: Abel said on 2026-11-17 that the license is open and to go on («La licencia es abierta, puedes seguir

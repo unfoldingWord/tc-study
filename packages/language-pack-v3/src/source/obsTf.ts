@@ -58,10 +58,60 @@ function sections(md: string): Sec[] {
   return out
 }
 
-/** The parts of the 5M session, by the second-level heading that opens them. */
-const PART_OF_HEADING: [string, string][] = [['Biblical Interpretation', 'm1'], ['Theological Dialogue', 'm2'], ['Personal Reflection', 'm3']]
+/**
+ * The headings a manual of one language uses (`spec/obs-5m-checks.md`, "Reading the source"). A heading matches a text when it starts
+ * with it, ignoring case, hyphens, accents and the white space around them. `blocks` are first-level headings whose section is a block of the
+ * story itself (the manual of a language that does not transclude them): the heading starts with the text, and its section runs to the next
+ * heading of the first or second level; the block is stored once, under the key `obs_story_N.md#{heading}`.
+ */
+export type ObsTfHeadings = {
+  intro: string[]
+  story: string[]
+  parts: { m1: string[]; m2: string[]; m3: string[] }
+  lists: { observation: string[]; terms: string[]; discourse: string[]; theology: string[]; journal: string[] }
+  blocks: Record<string, string>
+}
 
-export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs: readonly ObsStory[]): ObsTfResult {
+export const OBS_TF_HEADINGS: Record<string, ObsTfHeadings> = {
+  en: {
+    intro: ['Introduction'],
+    story: ['Open Bible Story:'],
+    parts: { m1: ['Biblical Interpretation'], m2: ['Theological Dialogue'], m3: ['Personal Reflection'] },
+    lists: { observation: ['Observation Questions'], terms: ['Translation Questions'], discourse: ['Discourse Questions'], theology: ['Theological Questions'], journal: ['Journal Reflection'] },
+    blocks: {},
+  },
+  id: {
+    intro: ['Pengantar'],
+    story: ['Cerita Alkitab'],
+    parts: { m1: ['Penafsiran Alkitab', 'Interpretasi Alkitab'], m2: ['Dialog Teologis', 'Percakapan Teologis'], m3: ['Refleksi Pribadi'] },
+    lists: {
+      observation: ['Pertanyaan-Pertanyaan Observasi'],
+      terms: ['Pertanyaan-Pertanyaan Penerjemahan', 'Pertanyaan-Pertanyaan Terjemahan'],
+      discourse: ['Pertanyaan-Pertanyaan Diskursus', 'Pertanyaan-Pertanyaan Diskurus'],
+      theology: ['Pertanyaan-Pertanyaan Teologis'],
+      journal: ['Refleksi Jurnal'],
+    },
+    blocks: {
+      'Studi Komunitas': 'community',
+      'Naskah Awal Terjemahan': 'drafting',
+      'Pemeriksaan Tim': 'checking',
+      'Praktik Pelayanan': 'm4',
+      'Penjangkauan Misi': 'm5',
+      Kesimpulan: 'conclusion',
+    },
+  },
+}
+
+const fold = (x: string): string =>
+  x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[-\u2010-\u2015]+/g, ' ').replace(/\s+/g, ' ').trim()
+const startsWithAny = (h: string, texts: readonly string[]): boolean => texts.some((t) => fold(h).startsWith(fold(t)))
+
+/**
+ * `lang` picks the headings ({@link OBS_TF_HEADINGS}); the reviewed corrections of frame labels (`CORRESPONDENCE`, `LABEL_FIXES`) are of the English manual.
+ */
+export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs: readonly ObsStory[], lang = 'en'): ObsTfResult {
+  const H = OBS_TF_HEADINGS[lang]
+  if (H === undefined) return { model: { res, stories: [], parts: [], questions: [], terms: [], shared: [], frames: [], framework: [] }, errors: [`no headings are known for the language ${lang}`], warnings: [] }
   const errors: string[] = []
   const warnings: string[] = []
   const read = (name: string): string | undefined => {
@@ -132,9 +182,11 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
     const tfFrames: { label: string; text: string }[] = []
     const kOf: Record<string, number> = {}
     const nextK = (part: string): number => (kOf[part] = (kOf[part] ?? 0) + 1)
-    const fixes = LABEL_FIXES[n] ?? {}
+    const fixes = lang === 'en' ? LABEL_FIXES[n] ?? {} : {}
     let title = ''
     let ref = ''
+    let introTitle = 'Introduction'
+    let tokenRows = 0
 
     const mapFrames = (label: string): { ids: number[]; corrected: boolean } => {
       let norm = label.replace(/^(\d+)-(\d+)$/, (_, a: string, b: string) => `${pad(Number(a))}-${pad(Number(b))}`)
@@ -157,7 +209,10 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
           errors.push(`${where}: unknown transclusion ${key}`)
           continue
         }
-        if (sharedBlock(key, where)) blocks.push({ story: n, part, shared: key })
+        if (sharedBlock(key, where)) {
+          blocks.push({ story: n, part, shared: key })
+          tokenRows++
+        }
       }
     }
     const withoutTransclusions = (body: string): string => body.replace(/!\[\[[^\]]+\]\]/g, '')
@@ -175,19 +230,62 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
 
     let mode = ''
     const intro: string[] = []
+    // A block of the story itself (`H.blocks`): its heading (first level, or third when the conversion levelled it so), and the sections below it up to the next heading of its level or above (never below the second).
+    let open: { part: string; head: string; text: string; level: number } | undefined
+    const closeBlock = (): void => {
+      if (open === undefined) return
+      const key = `${file}#${open.head}`
+      if (sharedByKey.has(key)) errors.push(`${where}: the block ${JSON.stringify(open.head)} is in the story twice`)
+      else {
+        const block: ObsTfShared = { key, title: open.head }
+        const text = open.text.trim()
+        if (text !== '') block.text = text
+        sharedByKey.set(key, block)
+        blocks.push({ story: n, part: open.part, shared: key })
+      }
+      open = undefined
+    }
     for (const s of secs) {
       const h = s.head
-      if (s.level === 2 && h === 'Introduction') {
+      // A heading of the second level that no part uses, right after a block's heading and before any of its text, is the rest of a title that the conversion split in two.
+      const knownSecond = startsWithAny(h, H.intro) || (['m1', 'm2', 'm3'] as const).some((c) => startsWithAny(h, H.parts[c]))
+      if (open !== undefined && open.level === 1 && s.level === 2 && !knownSecond && open.text.trim() === '') {
+        takeTransclusions(s.body)
+        open.text += `## ${h}\n${withoutTransclusions(s.body)}`
+        continue
+      }
+      const namesBlock = Object.keys(H.blocks).some((text) => startsWithAny(h, [text]))
+      if (open !== undefined && (s.level <= Math.max(open.level, 2) || (s.level === 3 && namesBlock))) closeBlock()
+      if (open !== undefined) {
+        takeTransclusions(s.body)
+        open.text += `${'#'.repeat(s.level)} ${h}\n${withoutTransclusions(s.body)}`
+        continue
+      }
+      if ((s.level === 1 || s.level === 3) && Object.keys(H.blocks).length > 0) {
+        const part = Object.entries(H.blocks).find(([text]) => startsWithAny(h, [text]))?.[1]
+        if (part === undefined && s.level === 1) {
+          errors.push(`${where}: the first-level heading ${JSON.stringify(h)} is not known`)
+          continue
+        }
+        if (part !== undefined) {
+          mode = 'block'
+          takeTransclusions(s.body)
+          open = { part, head: h, text: withoutTransclusions(s.body), level: s.level }
+          continue
+        }
+      }
+      if (s.level === 2 && startsWithAny(h, H.intro)) {
         mode = 'intro'
+        introTitle = h
         if (s.body.trim() !== '') intro.push(s.body.trim())
         continue
       }
-      if (mode === 'intro' && s.level === 3 && !h.startsWith('Open Bible Story:')) { intro.push(`### ${h}\n${s.body.trim()}`); continue }
-      if (s.level === 3 && h.startsWith('Open Bible Story:')) {
+      if (mode === 'intro' && s.level === 3 && !startsWithAny(h, H.story)) { intro.push(`### ${h}\n${s.body.trim()}`); continue }
+      if (s.level === 3 && startsWithAny(h, H.story)) {
         const text = intro.join('\n\n')
-        blocks.push(text === '' ? { story: n, part: 'intro', title: 'Introduction' } : { story: n, part: 'intro', title: 'Introduction', text })
+        blocks.push(text === '' ? { story: n, part: 'intro', title: introTitle } : { story: n, part: 'intro', title: introTitle, text })
         blocks.push({ story: n, part: 'frames' })
-        title = h.replace('Open Bible Story:', '').trim()
+        title = h.includes(':') ? h.slice(h.indexOf(':') + 1).trim() : ''
         mode = 'frames'
         continue
       }
@@ -200,7 +298,7 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         continue
       }
       if (s.level === 2) {
-        const code = PART_OF_HEADING.find(([prefix]) => h.startsWith(prefix))?.[1]
+        const code = (['m1', 'm2', 'm3'] as const).find((c) => startsWithAny(h, H.parts[c]))
         if (code === undefined) {
           errors.push(`${where}: the part heading ${JSON.stringify(h)} is not known`)
           continue
@@ -216,11 +314,11 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         const text = lead(s.body)
         blocks.push({ story: n, part, list, title: h, ...(text === undefined ? {} : { text }) })
       }
-      if (s.level === 3 && h === 'Observation Questions') { listHead('m1', 'observation', 'm1:observation'); takeTransclusions(s.body); continue }
-      if (s.level === 3 && h === 'Translation Questions') { listHead('m1', 'terms', 'm1:terms'); continue }
-      if (s.level === 3 && h === 'Discourse Questions') { listHead('m2', 'discourse', 'm2:discourse'); continue }
-      if (s.level === 3 && (h === 'Theological Questions' || h === 'Journal Reflection')) {
-        const [part, list] = h === 'Theological Questions' ? ['m2', 'theology'] : ['m3', 'journal']
+      if (s.level === 3 && startsWithAny(h, H.lists.observation)) { listHead('m1', 'observation', 'm1:observation'); takeTransclusions(s.body); continue }
+      if (s.level === 3 && startsWithAny(h, H.lists.terms)) { listHead('m1', 'terms', 'm1:terms'); continue }
+      if (s.level === 3 && startsWithAny(h, H.lists.discourse)) { listHead('m2', 'discourse', 'm2:discourse'); continue }
+      if (s.level === 3 && (startsWithAny(h, H.lists.theology) || startsWithAny(h, H.lists.journal))) {
+        const [part, list] = startsWithAny(h, H.lists.theology) ? ['m2', 'theology'] : ['m3', 'journal']
         const { leadText, items } = numbered(s.body)
         mode = `${part}:${list}`
         const text = lead(leadText)
@@ -262,11 +360,31 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         questions.push({ story: n, part: 'm2', list: 'discourse', k: nextK('m2'), frames: ids, q, ...(answer === '' ? {} : { a: answer }), ...(m && mapped.some((x) => x.corrected) ? { refText: m[2].trim() } : {}) })
         continue
       }
+      // A third-level heading that no list uses would lose its questions without a word: it is an error.
+      // In a list of questions or terms, one that the conversion turned into a heading is the text of the question or term before it.
+      // Not one that looks like the heading of a list, a part or a block that was misspelled: that one would take the questions below it with it.
+      const looksLikeHeading = /^(pertanyaan|refleksi|dialog|percakapan|penafsiran|interpretasi|question|journal|theolog|discourse)/.test(fold(h))
+      if (s.level === 3 && (mode === 'm1:observation' || mode === 'm1:terms') && !looksLikeHeading) {
+        const last = mode === 'm1:observation' ? questions.filter((q) => q.story === n && q.list === 'observation').at(-1) : undefined
+        const lastTerm = mode === 'm1:terms' ? terms.filter((t) => Math.floor(t.frame / 100) === n).at(-1) : undefined
+        takeTransclusions(s.body)
+        const text = [h, ...paras(withoutTransclusions(s.body))].join('\n')
+        if (last !== undefined) last.a = last.a === undefined ? text : `${last.a}\n${text}`
+        else if (lastTerm !== undefined) lastTerm.text = `${lastTerm.text}\n\n${text}`
+        else {
+          errors.push(`${where}: the heading ${JSON.stringify(h)} comes before any question or term of its list`)
+          continue
+        }
+        warnings.push(`${where}: the heading ${JSON.stringify(h.slice(0, 60))} inside a list was taken as the text of the ${last !== undefined ? 'question' : 'term'} before it`)
+        continue
+      }
+      if (s.level === 3 && mode !== '' && mode !== 'frames') errors.push(`${where}: the heading ${JSON.stringify(h)} is not a heading of a list or a block of this language`)
       if (s.level >= 1 && mode !== '') takeTransclusions(s.body)
     }
+    closeBlock()
 
     // The frames of the story against the obs story's (checks 1, 2, 5, 6).
-    const corr = CORRESPONDENCE[n]
+    const corr = lang === 'en' ? CORRESPONDENCE[n] : undefined
     const labelIds = (label: string): number[] => corr?.[label] ?? [frameIdOf(label) ?? -1]
     let storyInTf = false
     if (st === undefined) {
@@ -298,9 +416,9 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
           warnings.push(`${where}: frame ${f.label}: text differs from obs (manual «${a.slice(Math.max(0, k - 20), k + 40)}» obs «${b.slice(Math.max(0, k - 20), k + 40)}»)`)
         }
       }
-      if (normText(title) !== normText(st.title)) warnings.push(`${where}: title differs (manual «${title}» obs «${st.title}»)`)
+      if (title !== '' && normText(title) !== normText(st.title.replace(/^\d+\.\s*/, ''))) warnings.push(`${where}: title differs (manual «${title}» obs «${st.title}»)`)
       const obsRef = (st.reference ?? '').replace(/^[^:]*:\s*/, '')
-      if (ref !== '' && normText(ref) !== normText(obsRef)) warnings.push(`${where}: reference differs (manual «${ref}» obs «${obsRef}»)`)
+      if (lang === 'en' && ref !== '' && normText(ref) !== normText(obsRef)) warnings.push(`${where}: reference differs (manual «${ref}» obs «${obsRef}»)`)
     }
     const frameOk = (id: number): boolean =>
       Math.floor(id / 100) === n && (storyInTf ? frames.some((f) => f.frame === id) : st!.frames.some((x) => n * 100 + x.n === id))
@@ -320,7 +438,7 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
       if (present.has(p)) for (const l of ls) if (!blocks.some((b) => b.part === p && b.list === l)) warnings.push(`${where}: part ${p} has no list ${l}`)
     }
     const tokens = [...md.matchAll(/!\[\[([^\]]+)\]\]/g)].filter((m) => !/\.(jpe?g|png)$/i.test(m[1])).length
-    const rows = blocks.filter((b) => b.shared !== undefined).length
+    const rows = tokenRows
     if (tokens !== rows) errors.push(`${where}: ${tokens} transclusions in the text and ${rows} shared rows: one was not read`)
     coverage.push(n)
     parts.push(...blocks)
