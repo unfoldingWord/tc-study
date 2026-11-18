@@ -146,11 +146,6 @@ jobs:
             echo "::error::obs cannot be combined with compare: the whole packs have no obs unit"
             exit 1
           fi
-          # The OBS 5M manual is the English manual of format 3: it goes in the obs segment, so it needs obs, parts and format 3, on staging.
-          if [ "$OBS_5M" = true ] && { [ "$LANGUAGE" != en ] || [ "$OBS" != true ] || [ "$PARTS" != true ] || [ "${{ inputs.v3 }}" != true ] || [ "$TARGET" != staging ]; }; then
-            echo "::error::obs_5m needs language en, obs, parts, v3 and target staging"
-            exit 1
-          fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
           if [ -n "$REQUESTED_COMPAT" ] && ! [[ "$REQUESTED_COMPAT" =~ ^f[0-9]+\.[0-9]+-u[A-Za-z0-9_.]+-p[0-9]+-q[0-9]+-a[0-9]+-t[0-9]+$ ]]; then
             echo "::error::compat is not a compat key"
@@ -361,10 +356,10 @@ jobs:
         continue-on-error: true
         run: bun packages/resource-pipeline/cli/fetch-topic-sources.ts --out "$RUNNER_TEMP/topics" --work "$RUNNER_TEMP/packs-v3-work"
 
-      # The OBS Five Movements manual (en_obs-tf), at the commit its tag v4 points to: a moved tag fails the step instead of changing the pack.
+      # The OBS Five Movements manual (en_obs-tf; only for language en with obs, parts, v3 and staging: any other combination leaves it unfetched and the format 3 step skips), at the commit its tag v4 points to: a moved tag fails the step instead of changing the pack.
       - name: OBS 5M manual (format 3)
         id: obs5m
-        if: inputs.obs_5m && inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
+        if: inputs.obs_5m && inputs.language == 'en' && inputs.obs && inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
         continue-on-error: true
         run: |
           set -e
