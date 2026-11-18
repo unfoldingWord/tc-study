@@ -29,6 +29,11 @@ const pad = (n: number): Uint8Array => new Uint8Array((512 - (n % 512)) % 512)
  * A path longer than 100 bytes is written with a pax `path` record; `gnuLong` writes those with a GNU `L` entry instead.
  */
 export function tarGz(root: string, files: [string, Uint8Array | string][], gnuLong = false): Uint8Array {
+  return new Uint8Array(gzipSync(tar(root, files, gnuLong)))
+}
+
+/** The tarball of {@link tarGz}, not gzipped (a test cuts or changes it, then gzips it). */
+export function tar(root: string, files: [string, Uint8Array | string][], gnuLong = false): Uint8Array {
   const parts: Uint8Array[] = []
   const add = (b: Uint8Array) => parts.push(b)
   const comment = enc.encode('52 comment=0123456789abcdef0123456789abcdef01234567\n')
@@ -67,8 +72,12 @@ export function tarGz(root: string, files: [string, Uint8Array | string][], gnuL
     tar.set(p, at)
     at += p.length
   }
-  return new Uint8Array(gzipSync(tar))
+  return tar
 }
+
+/** A header of a regular file, for a test that writes its own tarball. */
+export const fileHeader = (name: string, size: number): Uint8Array => header(name, size, '0')
+export { gzipSync }
 
 /** The bytes as a stream of small chunks (so a reader must join headers and bodies across chunks). */
 export async function* chunks(bytes: Uint8Array, size = 37): AsyncIterable<Uint8Array> {

@@ -72,22 +72,29 @@ export type PersonEntry = PersonRef & { names: string[]; verses: number }
 type Ctx = {
   core: XtopicsCore
   tw: Map<string, string[]>
+  parentsOf: Map<string, Set<string>>
   mapNames: Record<string, string[]>
+  topics?: TopicsCore
   people?: TopicsCore['people']
 }
 
-const contexts = new WeakMap<object, Map<object | undefined, Ctx>>()
+/** What depends on the common core alone, built once per core (a reader keeps its core): the same-as index and the parents. */
+const byCore = new WeakMap<XtopicsCore, { tw: Map<string, string[]>; parentsOf: Map<string, Set<string>> }>()
 
 function contextOf(core: XtopicsCore, mapNames: Record<string, string[]> | undefined, topics: TopicsCore | undefined): Ctx {
-  // One per core and language topics core, so the same-as index is built once per reader
-  let byLang = contexts.get(core)
-  if (byLang === undefined) contexts.set(core, (byLang = new Map()))
-  let ctx = byLang.get(topics)
-  if (ctx === undefined) {
-    ctx = { core, tw: twOfPeople(core), mapNames: mapNames ?? {}, people: topics?.people }
-    byLang.set(topics, ctx)
+  let c = byCore.get(core)
+  if (c === undefined) {
+    const parentsOf = new Map<string, Set<string>>()
+    for (const r of core.relations ?? []) {
+      if (r.type !== 'parent-of') continue
+      let set = parentsOf.get(r.to)
+      if (set === undefined) parentsOf.set(r.to, (set = new Set()))
+      set.add(r.from)
+    }
+    c = { tw: twOfPeople(core), parentsOf }
+    byCore.set(core, c)
   }
-  return ctx
+  return { core, ...c, mapNames: mapNames ?? {}, topics, people: topics?.people }
 }
 
 function ref(ctx: Ctx, id: string): PersonRef {
@@ -101,7 +108,10 @@ function ref(ctx: Ctx, id: string): PersonRef {
 
 const countOf = (core: XtopicsCore, id: string): number => [...(core.occurrences.get(id)?.values() ?? [])].reduce((n, [, verses]) => n + verses, 0)
 
-/** In the order of their first verse; those with no verse last; ties by id (code point). */
+/**
+ * In the order of their first verse; those with no verse last; ties by id (code point). The verses need the parts: with no part of a
+ * book installed, the order of the people of that book falls back to their ids.
+ */
 function ordered(list: Relative[]): Relative[] {
   const first = (r: Relative): number => r.verses[0]?.[0] ?? Number.POSITIVE_INFINITY
   return list.sort((a, b) => first(a) - first(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -130,44 +140,39 @@ async function partsOf(reader: PackReader, books: Set<string>): Promise<Map<stri
 
 /**
  * The family of a person (`per:` id): `data: null` when `xtopics` is not installed or the id is not a person of it. Reads the `xtopics`
- * core and only the parts of the books the person shares with a relative (their verses give the verses of each relation).
+ * core and only the parts of the books the person shares with a relative (their verses give the verses of each relation). A part it
+ * needed and could not read is listed in `notInstalled` (`{ unit: "xtopics", book, what: "part" }`): its verses are missing, not zero.
  */
 export async function familyQuery(reader: PackReader, id: string): Promise<Answer<FamilyData | null>> {
   if (typeof id !== 'string' || !id.startsWith('per:')) throw new ClientError('E_ARG', `not a person id: ${JSON.stringify(id)}`)
   const out = newAnswer<FamilyData | null>(reader, 'family')
   const ctx = await cores(reader, out)
   if (ctx === undefined || ctx.core.topics.get(id)?.kind !== 'person') return out
-  const parentsOf = new Map<string, Set<string>>()
-  const addParent = (child: string, parent: string): void => {
-    let set = parentsOf.get(child)
-    if (set === undefined) parentsOf.set(child, (set = new Set()))
-    set.add(parent)
-  }
   const rel = { parents: new Set<string>(), children: new Set<string>(), partners: new Set<string>(), siblings: new Set<string>() }
   for (const r of ctx.core.relations ?? []) {
-    if (r.type === 'parent-of') addParent(r.to, r.from)
-    if (r.from !== id && r.to !== id) continue
+    if ((r.from !== id && r.to !== id) || r.from === r.to) continue
     const other = r.from === id ? r.to : r.from
     if (r.type === 'parent-of') (r.from === id ? rel.children : rel.parents).add(other)
     else if (r.type === 'partner-of') rel.partners.add(other)
     else if (r.type === 'sibling-of') rel.siblings.add(other)
   }
   // A relation's verses are in the books both people are in: only those parts are read
-  const booksOf = (p: string): Set<string> => new Set(ctx.core.occurrences.get(p)?.keys() ?? [])
-  const own = booksOf(id)
+  const booksOf = (p: string): string[] => [...(ctx.core.occurrences.get(p)?.keys() ?? [])]
+  const own = new Set(booksOf(id))
   const books = new Set<string>()
   for (const other of [...rel.parents, ...rel.children, ...rel.partners, ...rel.siblings]) for (const b of booksOf(other)) if (own.has(b)) books.add(b)
   const parts = await partsOf(reader, books)
-  const versesOf = (p: string): number[] => [...booksOf(p)].filter((b) => books.has(b)).flatMap((b) => parts.get(b)?.occurrences.get(p) ?? [])
+  for (const b of books) if (!parts.has(b)) missingUnit(out, { unit: 'xtopics', book: b, bytes: 0, what: 'part' })
+  const versesOf = (p: string): number[] => booksOf(p).flatMap((b) => (books.has(b) ? (parts.get(b)?.occurrences.get(p) ?? []) : []))
   const mine = versesOf(id)
+  const myParents = ctx.parentsOf.get(id) ?? new Set<string>()
   const relatives = (ids: Set<string>, sibling = false): Relative[] =>
     ordered(
       [...ids].map((other) => {
         const r: Relative = { ...ref(ctx, other), verses: kinVerses(mine, versesOf(other)) }
         if (sibling) {
-          const a = parentsOf.get(id) ?? new Set<string>()
-          const b = parentsOf.get(other) ?? new Set<string>()
-          if (a.size === 2 && b.size === 2 && [...a].filter((p) => b.has(p)).length === 1) r.half = true
+          const theirs = ctx.parentsOf.get(other) ?? new Set<string>()
+          if (myParents.size === 2 && theirs.size === 2 && [...myParents].filter((p) => theirs.has(p)).length === 1) r.half = true
         }
         return r
       }),
@@ -186,7 +191,7 @@ export async function familyQuery(reader: PackReader, id: string): Promise<Answe
     sources,
   }
   for (const key of sources) {
-    const release = releaseOf(ctx.core.res, key)
+    const release = releaseOf(ctx.core.res, key) || releaseOf(ctx.topics?.res, key)
     if (release !== '') out.cites.push({ res: key, release })
   }
   return out
@@ -196,13 +201,12 @@ export async function familyQuery(reader: PackReader, id: string): Promise<Answe
  * Every person of `xtopics` with the names a client may find it by (`ids.md`, "Names of people"): its name in the language first, then its
  * aliases (`people.aliases`), the first `map` name of each `tw:names/` article joined to it, its English title, and its first name in the
  * language's `topics`; each once, as stored (the pack does not fold: the client folds). Reads the cores only. `data: null` when `xtopics` is
- * not installed.
+ * not installed. A client that searches by name builds its index from this once per reader.
  */
 export async function peopleQuery(reader: PackReader): Promise<Answer<PersonEntry[] | null>> {
   const out = newAnswer<PersonEntry[] | null>(reader, 'people')
   const ctx = await cores(reader, out)
   if (ctx === undefined) return out
-  const topics = (await reader.mapsOf(['topics'], { coreOnly: true })).topics?.core
   const aliasesOf = new Map<string, string[]>()
   for (const [name, ids] of Object.entries(ctx.people?.aliases ?? {})) {
     for (const pid of ids) {
@@ -215,7 +219,7 @@ export async function peopleQuery(reader: PackReader): Promise<Answer<PersonEntr
   for (const [pid, t] of ctx.core.topics) {
     if (t.kind !== 'person' || !pid.startsWith('per:')) continue
     const r = ref(ctx, pid)
-    const names = [r.name, ...(aliasesOf.get(pid) ?? []), ...(ctx.tw.get(pid) ?? []).map((c) => ctx.mapNames[c]?.[0] ?? ''), t.title, topics?.names[pid]?.[0]?.[0] ?? '']
+    const names = [r.name, ...(aliasesOf.get(pid) ?? []), ...(ctx.tw.get(pid) ?? []).map((c) => ctx.mapNames[c]?.[0] ?? ''), t.title, ctx.topics?.names[pid]?.[0]?.[0] ?? '']
     list.push({ ...r, names: [...new Set(names.filter((n) => n !== ''))], verses: countOf(ctx.core, pid) })
   }
   out.data = list

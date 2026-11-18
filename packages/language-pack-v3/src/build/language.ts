@@ -542,7 +542,7 @@ export const ACAI_CREDIT = {
   title: 'ACAI Biblical Entity Data: people',
   license: 'CC-BY-SA-4.0',
   attribution:
-    'ACAI Biblical Entity Data © 2024 BiblioNexus (https://github.com/BibleAquifer/ACAI), CC BY-SA 4.0. Changed: only the gender, the names and other names in six languages and the uW Translation Words titles of the people were read, joined to TIPNR',
+    'ACAI Biblical Entity Data © 2024 BiblioNexus (https://github.com/BibleAquifer/ACAI), CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changed: only the gender, the names and other names in six languages and the uW Translation Words titles of the people were extracted, joined to TIPNR and reduced; the names are reproduced where the pack cannot derive them',
 } as const
 
 /** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */
@@ -726,13 +726,15 @@ export async function buildCommon(o: {
     // ACAI: the people, and the English titles of the tW names its same-as compares with
     let acai: AcaiPerson[] | undefined
     let twTitles: Map<string, string> | undefined
+    const twUsed: { key: string; stamp: string }[] = []
     if (t.acai !== undefined) {
       const parsed = parseAcai(t.acai)
       acai = parsed.people
       res.acai = [ACAI_SOURCE.key, parsed.commit.slice(0, 8)]
       if (lang !== undefined) {
         twTitles = new Map()
-        for (const ref of (await o.source.resources(lang)).filter((r) => r.kind === 'Translation Words')) {
+        for (const ref of (await o.source.resources(lang)).filter((r) => r.kind === 'Translation Words').sort((a, b) => compareCodePoints(a.key, b.key))) {
+          twUsed.push({ key: ref.key, stamp: tagOf(ref.stamp) })
           for await (const row of o.source.rows({ lang, resource: ref.key, layer: 'text' })) {
             const m = /^helps-text:tw-title:([^@]+)@[^:]*:(names\/[A-Za-z0-9_-]+)$/.exec(row.key)
             const value = row.value as { content?: unknown } | null
@@ -827,7 +829,8 @@ export async function buildCommon(o: {
       ...stamps,
       ...(built.core.chunks === undefined ? [] : [{ key: ult!.key, stamp: tagOf(ult!.stamp) }]),
       ...(built.core.obsFrames === undefined ? [] : [{ key: OBS_FRAMES_SOURCE.key, stamp: OBS_FRAMES_SOURCE.release }]),
-      ...(acaiUsed ? [{ key: res.acai![0], stamp: res.acai![1] }] : []),
+      // ACAI's same-as compares its titles with those of the tW of the map language: that tW is an input of the core too
+      ...(acaiUsed ? [{ key: res.acai![0], stamp: res.acai![1] }, ...twUsed] : []),
     ]
     const coreInputs = built.core.chunks === undefined && built.core.obsFrames === undefined && !acaiUsed ? inputs : inputsOf([...rows, ...chunkRows, ...frameRows, ...acaiRows], coreStamps)
     segments.push(await builtSegment(xtopicsSegment(built.core), coreInputs))

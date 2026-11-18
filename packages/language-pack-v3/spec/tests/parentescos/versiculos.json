@@ -1,0 +1,170 @@
+{
+  "rule": "ids.md, Verses of a family relation. a and b are verse ids (book * 1000000 + chapter * 1000 + verse), in any order, maybe repeated; verses is what the rule gives, the same with a and b swapped.",
+  "cases": [
+    {
+      "what": "shared verses: the first three, in verse order",
+      "a": [
+        1027001,
+        1025026,
+        1025028,
+        1026001
+      ],
+      "b": [
+        1026001,
+        1025028,
+        1025026,
+        1027001
+      ],
+      "verses": [
+        [
+          1025026,
+          1025026
+        ],
+        [
+          1025028,
+          1025028
+        ],
+        [
+          1026001,
+          1026001
+        ]
+      ]
+    },
+    {
+      "what": "one shared verse, repeated in the input",
+      "a": [
+        1025026,
+        1025026
+      ],
+      "b": [
+        1025026
+      ],
+      "verses": [
+        [
+          1025026,
+          1025026
+        ]
+      ]
+    },
+    {
+      "what": "none shared: the closest pair in one chapter",
+      "a": [
+        1004001,
+        1009010
+      ],
+      "b": [
+        1004003,
+        1009014
+      ],
+      "verses": [
+        [
+          1004001,
+          1004003
+        ]
+      ]
+    },
+    {
+      "what": "the pair is [smaller, larger]",
+      "a": [
+        1004010
+      ],
+      "b": [
+        1004007
+      ],
+      "verses": [
+        [
+          1004007,
+          1004010
+        ]
+      ]
+    },
+    {
+      "what": "a tie of distance: the smallest first verse",
+      "a": [
+        1005010,
+        1003005
+      ],
+      "b": [
+        1005008,
+        1003007
+      ],
+      "verses": [
+        [
+          1003005,
+          1003007
+        ]
+      ]
+    },
+    {
+      "what": "a tie of distance and of first verse cannot happen with one person; with the first verse on both sides, the smallest last",
+      "a": [
+        1005010
+      ],
+      "b": [
+        1005008,
+        1005012
+      ],
+      "verses": [
+        [
+          1005008,
+          1005010
+        ]
+      ]
+    },
+    {
+      "what": "exactly three apart is close; four is not",
+      "a": [
+        1006001,
+        1007001
+      ],
+      "b": [
+        1006004,
+        1007005
+      ],
+      "verses": [
+        [
+          1006001,
+          1006004
+        ]
+      ]
+    },
+    {
+      "what": "four apart: none",
+      "a": [
+        1004001
+      ],
+      "b": [
+        1004005
+      ],
+      "verses": []
+    },
+    {
+      "what": "close but in two chapters: none",
+      "a": [
+        1004026
+      ],
+      "b": [
+        1005001
+      ],
+      "verses": []
+    },
+    {
+      "what": "the same chapter and verse in two books: none",
+      "a": [
+        1004001
+      ],
+      "b": [
+        2004001
+      ],
+      "verses": []
+    },
+    {
+      "what": "one person has no verses (its parts not installed): none",
+      "a": [],
+      "b": [
+        1004001
+      ],
+      "verses": []
+    }
+  ]
+}

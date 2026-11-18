@@ -336,11 +336,16 @@ export function buildXtopics(o: {
     if (o.res.acai === undefined) throw new Error('acai: the people of ACAI need res.acai (its key and release)')
     const acaiKey = o.res.acai[0]
     const perOfRef = new Map<string, string>()
-    for (const [id, t] of topics) if (t.kind === 'person' && id.startsWith('per:')) perOfRef.set(t.ref, id)
+    for (const [id, t] of topics) {
+      if (t.kind !== 'person' || !id.startsWith('per:')) continue
+      if (perOfRef.has(t.ref)) report.push(`review: acai: ${perOfRef.get(t.ref)} and ${id} have the same TIPNR name ${t.ref}: ACAI joins ${id}`)
+      perOfRef.set(t.ref, id)
+    }
     const joined = joinAcai(o.acai, perOfRef, report)
     for (const [per, p] of [...joined.byPer].sort((a, b) => compareCodePoints(a[0], b[0]))) if (p.gender !== 0) gender[per] = p.gender
     if (Object.keys(gender).length > 0) acaiUsed = true
-    if (o.twTitles !== undefined) {
+    if (o.twTitles === undefined) report.push('acai: no tW titles (no map language): no same-as of ACAI')
+    else {
       const linked = new Set(relations.filter((r) => r.type === 'same-as').map((r) => r.from))
       const byFolded = new Map<string, Set<string>>()
       const index = (text: string, concept: string): void => {

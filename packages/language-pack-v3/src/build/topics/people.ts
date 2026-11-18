@@ -65,6 +65,10 @@ export function buildPeople(o: {
   const { byPer, aliases } = joinAcai(o.acai, perOfRef, joinReport)
   const tw = twOfPeople(o.xtopics)
   const nfc = (s: string): string => s.normalize('NFC')
+  // The map names are NFC as map.cddl stores them; made NFC here too, so both sides are compared byte for byte after NFC
+  const mapNames: Record<string, string[]> = {}
+  for (const [k, v] of Object.entries(o.mapNames)) mapNames[k] = v.map(nfc)
+  o = { ...o, mapNames }
 
   // names: only where the rule without the table gives another text
   const names: Record<string, string> = {}

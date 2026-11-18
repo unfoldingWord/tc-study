@@ -724,6 +724,18 @@ async function kinship(): Promise<Map<string, Uint8Array>> {
   out.set('parentescos/personas-nota-vacia.seg', await write(withPeople({ ...people, notes: { ...people.notes, 'per:jacob': '' } })))
   out.set('parentescos/personas-alias-desordenado.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Jacob: ['per:jacob', 'per:israel'] } })))
   out.set('parentescos/personas-sin-aliases.seg', await write(withPeople({ names: people.names, notes: people.notes })))
+  out.set('parentescos/personas-nombre-vacio.seg', await write(withPeople({ ...people, names: { ...people.names, 'per:esau': '' } })))
+  out.set('parentescos/personas-nota-de-lugar.seg', await write(withPeople({ ...people, notes: { 'lug:hebron': 'en Canaán', ...people.notes } })))
+  out.set('parentescos/personas-alias-sin-ids.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Abram: [] } })))
+  out.set('parentescos/personas-alias-id-de-lugar.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Hebrón: ['lug:hebron'] } })))
+  out.set('parentescos/personas-alias-repetido.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Jacob: ['per:israel', 'per:israel'] } })))
+  out.set('parentescos/personas-alias-vacio.seg', await write(withPeople({ ...people, aliases: { '': ['per:abraham'], ...people.aliases } })))
+  out.set('parentescos/genero-no-bytes.seg', await write(withX({ gender: [1, 0, 2] })))
+  // A part with a core table: the gender of the core in the part of Genesis
+  const part = xtopicsSegment({ part: 'gen', occurrences: new Map([['per:isaac', [verseId('gen', 21, 3)]]]) })
+  out.set('parentescos/genero-en-parte.seg', await write({ h: { ...part.h, tables: { ...part.h.tables, gender: [1, false] } }, t: { ...part.t, gender: genderOf({}) } as Segment['t'] }))
+  // Accepted: three empty maps and a key the schema does not list (the reader leaves it out)
+  out.set('parentescos/personas-vacia-y-clave-extra.seg', await write(withPeople({ names: {}, notes: {}, aliases: {}, descriptions: { 'per:isaac': 'a key a later version adds' } })))
   return out
 }
 

@@ -132,20 +132,30 @@ ACAI (`BibleAquifer/ACAI`, `fuentes.md`) adds to the people of TIPNR what TIPNR 
 languages, other names (aliases) and the uW Translation Words article of a person. It never makes, changes or merges an id,
 and none of its relations is used (the family relations come from TIPNR alone).
 
-- **Join.** An ACAI person record lists, in `alternate_sources.tipnr`, TIPNR unique names (`Isaac@Gen.17.19-Jas`). A record
-  whose own id is its `primary_id` is joined to the `per:` topic whose `ref` is one of those names, when they give exactly one
-  topic; none or several is not joined (several goes to the review list). Two records joined to one topic: the first by ACAI
-  id is used, the second goes to the review list. A record whose `primary_id` is another record is an **alias record**: it
-  belongs to the topic its primary record is joined to, and is not joined by its own TIPNR names.
-- **Gender** (`xtopics` `gender`): ACAI's `male` is 1, `female` 2; anything else, or a person ACAI does not join, is 0.
+- **What is read.** Of each file of `people/json/` (an object, or a list whose first item is the object) whose `id` starts
+  `person:`: `id`, `primary_id` (missing or empty: the `id`), `gender`, `alternate_sources.tipnr` (texts),
+  `alternate_sources.aquifer` (texts `number|title|resource`: only those of exactly three pieces whose resource is
+  `UWTranslationWords`, and of them the title), and `localizations.<code>.preferred_label` for the six codes below. Texts are
+  trimmed and made NFC. `src/source/acai.ts` `trimAcai` writes exactly this, sorted by `id`, as `acai/people.json`; that file
+  is what the builder reads, and its sha256 is pinned (`fuentes.md`). Not read: descriptions, word lists, references (ORG
+  versification), roles, tribes, places and relations.
+- **Join.** A record whose `primary_id` is its own id is joined to the `per:` topic whose `ref` is one of its TIPNR names, when
+  they give exactly one topic; none is not joined, several goes to the review list. Two records joined to one topic: the
+  first by ACAI id (code point) is used, the second and its alias records go to the review list. A record whose `primary_id`
+  is another record is an **alias record**: it belongs to the topic its primary record is joined to, and is not joined by its
+  own TIPNR names. An alias record whose primary is not joined, or is itself an alias record, is left out and reported.
+- **Gender** (`xtopics` `gender`): ACAI's `male` is 1, `female` 2; anything else, or a person ACAI does not join, is 0. A core
+  where every value would be 0 has no table.
 - **`same-as` of ACAI.** ACAI names a uW Translation Words article by its English title (`26734|Isaac|UWTranslationWords`;
-  the number is Aquifer's, not an id of tW). The title is folded (lowercase, combining marks dropped after NFD, only letters
-  and digits kept) and compared with the folded slug of every `tw:names/` concept and with its folded English title and each
-  comma-separated piece of it (`Jacob, Israel`). When exactly one concept matches, and the TIPNR rule above joined that concept
-  to no one, the builder adds `same-as` from the concept to the person (source ACAI, confidence 75). A concept the TIPNR rule
-  joined keeps only that: ACAI fills what is missing. No match, several, and a concept joined by TIPNR to someone else go to the
-  review list. A pair is never added twice.
-- **What is not read:** ACAI's descriptions, word lists, references (ORG versification), roles, tribes, places and relations.
+  the number is Aquifer's, not an id of tW). The titles compared are those of the tW of the map language of the common build
+  (`mapLang`, English: the rows `helps-text:tw-title:`), whose key and release are then inputs of the core; a build without a
+  map language makes no `same-as` of ACAI and says so in its report. The title is folded (combining marks dropped after NFD,
+  lowercase, only letters and digits kept) and compared with the folded slug of every `tw:names/` concept and with its
+  folded English title and each comma-separated piece of it (`Jacob, Israel`). When exactly one concept matches, and the TIPNR
+  rule above joined that concept to no one, the builder adds `same-as` from the concept to the person (source ACAI,
+  confidence 75). A concept the TIPNR rule joined keeps only that: ACAI fills what is missing. Two ACAI people may each get
+  the same concept this way. No match, several, and a concept joined by TIPNR to someone else go to the review list. A pair is
+  never added twice.
 
 ### Names of people
 
@@ -156,35 +166,51 @@ The name a client shows for a person `P` in language `L` is, in this order:
    core (the first such concept by code point that has a name in `L`);
 3. else the English title of `P` (`xtopics` `topics.title`).
 
+The names of `L`'s `topics` `names` (taken from the alignment, often noisy: "he", "his son") are not part of this rule. A client
+may still find a person by its first one.
+
 The builder of `L` writes, for a person ACAI joins and names in `L` (the language's ACAI code: `en` eng, `es-419` spa, `fr`
 fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
-- **`names`**: ACAI's preferred label in `L`, split into the name and a final note in parentheses (`Jacob (padre de José)` is
-  the name `Jacob` and the note `padre de José`); the name is written only when it is not, byte for byte after NFC, what steps
-  2 and 3 give.
+- **The label.** ACAI's preferred label is split into a name and a note: when it ends with `(`, a text with no parenthesis,
+  `)` (spaces around them ignored), and something that is not a space comes before the `(`, the name is what comes before and
+  the note what is inside, each trimmed (`Jacob (padre de José)` is `Jacob` and `padre de José`); otherwise the whole label,
+  trimmed, is the name and there is no note (`A (b) c`, `(x)`). An empty name gives nothing; an empty note is no note.
+- **`names`**: the name, only when it is not, byte for byte, what steps 2 and 3 give. Both sides are NFC: ACAI's after
+  trimming (above), the `map` names as `map.cddl` stores them.
 - **`aliases`**: the name of each alias record of `P` in `L` (its note dropped: `P` has its own), to `P`; only when it is not
   `P`'s name in `L` (the rule above, with `names`), its English title, or the first `map` name in `L` of a `tw:names/` concept
   joined to `P`. Two alias records with the same name are one key with all their people.
 - **`notes`**: the note of `P`'s label in `L`, only when `P`'s name in `L` is a name another person can also be found by in
   `L`: that person's name in `L`, an alias in `L`, the first `map` name in `L` of a `tw:names/` concept joined to it, or its
-  English title; compared byte for byte. There the note tells the two apart. A label with no note gives none.
+  English title; compared byte for byte. There the note tells the two apart.
+- A table with nothing in its three maps is not written. No table means: every name comes from steps 2 and 3, no person has a
+  note or an alias.
 
-A client that compares names folds them its own way; the pack does not fold. An `L` with no `people` table (an older pack, or a
-language ACAI does not name) uses steps 2 and 3.
+**Built against one common.** What `people` leaves out is what steps 2 and 3 give with the `xtopics` core the language was
+built against, the common its catalog requires (`requires`, `catalog.md`); `notes` also depends on the people of that core. A
+client that reads the table with another common (one installed before or after) is not wrong in kind, only less exact: a person
+may show its tW title or English title instead of ACAI's name, two people may be told apart by no note, and an id the common
+lacks is ignored. It is never an error. A client that keeps the common its language requires, as `install` does, sees the names
+the builder meant.
+
+A client that compares names folds them its own way; the pack does not fold.
 
 ### Verses of a family relation
 
 The relations `parent-of`, `sibling-of` and `partner-of` of `xtopics` carry no verse. A client finds the verses that show one
-from what the pack already has, the verses of each person in the `xtopics` parts (`occurrences`), with this rule (normative:
-every client gives the same verses):
+from what the pack already has, the verses of each person in the `xtopics` parts (`occurrences` of the parts; the core has
+only counts), with this rule (normative: every client gives the same verses):
 
-1. Let `A` and `B` be the verse ids of the two people (all books). If they share verses, the first three shared ones in
-   canonical order (verse id order), each as the pair `[v, v]`.
+1. Let `A` and `B` be the verse ids of the two people in the parts installed (all books). If they share verses, the first three
+   shared ones in canonical order (verse id order), each as the pair `[v, v]`.
 2. Else, of all pairs `a` of `A` and `b` of `B` in the same chapter with `|a - b| <= 3`, the one with the smallest `|a - b|`;
    on a tie, the one with the smallest `min(a, b)`, then the smallest `max(a, b)`. It is given as `[min(a, b), max(a, b)]`.
 3. Else none.
 
-The verses are not stored in the pack because they can be derived (`language-pack-client` `kinVerses`). A part that is not
-installed gives no verses of its book.
+The rule is symmetric: which end is `from` does not matter. A relation never joins a person to itself (the builder drops one).
+A part that is not installed gives no verses of its book, and a client with the core alone gives none. The verses are not stored
+in the pack because they can be derived (`language-pack-client` `kinVerses`); `tests/parentescos/versiculos.json` holds the
+vectors every implementation must give.
 
 ## Strong keys
 

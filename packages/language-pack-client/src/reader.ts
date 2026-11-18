@@ -370,17 +370,22 @@ export function makeReader(o: ReaderInput): PackReader {
   }
   /**
    * Only the parts of the books named of one map unit (by `part`, from the catalogs), each read once and cached like any segment: a query
-   * that needs a few books does not decode the 66. A part that is missing or bad is left out. When the unit was read whole already, or a
-   * catalog does not say which segment is which part, the parts come from the whole unit.
+   * that needs a few books does not decode the 66. A part that is missing or bad is left out. When the unit was read whole already, its
+   * parts are those; when a catalog does not say which segment is which part (an older catalog), the whole unit is read.
    */
   async function mapParts(unit: keyof typeof VIEWS, books: readonly string[]): Promise<Map<string, Part> | undefined> {
     const ids = activeIds.get(unit)
     if (ids === undefined) return undefined
     const wanted = new Set(books)
     const pick = (parts: Map<string, Part>): Map<string, Part> => new Map([...parts].filter(([book]) => wanted.has(book)))
-    if (mapUnits.has(unit) || ids.some((id) => partOf.get(id) === undefined)) {
+    if (ids.some((id) => partOf.get(id) === undefined)) {
       const whole = (await mapUnit(unit)) as { parts: Map<string, Part> } | undefined
       return whole === undefined ? undefined : pick(whole.parts)
+    }
+    // The unit read whole already: its parts, when it read (one bad part makes the whole unit undefined: then part by part below)
+    if (mapUnits.has(unit)) {
+      const whole = (await mapUnit(unit)) as { parts: Map<string, Part> } | undefined
+      if (whole !== undefined) return pick(whole.parts)
     }
     const out = new Map<string, Part>()
     await Promise.all(

@@ -41,7 +41,9 @@ xtopics-core-tables = {
   ? "gender": uvarints,        ; optional, v1; core only; the gender of each person, from ACAI (ids.md, "People of ACAI"): one
                                ; number per row of topics.ids, in its order: 0 no data, 1 man, 2 woman. Only a topic of kind
                                ; person whose id starts "per:" may have 1 or 2. A reader checks the length, the values and that
-                               ; rule. A column, not a map by id: the ids are already in topics.ids, so nothing is repeated
+                               ; rule. A column, not a map by id: the ids are already in topics.ids, so nothing is repeated.
+                               ; Another value would be a new version of the table (v2), which a reader of v1 skips; a core
+                               ; where every value is 0 has no table
 }
 
 topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)

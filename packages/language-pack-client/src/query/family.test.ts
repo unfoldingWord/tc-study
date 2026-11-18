@@ -1,10 +1,23 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { MapSet, Topic, TopicsCore, XtopicsCore, XtopicsPart } from '@bt-synergy/language-pack-v3'
 import type { PackReader } from '../reader'
 import { familyQuery, kinVerses, peopleQuery } from './family'
 
 const v = (book: number, chapter: number, verse: number): number => book * 1_000_000 + chapter * 1000 + verse
 const gen = (c: number, x: number): number => v(1, c, x)
+
+describe('kinVerses: the vectors of spec/tests/parentescos/versiculos.json', () => {
+  const file = join(import.meta.dir, '../../../language-pack-v3/spec/tests/parentescos/versiculos.json')
+  const { cases } = JSON.parse(readFileSync(file, 'utf8')) as { cases: { what: string; a: number[]; b: number[]; verses: [number, number][] }[] }
+  for (const c of cases) {
+    test(c.what, () => {
+      expect(kinVerses(c.a, c.b)).toEqual(c.verses)
+      expect(kinVerses(c.b, c.a)).toEqual(c.verses)
+    })
+  }
+})
 
 describe('kinVerses (ids.md, "Verses of a family relation")', () => {
   test('the first three shared verses, in verse order, each as [v, v]', () => {
@@ -134,9 +147,20 @@ describe('family', () => {
     const esau = (await familyQuery(reader(), 'per:esau')).data!
     expect(esau.siblings).toEqual([{ id: 'per:israel', name: 'Jacob', gender: 1, verses: [[gen(25, 26), gen(25, 26)], [gen(25, 28), gen(25, 28)]] }])
   })
-  test('without the parts: the same people, no verses, in id order', async () => {
-    const d = (await familyQuery(reader({ parts: false }), 'per:isaac')).data!
-    expect(d.children.map((c) => [c.id, c.verses])).toEqual([['per:esau', []], ['per:israel', []]])
+  test('without the parts: the same people, no verses, in id order, and the parts it needed listed as not installed', async () => {
+    const a = await familyQuery(reader({ parts: false }), 'per:isaac')
+    expect(a.data!.children.map((c) => [c.id, c.verses])).toEqual([['per:esau', []], ['per:israel', []]])
+    expect(a.notInstalled).toEqual([{ unit: 'xtopics', book: 'gen', bytes: 0, what: 'part' }])
+  })
+  test('not half: a sibling with one parent in the data, or three', async () => {
+    const one = { ...core, relations: core.relations!.filter((r) => !(r.from === 'per:hagar' && r.to === 'per:ishmael')) }
+    const three = { ...core, relations: [...core.relations!, { from: 'per:terah', to: 'per:ishmael', type: 'parent-of', source: TIPNR, confidence: 100 }] }
+    for (const c of [one, three]) {
+      const r = { ...reader(), mapsOf: async (units: readonly string[], how?: { coreOnly?: boolean }) => ({ ...(await reader().mapsOf(units as never, how)), ...(units.includes('xtopics') ? { xtopics: { core: c, parts } } : {}) }) } as unknown as PackReader
+      const d = (await familyQuery(r, 'per:isaac')).data!
+      expect(d.siblings.find((s) => s.id === 'per:ishmael')!.half).toBeUndefined()
+      expect(d.siblings.find((s) => s.id === 'per:zimran')!.half).toBe(true)
+    }
   })
   test('without the topics of the language: the derived names (tW article, else the English title)', async () => {
     const d = (await familyQuery(reader({ topics: false }), 'per:isaac')).data!

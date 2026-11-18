@@ -61,12 +61,13 @@ export function toCrlf(bytes: Uint8Array): Uint8Array {
 const sha256Of = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex')
 
 /** The trimmed bytes of a `tree` pin from the body of its tarball, or why the files are not the pinned ones. */
-export async function treeBytes(s: TopicSource, body: AsyncIterable<Uint8Array>): Promise<{ bytes: Uint8Array; files: number } | { error: string }> {
+export async function treeBytes(s: TopicSource, body: AsyncIterable<Uint8Array>): Promise<{ bytes: Uint8Array; files: number; issues: string[] } | { error: string }> {
   const files = await filesOfTarball(body, s.path)
   const manifest = sha256Of(new TextEncoder().encode(manifestOf(files)))
   if (manifest !== s.manifestSha256) return { error: `${s.target}: the ${files.size} files under ${s.path} have the manifest sha256 ${manifest}, the pin says ${s.manifestSha256}` }
   const texts = new Map([...files].map(([p, b]) => [p, new TextDecoder().decode(b)]))
-  return { bytes: new TextEncoder().encode(trimAcai(texts, s.commit, [])), files: files.size }
+  const issues: string[] = []
+  return { bytes: new TextEncoder().encode(trimAcai(texts, s.commit, issues)), files: files.size, issues }
 }
 
 const USAGE = 'Usage: fetch-topic-sources --out <dir> [--work <dir>]'
@@ -141,6 +142,7 @@ export async function main(args: string[], io: Io, fetchFn: FetchFn = (u) => fet
           return 1
         }
         bytes = got.bytes
+        for (const line of got.issues) io.log(`${s.target}: ${line}`)
       } else bytes = new Uint8Array(await res.arrayBuffer())
     } catch (e) {
       io.error(`${s.target}: ${e instanceof Error ? e.message : String(e)}`)

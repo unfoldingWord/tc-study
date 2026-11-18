@@ -96,6 +96,8 @@ export function parseAcai(text: string): { commit: string; people: AcaiPerson[] 
     for (const [k, v] of Object.entries(p.labels)) if (typeof v === 'string') labels[k] = v
     return { id: p.id, primary: p.primary, tipnr: strings(p.tipnr), tw: strings(p.tw), gender: p.gender as 0 | 1 | 2, labels }
   })
+  // The join takes "the first by ACAI id": the order is the id's, whatever the file's
+  people.sort((a, b) => compareCodePoints(a.id, b.id))
   return { commit: d.commit, people }
 }
 
@@ -118,9 +120,10 @@ export function joinAcai(
   perOfRef: Map<string, string>,
   report: string[],
 ): { byPer: Map<string, AcaiPerson>; aliases: { person: AcaiPerson; per: string }[] } {
+  const sorted = [...people].sort((a, b) => compareCodePoints(a.id, b.id))
   const own = new Map<string, string>()
   let none = 0
-  for (const p of people) {
+  for (const p of sorted) {
     if (p.primary !== p.id) continue
     const found = [...new Set(p.tipnr.map((t) => perOfRef.get(t)).filter((x): x is string => x !== undefined))]
     if (found.length === 1) own.set(p.id, found[0])
@@ -128,21 +131,25 @@ export function joinAcai(
     else report.push(`review: acai ${p.id}: its TIPNR names give ${found.length} people (${found.sort(compareCodePoints).join(', ')}): not joined`)
   }
   const byPer = new Map<string, AcaiPerson>()
-  for (const p of people) {
+  for (const p of sorted) {
     const per = own.get(p.id)
     if (per === undefined) continue
     if (byPer.has(per)) {
-      report.push(`review: acai ${p.id} and ${byPer.get(per)!.id} are both ${per}: only the first is used`)
+      report.push(`review: acai ${p.id} and ${byPer.get(per)!.id} are both ${per}: only the first is used, with its alias records`)
       continue
     }
     byPer.set(per, p)
   }
   const aliases: { person: AcaiPerson; per: string }[] = []
-  for (const p of people) {
+  let lost = 0
+  for (const p of sorted) {
     if (p.primary === p.id) continue
     const per = own.get(p.primary)
     if (per !== undefined && byPer.get(per)?.id === p.primary) aliases.push({ person: p, per })
+    else lost++
   }
-  report.push(`acai: ${byPer.size} person records joined to TIPNR, ${none} with no TIPNR person, ${aliases.length} alias records joined`)
+  report.push(
+    `acai: ${byPer.size} person records joined to TIPNR, ${none} with no TIPNR person, ${aliases.length} alias records joined, ${lost} alias records left out (their primary is not joined, not used, or an alias record)`,
+  )
   return { byPer, aliases }
 }

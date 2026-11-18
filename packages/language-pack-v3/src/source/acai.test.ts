@@ -69,6 +69,7 @@ describe('joinAcai', () => {
         p('person:Judas.2', ['Iscariot|Judas@Mat.10.4-Act', 'Judas@Mat.10.4-Act']),
         p('person:Mixed', ['Judas@Mat.10.4-Act', 'Judah@Gen.29.35-Rev']),
         p('person:Nobody', ['Nobody@Gen.1.1']),
+        p('person:Chained', [], 'person:Jacob'),
       ],
       refs,
       report,
@@ -76,6 +77,6 @@ describe('joinAcai', () => {
     expect([...byPer.keys()].sort()).toEqual(['per:isaac', 'per:israel', 'per:judas'])
     expect(aliases.map((a) => [a.person.id, a.per])).toEqual([['person:Jacob', 'per:israel']])
     expect(report).toContain('review: acai person:Mixed: its TIPNR names give 2 people (per:judah, per:judas): not joined')
-    expect(report).toContain('acai: 3 person records joined to TIPNR, 1 with no TIPNR person, 1 alias records joined')
+    expect(report).toContain('acai: 3 person records joined to TIPNR, 1 with no TIPNR person, 1 alias records joined, 1 alias records left out (their primary is not joined, not used, or an alias record)')
   })
 })
