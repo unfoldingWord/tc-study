@@ -164,6 +164,52 @@ describe('buildPeople: an alias that names its person rarely and another person 
     expect(buildPeople({ lang: 'es-419', xtopics: core, mapNames: {}, acai: noEnglish, records, report: [] })!.aliases.David).toEqual(['per:judah'])
     const davidInNoVerse = { ...core, occurrences: new Map([...core.occurrences!].filter(([id]) => id !== 'per:david')) }
     expect(run({ xtopics: davidInNoVerse }).aliases.David).toEqual(['per:judah'])
+    // Judah has no TIPNR record among the records given
+    expect(run({ records: records.filter((r) => r.id !== 'per:judah') }).aliases.David).toEqual(['per:judah'])
+  })
+  test('a build that cannot weigh says so; one that can does not', () => {
+    const line = 'people: en: no TIPNR records or no counts: no alias is weighed against another person\'s name'
+    const reportOf = (o: Partial<Parameters<typeof buildPeople>[0]>): string[] => {
+      const report: string[] = []
+      buildPeople({ lang: 'en', xtopics: core, mapNames: {}, acai: people, records, report, ...o })
+      return report
+    }
+    expect(reportOf({ records: undefined })).toContain(line)
+    expect(reportOf({ records: [] })).toContain(line)
+    expect(reportOf({ xtopics: { ...core, occurrences: undefined } })).toContain(line)
+    expect(reportOf({})).not.toContain(line)
+  })
+  test('the report of what is left out is sorted and has no repeat', () => {
+    const report: string[] = []
+    const twice = [...people, alias('person:David.3', 'person:Judah', 'David (Judah)', 'David (Judá)')].reverse()
+    buildPeople({ lang: 'en', xtopics: core, mapNames: {}, acai: twice, records, report })
+    expect(report.find((l) => l.includes('left out'))).toBe(
+      "people: en: 1 aliases left out, mostly another person's name: «David» → per:judah (1 verses by that name; per:david 964)",
+    )
+  })
+  test('the names of the language decide: «Saul» for Paul is left out in English, «Saulo» stays in Spanish', () => {
+    const sp = {
+      ...core,
+      topics: new Map([...core.topics, ['per:saul', person('Saul', 'Saul@1Sa.9.2-Act')], ['per:paul', person('Paul', 'Paul@Act.7.58-2Pe')]]),
+      occurrences: new Map([...core.occurrences!, ['per:saul', occ(327)], ['per:paul', occ(182)]]),
+    }
+    const recs = [...records, rec('per:paul', 'Paul@Act.7.58-2Pe', [['Paul', 160], ['Saul', 22]])]
+    const acaiSp = [
+      ...people,
+      own('person:Saul', 'Saul@1Sa.9.2-Act', 'Saul', 'Saúl'),
+      own('person:Paul', 'Paul@Act.7.58-2Pe', 'Paul', 'Pablo'),
+      alias('person:Saul.2', 'person:Paul', 'Saul (Paul)', 'Saulo (Pablo)'),
+    ]
+    expect(buildPeople({ lang: 'en', xtopics: sp, mapNames: {}, acai: acaiSp, records: recs, report: [] })!.aliases.Saul).toBeUndefined()
+    expect(buildPeople({ lang: 'es-419', xtopics: sp, mapNames: {}, acai: acaiSp, records: recs, report: [] })!.aliases.Saulo).toEqual(['per:paul'])
+  })
+  test('an alias left out no longer makes a note', () => {
+    // David's note "rey" is stored only while another person (Judah, by the alias) is also found by «David»
+    const withNote = people.map((p) => (p.id === 'person:David' ? { ...p, labels: { eng: 'David (king)', spa: 'David (rey)' } } : p))
+    const kept = buildPeople({ lang: 'en', xtopics: core, mapNames: {}, acai: withNote, records: undefined, report: [] })!
+    expect(kept.notes['per:david']).toBe('king')
+    const fixed = buildPeople({ lang: 'en', xtopics: core, mapNames: {}, acai: withNote, records, report: [] })!
+    expect(fixed.notes['per:david']).toBeUndefined()
   })
   test('the boundary: dropped when the calls are exactly a tenth of the other person\'s verses', () => {
     const exact = { ...core, occurrences: new Map([...core.occurrences!, ['per:david', occ(10)]]) }

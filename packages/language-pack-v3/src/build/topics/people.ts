@@ -167,7 +167,7 @@ export function buildPeople(o: {
     for (const c of tw.get(id) ?? []) hold(o.mapNames[c]?.[0] ?? '', id)
   }
   for (const [name, ids] of Object.entries(people.aliases)) for (const id of ids) hold(name, id)
-  if (o.records === undefined || o.xtopics.occurrences === undefined) o.report.push(`people: ${o.lang}: no TIPNR records or no counts: no alias is weighed against another person's name`)
+  if (o.records === undefined || o.records.length === 0 || o.xtopics.occurrences === undefined) o.report.push(`people: ${o.lang}: no TIPNR records or no counts: no alias is weighed against another person's name`)
   const out = [...new Set(leftOut)].sort(compareCodePoints)
   if (out.length > 0) o.report.push(`people: ${o.lang}: ${out.length} aliases left out, mostly another person's name: ${out.join('; ')}`)
   for (const [per, note] of [...noteOf].sort((a, b) => compareCodePoints(a[0], b[0]))) {

@@ -192,7 +192,7 @@ fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
     could not choose, so «David» is not stored for Judah. «Simon» for Peter (45 verses) and «Jehoram» for Joram (filed under
     Joram's line of H3088) stay. The build report lists what is left out.
     The rule does not apply (the alias stays) when the alias record has no English name, when `P` has no TIPNR record, or
-    when `Q` is in no verse; a build without TIPNR records or counts weighs no alias and says so. The names compared are those
+    when `Q` is in no verse; a build without TIPNR records (none given, or an empty list) or without counts weighs no alias and says so. The names compared are those
     of `L`, so the result can differ between languages: in English «Saul» for Paul is left out (King Saul is in 327 verses,
     TIPNR calls Paul «Saul» in 22), while in Spanish «Saulo» finds no one else and stays. `notes` are decided after this, so
     an alias left out no longer makes a note.
