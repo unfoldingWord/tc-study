@@ -336,7 +336,7 @@ export function buildXtopics(o: {
     if (o.res.acai === undefined) throw new Error('acai: the people of ACAI need res.acai (its key and release)')
     const acaiKey = o.res.acai[0]
     const perOfRef = new Map<string, string>()
-    for (const [id, t] of topics) {
+    for (const [id, t] of [...topics].sort((a, b) => compareCodePoints(a[0], b[0]))) {
       if (t.kind !== 'person' || !id.startsWith('per:')) continue
       if (perOfRef.has(t.ref)) report.push(`review: acai: ${perOfRef.get(t.ref)} and ${id} have the same TIPNR name ${t.ref}: ACAI joins ${id}`)
       perOfRef.set(t.ref, id)

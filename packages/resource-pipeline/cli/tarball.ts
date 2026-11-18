@@ -13,12 +13,14 @@ export const MAX_KEPT = 64 * 1024 * 1024
 const MAX_META = 1024 * 1024
 
 const utf8 = new TextDecoder('utf-8', { fatal: true })
+/** Header fields are decoded leniently: a name that is not UTF-8 on a file that is not kept must not stop the read. */
+const lenient = new TextDecoder('utf-8')
 
 /** The text of a NUL-padded tar header field. */
 function field(b: Uint8Array, at: number, len: number): string {
   const slice = b.subarray(at, at + len)
   const end = slice.indexOf(0)
-  return utf8.decode(end < 0 ? slice : slice.subarray(0, end))
+  return lenient.decode(end < 0 ? slice : slice.subarray(0, end))
 }
 
 /** The size field of a header: octal digits (spaces and NULs around them); anything else is an error. */

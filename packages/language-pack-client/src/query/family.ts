@@ -86,7 +86,7 @@ function contextOf(core: XtopicsCore, mapNames: Record<string, string[]> | undef
   if (c === undefined) {
     const parentsOf = new Map<string, Set<string>>()
     for (const r of core.relations ?? []) {
-      if (r.type !== 'parent-of') continue
+      if (r.type !== 'parent-of' || r.from === r.to) continue
       let set = parentsOf.get(r.to)
       if (set === undefined) parentsOf.set(r.to, (set = new Set()))
       set.add(r.from)

@@ -106,7 +106,7 @@ export function parseAcai(text: string): { commit: string; people: AcaiPerson[] 
  * parentheses is the name with note `""`. Only a final `( … )` is a note.
  */
 export function splitLabel(label: string): [name: string, note: string] {
-  const m = /^(.*\S)\s*\(([^()]*)\)\s*$/u.exec(label)
+  const m = /^(.*\S)\s*\(([^()]*)\)\s*$/su.exec(label)
   return m === null ? [label.trim(), ''] : [m[1].trim(), m[2].trim()]
 }
 

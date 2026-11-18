@@ -140,7 +140,8 @@ and none of its relations is used (the family relations come from TIPNR alone).
   is what the builder reads, and its sha256 is pinned (`fuentes.md`). Not read: descriptions, word lists, references (ORG
   versification), roles, tribes, places and relations.
 - **Join.** A record whose `primary_id` is its own id is joined to the `per:` topic whose `ref` is one of its TIPNR names, when
-  they give exactly one topic; none is not joined, several goes to the review list. Two records joined to one topic: the
+  they give exactly one topic (were two `per:` topics to share a `ref`, the last by id is the one joined, and the build reports
+  it); none is not joined, several goes to the review list. Two records joined to one topic: the
   first by ACAI id (code point) is used, the second and its alias records go to the review list. A record whose `primary_id`
   is another record is an **alias record**: it belongs to the topic its primary record is joined to, and is not joined by its
   own TIPNR names. An alias record whose primary is not joined, or is itself an alias record, is left out and reported.
@@ -172,11 +173,11 @@ may still find a person by its first one.
 The builder of `L` writes, for a person ACAI joins and names in `L` (the language's ACAI code: `en` eng, `es-419` spa, `fr`
 fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
 - **The label.** ACAI's preferred label is split into a name and a note: when it ends with `(`, a text with no parenthesis,
-  `)` (spaces around them ignored), and something that is not a space comes before the `(`, the name is what comes before and
+  `)` (white space around them ignored, Unicode white space included), and something that is not white space comes before the `(`, the name is what comes before and
   the note what is inside, each trimmed (`Jacob (padre de José)` is `Jacob` and `padre de José`); otherwise the whole label,
   trimmed, is the name and there is no note (`A (b) c`, `(x)`). An empty name gives nothing; an empty note is no note.
 - **`names`**: the name, only when it is not, byte for byte, what steps 2 and 3 give. Both sides are NFC: ACAI's after
-  trimming (above), the `map` names as `map.cddl` stores them.
+  trimming (above), the `map` names as `map.cddl` stores them; the English title is compared as `xtopics` stores it.
 - **`aliases`**: the name of each alias record of `P` in `L` (its note dropped: `P` has its own), to `P`; only when it is not
   `P`'s name in `L` (the rule above, with `names`), its English title, or the first `map` name in `L` of a `tw:names/` concept
   joined to `P`. Two alias records with the same name are one key with all their people.
