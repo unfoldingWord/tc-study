@@ -100,6 +100,10 @@ export const USAGE =
   '               does not know take the role of the same section of the English article with the same id (publish-v3 gives it)\n' +
   '  --obs-images (no value) builds only the catalog zxx-obsimg (the OBS pictures: downloaded, checked against the pin, converted to WebP): needs --out and takes\n' +
   '               only --sign-key, --revision (default 1), --previous, --built, --publisher and --cache (a folder that keeps the downloaded zip)\n' +
+  '  --obs-tf     the folder of an unpacked release of the OBS Theological Formation manual (en_obs-tf: obs_story_N.md and transclusions/): the Five Movements\n' +
+  '               tables go in the obs segment, and the resource in the catalog. English only today. A manual with errors stops the build. Needs --obs-tf-release;\n' +
+  '               without it every segment is the same bytes\n' +
+  '  --obs-tf-release   the release tag of that folder (v4): the manual says a wrong one in its own manifest, so it is given\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -128,6 +132,8 @@ type Options = {
   signKey?: string
   taConfig?: string
   roleHints?: string
+  /** `--obs-tf` and `--obs-tf-release`: the OBS 5M manual. */
+  obsTf?: { dir: string; release: string }
   /** `--obs-images`: build only the catalog `zxx-obsimg`; `list`, `originals` and `parts` are then empty. */
   obsImages?: boolean
   previous?: Uint8Array
@@ -135,7 +141,7 @@ type Options = {
 }
 
 const BOOLEAN_FLAGS = ['aligned', 'obs-images']
-const VALUE_FLAGS = ['previous', 'cache', 'list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints']
+const VALUE_FLAGS = ['previous', 'cache', 'list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints', 'obs-tf', 'obs-tf-release']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -276,7 +282,25 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     if (wrong !== undefined) throw new UsageError(`--topics: ${wrong}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig, roleHints }
+  const obsTfDir = flags.get('obs-tf')
+  const obsTfRelease = flags.get('obs-tf-release')
+  if ((obsTfDir === undefined) !== (obsTfRelease === undefined)) throw new UsageError('--obs-tf and --obs-tf-release go together')
+  if (obsTfDir !== undefined) {
+    if (!existsSync(obsTfDir) || !statSync(obsTfDir).isDirectory()) throw new UsageError(`--obs-tf: ${obsTfDir} is not a directory`)
+    if (!readdirSync(obsTfDir).some((f) => /^obs_story_\d+\.md$/.test(f))) throw new UsageError(`--obs-tf: ${obsTfDir} has no obs_story_N.md file`)
+    if (!/^v[0-9]+$/.test(obsTfRelease!)) throw new UsageError(`--obs-tf-release ${JSON.stringify(obsTfRelease)} is not a release tag (v4)`)
+  }
+
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig, roleHints, ...(obsTfDir === undefined ? {} : { obsTf: { dir: obsTfDir, release: obsTfRelease! } }) }
+}
+
+/** The files of the OBS Theological Formation manual in `dir` that the reader uses: `obs_story_N.md` and `transclusions/*.md`. */
+function obsTfFiles(dir: string): Map<string, string> {
+  const files = new Map<string, string>()
+  for (const f of readdirSync(dir).sort()) if (/^obs_story_\d+\.md$/.test(f)) files.set(f, readFileSync(join(dir, f), 'utf8'))
+  const transclusions = join(dir, 'transclusions')
+  if (existsSync(transclusions)) for (const f of readdirSync(transclusions).sort()) if (f.endsWith('.md')) files.set(`transclusions/${f}`, readFileSync(join(transclusions, f), 'utf8'))
+  return files
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -481,6 +505,7 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
     return
   }
   const lang = await languageOf(o.list)
+  if (o.obsTf !== undefined && lang !== 'en') throw new UsageError(`--obs-tf: the manual is English, and this language is ${JSON.stringify(lang)}`)
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(lang)) throw new Error(`${o.list}: the language ${JSON.stringify(lang)} cannot name a file`)
   const originalsLanguage = await languageOf(o.originals)
   if (originalsLanguage !== ORIGINALS) throw new Error(`${o.originals} is not the list of the originals: its language is ${JSON.stringify(originalsLanguage)}`)
@@ -552,6 +577,18 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
     taTocs,
     roleHints: roleHints?.hints,
     roleHintSegs: roleHints?.segs,
+    obsTf:
+      o.obsTf === undefined
+        ? undefined
+        : {
+            key: `unfoldingWord/${lang}/obs-tf`,
+            release: o.obsTf.release,
+            title: 'OBS Theological Formation',
+            license: 'CC-BY-SA-4.0',
+            rights: 'unfoldingWord',
+            attribution: 'unfoldingWord and Formation Stories',
+            files: obsTfFiles(o.obsTf.dir),
+          },
   })
 
   // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.

@@ -811,3 +811,31 @@ describe('build-v3: the book names list', () => {
     expect(names.tit?.[3]).toBe('text')
   })
 })
+
+describe('build-v3: --obs-tf', () => {
+  const folder = (): string => {
+    const dir = temp()
+    writeFileSync(join(dir, 'obs_story_1.md'), '## Introduction\n')
+    return dir
+  }
+  test('--obs-tf and --obs-tf-release go together, the folder has story files and the release is a tag', () => {
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', folder()]))).toThrow('go together')
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf-release', 'v4']))).toThrow('go together')
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', temp(), '--obs-tf-release', 'v4']))).toThrow('has no obs_story_N.md')
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', '4']))).toThrow('not a release tag')
+    expect(optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', 'v4'])).obsTf?.release).toBe('v4')
+    expect(optionsFromArgs(sample(temp())).obsTf).toBeUndefined()
+  })
+
+  test('a language that is not English is refused: the manual is English', async () => {
+    const dir = folder()
+    const r = await run(sample(temp(), ['--obs-tf', dir, '--obs-tf-release', 'v4']))
+    expect(r.code).toBe(2)
+    expect(r.err.join('\n')).toContain('the manual is English')
+  })
+
+  test('the usage text describes --obs-tf', () => {
+    expect(USAGE).toContain('--obs-tf')
+    expect(USAGE).toContain('--obs-tf-release')
+  })
+})
