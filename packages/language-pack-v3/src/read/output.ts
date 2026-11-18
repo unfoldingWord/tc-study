@@ -192,6 +192,7 @@ function xtopicsOut(seg: Segment): Record<string, unknown> {
     ranges: c.ranges,
     chunks: c.chunks,
     'obs-frames': c.obsFrames,
+    gender: c.gender,
   }
 }
 
@@ -209,7 +210,7 @@ function topicsOut(seg: Segment): Record<string, unknown> {
   const m = topicsView(seg)
   if (m.part !== 'core') return { names: listsOut((m as TopicsPart).names) }
   const c = m as TopicsCore
-  return { names: c.names, local: c.local, coverage: coverageOut(c.coverage) }
+  return { names: c.names, local: c.local, coverage: coverageOut(c.coverage), people: c.people }
 }
 
 /** The `macula` of an original as the reader outputs it (`tests/README.md`): v1 as stored, v2 with its trees and rows decoded. */

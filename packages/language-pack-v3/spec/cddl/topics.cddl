@@ -22,6 +22,21 @@ topics-core-tables = {
                                ; keys of local-topics (names, refs, related) and ignores any other key of an entry,
                                ; as everywhere (tests/README.md)
   "coverage": coverage,        ; required, v1
+  ? "people": topics-people,   ; optional, v1; core only; from ACAI (ids.md, "Names of people")
+}
+
+; What this language calls people where the pack cannot derive it. The name a client shows for a person is the rule of
+; ids.md ("Names of people"): "names" here, else the name in this language's map of the tW article joined to the person by
+; "same-as", else the English title of xtopics. The builder writes a name here only when it differs from what that rule gives
+; without it, so nothing is stored twice. Texts in NFC, as the builder normalized them; a reader neither folds nor normalizes.
+; Every per: id is a topic id of the common xtopics; one the installed xtopics lacks (an older common) is ignored by a client,
+; never an error. A reader reads these three keys and ignores any other.
+topics-people = {
+  "names": { * topic-id => tstr },      ; per: id -> its name, not empty
+  "notes": { * topic-id => tstr },      ; per: id -> what tells it apart ("padre de José"), not empty; only for a person whose
+                                        ; name in this language another person also has, as name or alias
+  "aliases": { * tstr => [+ topic-id] },  ; another name (not empty) -> the per: ids it names, sorted by code point, no
+                                        ; repeat; only a name the rule above and the tW articles do not already give
 }
 
 ; "source" says where the name came from: the aligned text ("alignment"), the language's own book outline

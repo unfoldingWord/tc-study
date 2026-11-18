@@ -440,6 +440,11 @@ export type XtopicsCore = {
    * frame; no leading zeros), its verse ranges in the order of the source. A frame that tells no verse has no key.
    */
   obsFrames?: Record<string, [first: number, last: number][]>
+  /**
+   * The gender of a person (`gender`, from ACAI): 1 man, 2 woman, per `per:` topic of this core. A person with no data has no key. The
+   * segment holds it as a column aligned with `topics.ids` (0 for no data and for every topic that is not a person).
+   */
+  gender?: Record<string, 1 | 2>
 }
 
 /** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */
@@ -456,7 +461,17 @@ export type TopicsCore = {
   names: Record<string, TopicName[]>
   local?: Record<string, { names: string[]; refs?: [number, number][]; related?: string[] }>
   coverage: Coverage
+  /** What this language calls people where the pack cannot derive it (`people`, from ACAI; `topics.cddl` and `ids.md`, "Names of people"). */
+  people?: TopicsPeople
 }
+
+/**
+ * The table `people` of a language's topics core. `names`: per `per:` id, its name in this language, only where it is not the derived
+ * name (`ids.md`). `notes`: per `per:` id, what tells it apart from another person of the same name in this language (`padre de José`),
+ * only for such people. `aliases`: another name of a person (an ACAI alias record) to the `per:` ids it names, sorted by code point, only
+ * where the language cannot derive it. Each map may be empty.
+ */
+export type TopicsPeople = { names: Record<string, string>; notes: Record<string, string>; aliases: Record<string, string[]> }
 
 /** The part of one book: the verses each topic's alignment names were taken from. */
 export type TopicsPart = { lang: string; part: string; names?: VerseLists }

@@ -95,7 +95,7 @@ name a person sees comes from each language's map.
 | --- | --- | --- | --- |
 | `tw:` | A word article | `tw:kt/grace`, `tw:names/abraham`, `tw:other/shepherd` | The tW path without `bible/` |
 | `ta:` | An Academy article | `ta:translate/figs-metaphor` | The tA manual and slug |
-| `per:` | A person | `per:abraham` | The id: TIPNR's unique name. The name shown: the language's `topics` names, else the English title in `xtopics` |
+| `per:` | A person | `per:abraham` | The id: TIPNR's unique name. The name shown: "Names of people" below |
 | `lug:` | A place | `lug:jerusalem` | As `per:` |
 | `ev:` | An event | `ev:plagues-of-egypt` | The id: Theographic's title or the builder's list. The name shown: the language's outline, else the English title in `xtopics` |
 | `tema:` | A topic (kind 4) | `tema:faith` | The builder's list; the language's name is in its `map` `names` (`map.cddl`). Part B builds no `tema:` id yet: the list is empty |
@@ -114,7 +114,7 @@ name a person sees comes from each language's map.
   - `part-of` (an event to the larger event) and `follows` (an event to its predecessor), from Theographic;
   - `participant`: from the event to a person, and `place`: from the event to a place, both from Theographic's participants and places, only when the name and at least one verse of the event match exactly one TIPNR record of that kind (confidence 80); a match that is not exactly one goes to the review list, and no relation is made;
   - `occurs-in`: from a story (`obs:`) or a section (`sec:`) to an event, when any verse of the event is also a verse of one of the story's or section's ranges (confidence 60). The test is overlap of any size, not containment: an event that begins in a story and ends outside it is listed, and a story can occur in several events (the Plagues of Egypt overlap OBS stories 10, 11, 12 and 48);
-  - `same-as`: from a `tw:names/` concept to the one person or place whose Strong keys it shares and whose verses overlap (confidence 70); a match that is not exactly one goes to the review list.
+  - `same-as`: from a `tw:names/` concept to the one person or place whose Strong keys it shares and whose verses overlap (confidence 70); a match that is not exactly one goes to the review list. A concept this rule joins to no one may get a `same-as` from ACAI instead (source ACAI, confidence 75; "People of ACAI" below), and then it may be joined to several people (the article "Abijah" is about several Abijahs).
   A TIPNR relation whose other end is a unique name shared by several records goes to the person's record when there is one, and is not reported as a review case.
 - **A TIPNR dStrong as a Strong key** (`topics.strongs`). TIPNR writes the Strong number of a name with STEPBible's capital disambiguation letter: `H2148P`, `G2197H`. The builder writes it as the key of the original (see "Strong keys"): Hebrew `H` and four digits, keeping a lowercase suffix when TIPNR has one (`H2148P` gives `H2148`, `H7462b` stays); Greek `G`, the number in four digits and a final `0`, which makes the five digits the UGNT writes (`G2197H` gives `G21970`; a disambiguation letter is dropped). Two comparisons use the keys. To take a name from the alignment, a word of the original matches when it has the same letter and number, and the same suffix when the key has one (`H2148` matches `H2148` and `H2148a`; `H2148a` only `H2148a`); for Greek only the first four digits of the number are compared, because the UGNT may end a number in a digit other than `0` (`G21970` and `G21971` both match a TIPNR `G2197`). To join a `tw:names/` concept to a person or place (`same-as`), only the letter and the four digits of the number are compared (`H2148a`, `H2148` and `G21970` against `G2197`). A text of another form is not a Strong key and goes to the build report.
 - **`ev:` concepts get no name from the alignment.** An event is named by its title (English, from Theographic) and by the language's outline; no name is taken for it from the aligned text.
@@ -125,6 +125,65 @@ name a person sees comes from each language's map.
 - **Ids are lowercase.** An article whose published name has capitals (`figs-orderHeb`) gets the lowercase id
   (`ta:translate/figs-orderheb`), and a link to it (`[[rc://*/ta/man/translate/figs-orderHeb]]`) is rewritten with the
   lowercase id (`[[ta:translate/figs-orderheb]]`).
+
+## People of ACAI
+
+ACAI (`BibleAquifer/ACAI`, `fuentes.md`) adds to the people of TIPNR what TIPNR lacks: the gender, the names in other
+languages, other names (aliases) and the uW Translation Words article of a person. It never makes, changes or merges an id,
+and none of its relations is used (the family relations come from TIPNR alone).
+
+- **Join.** An ACAI person record lists, in `alternate_sources.tipnr`, TIPNR unique names (`Isaac@Gen.17.19-Jas`). A record
+  whose own id is its `primary_id` is joined to the `per:` topic whose `ref` is one of those names, when they give exactly one
+  topic; none or several is not joined (several goes to the review list). Two records joined to one topic: the first by ACAI
+  id is used, the second goes to the review list. A record whose `primary_id` is another record is an **alias record**: it
+  belongs to the topic its primary record is joined to, and is not joined by its own TIPNR names.
+- **Gender** (`xtopics` `gender`): ACAI's `male` is 1, `female` 2; anything else, or a person ACAI does not join, is 0.
+- **`same-as` of ACAI.** ACAI names a uW Translation Words article by its English title (`26734|Isaac|UWTranslationWords`;
+  the number is Aquifer's, not an id of tW). The title is folded (lowercase, combining marks dropped after NFD, only letters
+  and digits kept) and compared with the folded slug of every `tw:names/` concept and with its folded English title and each
+  comma-separated piece of it (`Jacob, Israel`). When exactly one concept matches, and the TIPNR rule above joined that concept
+  to no one, the builder adds `same-as` from the concept to the person (source ACAI, confidence 75). A concept the TIPNR rule
+  joined keeps only that: ACAI fills what is missing. No match, several, and a concept joined by TIPNR to someone else go to the
+  review list. A pair is never added twice.
+- **What is not read:** ACAI's descriptions, word lists, references (ORG versification), roles, tribes, places and relations.
+
+### Names of people
+
+The name a client shows for a person `P` in language `L` is, in this order:
+
+1. `people.names[P]` of the `topics` core of `L`;
+2. else the first name in the `map` `names` of `L` of the `tw:names/` concept joined to `P` by a `same-as` of the `xtopics`
+   core (the first such concept by code point that has a name in `L`);
+3. else the English title of `P` (`xtopics` `topics.title`).
+
+The builder of `L` writes, for a person ACAI joins and names in `L` (the language's ACAI code: `en` eng, `es-419` spa, `fr`
+fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
+- **`names`**: ACAI's preferred label in `L`, split into the name and a final note in parentheses (`Jacob (padre de José)` is
+  the name `Jacob` and the note `padre de José`); the name is written only when it is not, byte for byte after NFC, what steps
+  2 and 3 give.
+- **`aliases`**: the name of each alias record of `P` in `L` (its note dropped: `P` has its own), to `P`; only when it is not
+  `P`'s name in `L` (the rule above, with `names`), its English title, or the first `map` name in `L` of a `tw:names/` concept
+  joined to `P`. Two alias records with the same name are one key with all their people.
+- **`notes`**: the note of `P`'s label in `L`, only when `P`'s name in `L` is also the name in `L` of another person, or an
+  alias of another person, compared byte for byte; there it tells the two apart. A label with no note gives none.
+
+A client that compares names folds them its own way; the pack does not fold. An `L` with no `people` table (an older pack, or a
+language ACAI does not name) uses steps 2 and 3.
+
+### Verses of a family relation
+
+The relations `parent-of`, `sibling-of` and `partner-of` of `xtopics` carry no verse. A client finds the verses that show one
+from what the pack already has, the verses of each person in the `xtopics` parts (`occurrences`), with this rule (normative:
+every client gives the same verses):
+
+1. Let `A` and `B` be the verse ids of the two people (all books). If they share verses, the first three shared ones in
+   canonical order (verse id order), each as the pair `[v, v]`.
+2. Else, of all pairs `a` of `A` and `b` of `B` in the same chapter with `|a - b| <= 3`, the one with the smallest `|a - b|`;
+   on a tie, the one with the smallest `min(a, b)`, then the smallest `max(a, b)`. It is given as `[min(a, b), max(a, b)]`.
+3. Else none.
+
+The verses are not stored in the pack because they can be derived (`language-pack-client` `kinVerses`). A part that is not
+installed gives no verses of its book.
 
 ## Strong keys
 

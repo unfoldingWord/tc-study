@@ -12,8 +12,10 @@
 import { compareCodePoints } from '../../codec/columns'
 import { BOOKS, bookNumber } from '../../ids'
 import type { BookModel, OrigModel, TopicName, TopicsCore, TopicsPart, XtopicsCore } from '../../model'
+import type { AcaiPerson } from '../../source/acai'
 import type { TipnrRecord } from '../../source/tipnr'
 import { alignedNames } from './alignedNames'
+import { buildPeople } from './people'
 import { sectionId } from './outline'
 
 type Range = [number, number]
@@ -47,6 +49,10 @@ export function buildTopics(o: {
   obsRes?: string[]
   /** The release of each resource the names come from (key, release). */
   releases: Map<string, string>
+  /** The ACAI people and its key and release: the `people` table (`ids.md`, "Names of people"); needs `mapNames`. */
+  acai?: { people: AcaiPerson[]; res: [string, string] }
+  /** The `names` of the language's map core (the titles of its articles). */
+  mapNames?: Record<string, string[]>
 }): { core: TopicsCore; parts: TopicsPart[]; report: string[] } {
   const report: string[] = []
   const { lang, xtopics } = o
@@ -156,11 +162,17 @@ export function buildTopics(o: {
       .sort((a, b) => b[2] - a[2] || compareCodePoints(a[0], b[0]) || compareCodePoints(a[1], b[1]))
   }
 
-  const res = [...used.keys()].sort(compareCodePoints).map((key): [string, string] => [key, o.releases.get(key) ?? ''])
+  // People: what the language calls people where nothing else in the pack says it
+  const people = o.acai === undefined ? undefined : buildPeople({ lang, xtopics, mapNames: o.mapNames ?? {}, acai: o.acai.people, report })
+  if (people !== undefined) touch(o.acai!.res[0], [])
+  const releases = new Map(o.releases)
+  if (o.acai !== undefined) releases.set(o.acai.res[0], o.acai.res[1])
+  const res = [...used.keys()].sort(compareCodePoints).map((key): [string, string] => [key, releases.get(key) ?? ''])
   const order = (list: Iterable<string>): string[] => [...list].sort((a, b) => bookNumber(a) - bookNumber(b))
   const coverage: TopicsCore['coverage'] = new Map(res.map(([key]) => [key, { whole: order(used.get(key)!), partial: [] }]))
   const core: TopicsCore = { lang, part: 'core', res, names, coverage }
   if (Object.keys(local).length > 0) core.local = local
+  if (people !== undefined) core.people = people
   const parts: TopicsPart[] = []
   for (const book of order(partNames.keys())) {
     const lists = new Map<string, number[]>()
