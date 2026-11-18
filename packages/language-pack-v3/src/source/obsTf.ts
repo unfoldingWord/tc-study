@@ -11,9 +11,9 @@
  */
 import type { ObsStory, ObsTfBlock, ObsTfModel, ObsTfQuestion, ObsTfShared, ObsTfTerm } from '../model'
 
-/** The fixed part and list codes, in the order of the spec. They are the sort order of the rows. */
-export const TF_PARTS = ['intro', 'frames', 'community', 'm1', 'm2', 'drafting', 'm3', 'checking', 'm4', 'm5', 'conclusion'] as const
-export const TF_LISTS = ['observation', 'terms', 'discourse', 'theology', 'journal'] as const
+import { TF_LISTS, TF_PARTS } from '../obsTfCodes'
+
+export { TF_LISTS, TF_PARTS }
 
 /** What each shared transclusion is a part of. */
 const SHARED_PART: Record<string, string> = {

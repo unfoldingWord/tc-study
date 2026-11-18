@@ -13,6 +13,7 @@ import type { Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
 import { checkRows } from './book'
+import { readObsTf } from './obsTf'
 import type { ObsFrame, ObsHelpRow, ObsHelpTable, ObsModel, ObsStory } from '../model'
 
 function bad(what: string): never {
@@ -213,6 +214,12 @@ export const OBS_TABLES: Readonly<Record<string, number[]>> = {
   links: [1],
   'study-notes': [1],
   'study-questions': [1],
+  'tf-parts': [1],
+  'tf-questions': [1],
+  'tf-terms': [1],
+  'tf-shared': [1],
+  'tf-frames': [1],
+  'tf-framework': [1],
 }
 
 /** The tables of helps, by their name in the segment and their key in the model. */
@@ -254,6 +261,8 @@ export function obsView(seg: Segment): ObsModel {
     for (const [name, key] of HELPS_TABLES) {
       if (t[name] !== undefined) model[key] = readHelps(t[name], name, table, res, seg.ulen)
     }
+    const tf = readObsTf(t, res, stories, seg.ulen)
+    if (tf !== undefined) model.tf = tf
     return model
   } catch (error) {
     // A malformed column: a varint that is cut short or not minimal.

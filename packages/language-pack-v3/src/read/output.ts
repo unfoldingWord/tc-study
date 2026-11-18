@@ -253,6 +253,7 @@ function bodyOut(seg: Segment): Record<string, unknown> {
         links: obsHelpsOut(m.links),
         'study-notes': obsHelpsOut(m.studyNotes),
         'study-questions': obsHelpsOut(m.studyQuestions),
+        tf: m.tf,
       }
     }
     case 'obsimg': {

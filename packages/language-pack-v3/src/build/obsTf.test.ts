@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { decodeBits, decodeTexts, decodeUvarints } from '../codec/columns'
 import { readSegment, writeSegment } from '../codec/container'
 import type { ObsModel, ObsTfModel } from '../model'
-import { OBS_TABLES } from '../read/obs'
+import { OBS_TABLES, obsView } from '../read/obs'
 import { parseObsTf } from '../source/obsTf'
 import { obsSegment } from './obs'
 
@@ -32,9 +32,10 @@ const withTf = (tf?: ObsTfModel): ObsModel => ({
 })
 
 const TF_KNOWN = Object.fromEntries(['tf-parts', 'tf-questions', 'tf-terms', 'tf-shared', 'tf-frames', 'tf-framework'].map((n) => [n, [1]]))
+const OLD_KNOWN = Object.fromEntries(Object.entries(OBS_TABLES).filter(([n]) => !n.startsWith('tf-')))
 const read = async (m: ObsModel, knowTf = true) => {
   const { bytes } = await writeSegment(obsSegment(m))
-  const { seg, skipped } = await readSegment(bytes, { known: knowTf ? { ...OBS_TABLES, ...TF_KNOWN } : OBS_TABLES })
+  const { seg, skipped } = await readSegment(bytes, { known: knowTf ? { ...OBS_TABLES, ...TF_KNOWN } : OLD_KNOWN })
   return { seg, skipped, bytes }
 }
 
@@ -101,5 +102,14 @@ describe('the Five Movements tables of the obs segment', () => {
     const code = base()
     code.parts[0].part = 'intro2'
     expect(() => obsSegment(withTf(code))).toThrow('not a fixed code')
+  })
+
+  test('read back as the model they were written from (the reader and the writer agree)', async () => {
+    const tf = tfModel()
+    const { seg } = await read(withTf(tf))
+    expect(obsView(seg).tf).toEqual(tf)
+    // a reader of the old list of tables skips them and gives no manual
+    const old = await read(withTf(tf), false)
+    expect(obsView(old.seg).tf).toBeUndefined()
   })
 })
