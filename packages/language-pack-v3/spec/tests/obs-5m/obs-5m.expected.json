@@ -1,0 +1,239 @@
+{
+  "h": {
+    "class": "obs",
+    "lang": "en",
+    "res": [
+      [
+        "unfoldingWord/en/obs",
+        "v9"
+      ],
+      [
+        "unfoldingWord/en/obs-tf",
+        "v4"
+      ]
+    ],
+    "tables": {
+      "stories": [
+        1,
+        true
+      ],
+      "strings": [
+        1,
+        true
+      ],
+      "tf-frames": [
+        1,
+        false
+      ],
+      "tf-framework": [
+        1,
+        false
+      ],
+      "tf-parts": [
+        1,
+        false
+      ],
+      "tf-questions": [
+        1,
+        false
+      ],
+      "tf-shared": [
+        1,
+        false
+      ],
+      "tf-terms": [
+        1,
+        false
+      ]
+    },
+    "v": 1
+  },
+  "id": "7ae330bcb34ef5853d048617b1c9f76669a608337c61df3bb417277be04e8185",
+  "stories": [
+    {
+      "frames": [
+        {
+          "image": "https://cdn.door43.org/obs/jpg/360px/obs-en-01-01.jpg",
+          "n": 1,
+          "text": "God made it all."
+        },
+        {
+          "n": 2,
+          "text": "And it was good."
+        }
+      ],
+      "n": 1,
+      "reference": "A Bible story from: Genesis 1-2",
+      "res": "unfoldingWord/en/obs",
+      "title": "The Creation"
+    }
+  ],
+  "tf": {
+    "frames": [
+      {
+        "frame": 201,
+        "text": "The serpent spoke."
+      },
+      {
+        "frame": 202,
+        "text": "She ate."
+      }
+    ],
+    "framework": [
+      {
+        "code": "m1",
+        "name": "Biblical Interpretation"
+      },
+      {
+        "code": "m2",
+        "name": "Theological Dialogue"
+      },
+      {
+        "code": "overview",
+        "text": "Welcome."
+      }
+    ],
+    "parts": [
+      {
+        "part": "intro",
+        "story": 1,
+        "text": "### Key Idea\nGod made everything.",
+        "title": "Introduction"
+      },
+      {
+        "part": "frames",
+        "story": 1
+      },
+      {
+        "part": "m1",
+        "story": 1,
+        "text": "Read the frames.",
+        "title": "Biblical Interpretation"
+      },
+      {
+        "list": "observation",
+        "part": "m1",
+        "story": 1,
+        "title": "Observation Questions"
+      },
+      {
+        "list": "terms",
+        "part": "m1",
+        "story": 1,
+        "title": "Translation Questions"
+      },
+      {
+        "part": "m2",
+        "story": 1,
+        "title": "Theological Dialogue"
+      },
+      {
+        "list": "discourse",
+        "part": "m2",
+        "story": 1,
+        "title": "Discourse Questions"
+      },
+      {
+        "list": "theology",
+        "part": "m2",
+        "story": 1,
+        "title": "Theological Questions"
+      },
+      {
+        "part": "drafting",
+        "shared": "movement_2_drafting",
+        "story": 1
+      },
+      {
+        "part": "m4",
+        "shared": "movement_4",
+        "story": 1
+      },
+      {
+        "part": "frames",
+        "story": 2,
+        "title": "The Fall"
+      }
+    ],
+    "questions": [
+      {
+        "a": "God.",
+        "frames": [
+          101
+        ],
+        "k": 1,
+        "list": "observation",
+        "part": "m1",
+        "q": "Who made it?",
+        "story": 1
+      },
+      {
+        "frames": [
+          102
+        ],
+        "k": 2,
+        "list": "observation",
+        "part": "m1",
+        "q": "What did he say?",
+        "story": 1
+      },
+      {
+        "a": "Because he made it.",
+        "frames": [
+          101,
+          102
+        ],
+        "k": 1,
+        "list": "discourse",
+        "part": "m2",
+        "q": "Why is it good?",
+        "refText": "01-1, 01-2",
+        "story": 1
+      },
+      {
+        "frames": [],
+        "k": 2,
+        "list": "theology",
+        "part": "m2",
+        "q": "What does it show about God?",
+        "story": 1
+      }
+    ],
+    "res": "unfoldingWord/en/obs-tf",
+    "shared": [
+      {
+        "key": "movement_2_drafting",
+        "text": "Draft the story.",
+        "title": "Movement 2: Drafting"
+      },
+      {
+        "key": "movement_4",
+        "title": "Movement 4: Apply"
+      }
+    ],
+    "stories": [
+      1,
+      2
+    ],
+    "terms": [
+      {
+        "frame": 101,
+        "k": 1,
+        "term": "made",
+        "text": "**made** means created."
+      },
+      {
+        "frame": 101,
+        "k": 2,
+        "text": "A paragraph without a term."
+      },
+      {
+        "frame": 202,
+        "k": 1,
+        "refText": "2-2",
+        "term": "ate",
+        "text": "**ate** means ate."
+      }
+    ]
+  }
+}

@@ -19,6 +19,16 @@ obs-tables = {
   ? "links": obs-helps,        ; optional, v1 (OBS tWL)
   ? "study-notes": obs-helps,  ; optional, v1 (OBS SN)
   ? "study-questions": obs-helps,   ; optional, v1 (OBS SQ)
+  ; DRAFT (OBS 5M, phase 0; not built, not in any reader yet): the Five Movements session manual (OBS Theological Formation).
+  ; All optional, so a reader that does not know them skips them (container.md). They never use the table "strings": with
+  ; them or without them, every other table of the segment has the same bytes (the header's "res" lists one resource more). The rules are in the block
+  ; "OBS Five Movements" at the end of this file.
+  ? "tf-parts": tf-parts,      ; optional, v1: the parts of each story's session, in order; the coverage
+  ? "tf-questions": tf-questions,   ; optional, v1: observation, discourse, theology and journal questions
+  ? "tf-terms": tf-terms,      ; optional, v1: the translation terms of M1, per frame
+  ? "tf-shared": tf-shared,    ; optional, v1: blocks the stories share, stored once
+  ? "tf-frames": tf-frames,    ; optional, v1: frame text taken from the manual where "stories" lacks the frame (absent today)
+  ? "tf-framework": tf-framework,   ; optional, v1: the five movements by code
 }
 
 story = {
@@ -48,4 +58,145 @@ obs-helps = {
   ? "refText": [* [row: uint, tstr]],
   ? "concept": column,
   "cols": { * tstr => column },
+}
+
+; ---- DRAFT: OBS Five Movements (5M), phase 0 ----
+;
+; Source: one OBS Theological Formation resource of the segment's language (Door43 "OBS Theological Formation", en_obs-tf
+; v4 today). The frames, the titles, the "A Bible story from" lines and the images are not here: they are the story's in
+; "stories". Every frame a 5M row names is story x 100 + frame (ids.md), after the reviewed correspondence of the build
+; (spec/obs-5m-checks.md), and it is a frame of "stories" or a row of tf-frames.
+;
+; RULES (normative)
+;
+; Set and versions. The six tables are one set; tf-parts is its root. The version of each table is the one in the header's
+; "tables" ([version, required]); every tf-* table is optional, version 1. A reader that lacks tf-parts, or knows a version
+; of it other than 1, uses none of the others. A builder never writes another tf-* table without tf-parts, writes tf-shared
+; when a row of tf-parts has "shared", tf-frames when a frame is missing from "stories", and tf-questions or tf-terms when
+; the source has rows for them.
+;
+; Header "res". The resource of the 5M set is listed in the header's "res" like every other resource of the segment, and the
+; build lists them in the order of their keys. Every tf-* table has "res" and all of them carry the same value: a different
+; one is E_BODY.
+;
+; Columns. The tf-* tables never use the encoding "strings" (E_BODY if a column does) and never "flags". Text columns are
+; "texts"; number columns are "uints". Each column below says whether it has "has". A "has" bit is 1 only for a non-empty
+; value; an empty string is never stored, and no column has a "has" that is all ones. A column marked "no has" that has one is E_BODY. The values of a column with
+; "has" are as many as its bits that are 1; a column without it has one value per row; any other count is E_BODY.
+; The "required" flag of a tf-* table is false; a reader treats true as false. A "res" index outside the header's "res" is
+; E_BODY. A "refText" lists rows in ascending order, without repeats, each below "n".
+;
+; Numbers. Rows and codes are numbered from 0. "k" is not a row: in tf-questions it counts from 1 within a part, in
+; tf-terms from 1 within a frame. The values of a column "shared" and the rows of "refText" are row numbers of their table,
+; from 0.
+;
+; Codes. Each table writes the codes it uses in its own "codes" (one table of codes for both "part" and "list"), in this
+; fixed order, parts first and then lists, which is also the sort order (a reader sorts by number and never by text); a code a
+; table does not use is not listed. A part code and a list code never coincide:
+;   parts: intro, frames, community, m1, m2, drafting, m3, checking, m4, m5, conclusion
+;   lists: observation, terms, discourse, theology, journal
+; Codes are fixed and never translated. A "codes" list with a code that is not fixed is E_BODY (the tables are version 1: a new code
+; would be a new version of the table).
+;
+; Order of rows. tf-parts: stories ascending, then the parts in the order above; a part's first row is its heading row (no
+; "list"), then one row per list of the part in the order of the list codes. The coverage ("stories" of tf-parts, not the segment's table of that name) is ascending, with no repeats. A row
+; of any tf-* table for a story that is not in the coverage is E_BODY. tf-questions: by story, part, k. tf-terms: by frame, k. tf-shared: in the
+; order of first use, going through tf-parts in row order. tf-frames: by frame ascending. tf-framework: m1 to m5, then
+; overview. "frames" ids of a question: the frames in the order the source writes them, without repeats.
+;
+; Missing tables and references. A reader that has tf-parts but does not have a table that a row needs (the header does not
+; list it, or it has a version the reader does not know) shows that row's heading and no body, and it is not an error: no
+; tf-shared (rows with "shared"), no tf-frames (a frame missing from "stories"), no tf-questions or tf-terms (a list with no
+; rows). A "shared" value that is not a row of tf-shared, a "refText" row that is not a row of its table, or a res index outside the
+; header's "res", is E_BODY. A frame that is neither in the segment's table "stories" nor in tf-frames is E_BODY.
+;
+; What a reader checks. The readers are strict about what a row says on its own (columns, "has", codes, ranges, res, k, refText,
+; the coverage, the order of rows by story, part and k, the keys of tf-shared, the references above). They do not check what only
+; the builder promises: that tf-shared follows the order of first use, that each of its rows is used, that a part has one heading
+; row and its lists in order, that the row of the part "frames" has no title or text, and that the frames of a question have no
+; repeats. A client never relies on those.
+;
+; Heading rows. A row with "shared" shows that block of tf-shared: its tf-parts "title" and "text" are not written (no
+; "has" bit), and the title is the block's. The row of the part "frames" has no title and no text: the app shows the story's
+; frames there. A story that is entirely in tf-frames has no title or image from "stories": the title of the story is the
+; "title" of its "frames" heading row, and the frames show text only. A part a story lacks has no row, and an app skips it.
+;
+; Ids. "{story}/{part}/{k}" for a question ("1/m1/3") and "{story}:{frame}/{k}" for a term ("1:1/2"). They are positional:
+; they are valid only for the release in "res", and the format guarantees nothing across releases (a release that inserts a
+; question renumbers the ones after it). A client that saves something against an id (a note) must keep the release and
+; a hash of the normalized question text with it, and treat the note as "from another version" when they do not match; that is
+; a client rule (Mini, phase 2), not a promise of the format.
+
+tf-parts = {
+  "res": res-index,
+  "stories": uvarints,         ; the coverage: the stories that have a session in this language, ascending (en: 1-50; id: 1-16)
+  "codes": strtab,
+  "n": uint,
+  "story": uvarints,
+  "part": uvarints,            ; a number of "codes"
+  "list": column,              ; uints, a number of "codes"; "has" is 1 on the rows of a list and 0 on the heading row of a part
+  "title": column,             ; texts, as published in the language; "has" (on heading rows of parts and of lists, not on rows with "shared")
+  "text": column,              ; texts, minimal markdown; "has"
+  "shared": column,            ; uints, a row of tf-shared; "has"
+}
+
+; One row per question. "k" counts the questions of the part across its lists (m2: discourse first, then theology).
+tf-questions = {
+  "res": res-index,
+  "codes": strtab,
+  "n": uint,
+  "story": uvarints,
+  "part": uvarints,            ; a number of "codes"
+  "list": uvarints,            ; a number of "codes"
+  "k": uvarints,
+  "frames": { "count": uvarints, "ids": uvarints },   ; per row, how many frames it names (0 for none), then all the ids
+  "q": column,                 ; texts, the question; no "has"
+  "a": column,                 ; texts with "has": the manual's answer (observation and discourse); an app may hide it
+  ? "refText": [* [row: uint, tstr]],   ; the frame label as the source wrote it, when the build corrected it
+}
+
+; One row per translation term. "k" counts from 1 within the frame.
+tf-terms = {
+  "res": res-index,
+  "n": uint,
+  "frame": uvarints,
+  "k": uvarints,
+  "term": column,              ; texts with "has": the paragraph's first bold span, as published (a paragraph without one has none)
+  "text": column,              ; texts: the whole paragraph, as published (term and guidance); no "has"
+  ? "refText": [* [row: uint, tstr]],
+}
+
+; The blocks the stories transclude, each once: drafting, checking, M4, M5, the conclusion, and the Community Study
+; sections of the devotional units that a story names. "key" is the transclusion as the source resolves it: the file name,
+; and for a section "file#heading" with the heading exactly as the file writes it (story 9 names it with one space and unit 5
+; writes two: the key has two).
+tf-shared = {
+  "res": res-index,
+  "n": uint,
+  "key": column,               ; texts; no "has"; two rows with the same key are E_BODY
+  "title": column,             ; texts: the block's first heading; no "has"
+  "text": column,              ; texts: the rest, minimal markdown; "has"
+}
+
+; Frames that the language's OBS resource lacks (a whole story, or one frame), with the text of the manual instead (the
+; approved hybrid), and only those: a frame that "stories" has is never in this table (E_BODY). The text is the table's "res" resource's, and an app marks it as manual text. Absent when no frame needs
+; it, which is the case of en and id today.
+tf-frames = {
+  "res": res-index,
+  "n": uint,
+  "frame": uvarints,
+  "text": column,              ; texts; no "has"
+}
+
+; The five movements: code (m1-m5, then overview) and name, from the headings of the source. The framing text of the method
+; (transclusions/overview.md, CC BY-SA 4.0 like the manual; Abel cleared the license on 2026-11-17) is in "text": the
+; purpose of each movement, and in the row "overview" the general framing text. This table has its own codes, in the order
+; above, and is not subject to the part codes. It belongs to the set: a reader that has no tf-parts ignores it too.
+tf-framework = {
+  "res": res-index,
+  "codes": strtab,
+  "n": uint,
+  "code": uvarints,
+  "name": column,              ; texts with "has": the rows m1-m5 have a name, the row overview has none; a reader requires neither
+  ? "text": column,            ; texts with "has"
 }

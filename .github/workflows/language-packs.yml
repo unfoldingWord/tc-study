@@ -70,6 +70,11 @@ on:
         required: false
         type: boolean
         default: false
+      obs_5m:
+        description: With parts, obs and v3, English only, add the OBS Five Movements manual (en_obs-tf v4) to the obs segment of format 3 (off by default)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -107,6 +112,7 @@ jobs:
       PARTS: ${{ inputs.parts }}
       COMPARE: ${{ inputs.compare }}
       OBS: ${{ inputs.obs }}
+      OBS_5M: ${{ inputs.obs_5m }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -138,6 +144,11 @@ jobs:
           # OBS is a parts unit: the comparison builds whole packs, which carry no obs unit, so the two would not match.
           if [ "$OBS" = true ] && [ "$COMPARE" = true ]; then
             echo "::error::obs cannot be combined with compare: the whole packs have no obs unit"
+            exit 1
+          fi
+          # The OBS 5M manual is the English manual of format 3: it goes in the obs segment, so it needs obs, parts and format 3, on staging.
+          if [ "$OBS_5M" = true ] && { [ "$LANGUAGE" != en ] || [ "$OBS" != true ] || [ "$PARTS" != true ] || [ "${{ inputs.v3 }}" != true ] || [ "$TARGET" != staging ]; }; then
+            echo "::error::obs_5m needs language en, obs, parts, v3 and target staging"
             exit 1
           fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
@@ -350,6 +361,17 @@ jobs:
         continue-on-error: true
         run: bun packages/resource-pipeline/cli/fetch-topic-sources.ts --out "$RUNNER_TEMP/topics" --work "$RUNNER_TEMP/packs-v3-work"
 
+      # The OBS Five Movements manual (en_obs-tf), at the commit its tag v4 points to: a moved tag fails the step instead of changing the pack.
+      - name: OBS 5M manual (format 3)
+        id: obs5m
+        if: inputs.obs_5m && inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -e
+          git clone --quiet --depth 1 --branch v4 https://git.door43.org/unfoldingWord/en_obs-tf.git "$RUNNER_TEMP/obs-tf"
+          test "$(git -C "$RUNNER_TEMP/obs-tf" rev-parse HEAD)" = 59f74b7cc87815bd2991aa0db8b42a9606c5ce13
+          test -f "$RUNNER_TEMP/obs-tf/obs_story_1.md"
+
       - name: Build and publish format 3
         id: v3
         timeout-minutes: 90
@@ -362,6 +384,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ inputs.mode == 'publish' && secrets.R2_SECRET_ACCESS_KEY || '' }}
           PACKS_V3_SIGNING_KEY: ${{ secrets.PACKS_V3_SIGNING_KEY }}
           TOPICS_OUTCOME: ${{ steps.topics.outcome }}
+          OBS5M_OUTCOME: ${{ steps.obs5m.outcome }}
         run: |
           # What Door43 or a library prints could look like a workflow command: none is read until the token comes back.
           token="$(openssl rand -hex 16)"
@@ -377,6 +400,12 @@ jobs:
               echo "### Format 3: $LANGUAGE"
               echo "Outcome: \`skipped\`: the topic sources step did not succeed, and a build without topics must not be published"
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # The OBS 5M manual was asked for and could not be fetched: no pack is built without it (a pack without it would drop the tables).
+          if [ "$OBS_5M" = true ] && [ "$OBS5M_OUTCOME" != success ]; then
+            echo '{"outcome":"skipped","reason":"the OBS 5M manual could not be fetched"}' > "$RUNNER_TEMP/packs-out/v3-result.json"
+            { echo; echo "### Format 3: $LANGUAGE"; echo "Outcome: \`skipped\`: the OBS 5M manual could not be fetched"; } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           # An upload without the key would put an unsigned catalog over a signed one: that fails this step (the 2.0 status is not touched).
@@ -400,6 +429,7 @@ jobs:
           # publish-v3 wants the tag in lowercase; the 2.0 files above keep the value as given.
           args=(--lang "${LANGUAGE,,}" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
           args+=(--topics "$RUNNER_TEMP/topics")
+          if [ "$OBS_5M" = true ]; then args+=(--obs-tf "$RUNNER_TEMP/obs-tf" --obs-tf-release v4); fi
           # The related of the tA articles needs the config.yaml of each manual, from the release the list names: without it the
           # build would lose those ties and say nothing, so a failed fetch fails this step (nothing was uploaded).
           if ! bun packages/resource-pipeline/cli/fetch-ta-config.ts --list "$list" --out "$RUNNER_TEMP/ta-config" >&2; then

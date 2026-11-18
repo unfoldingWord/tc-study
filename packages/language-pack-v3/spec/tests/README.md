@@ -119,6 +119,8 @@ required table it does not know is `E_TABLE`.
 | `book` / `questions` | `questions` |
 | `orig` / `macula` | `macula` |
 | `obs` / one of its five tables of helps | the key of that table |
+| `obs` / `tf-parts` (or its version) | `tf`, whole: the other five `tf-*` tables are not used without their root |
+| `obs` / any other `tf-*` table | that table's list inside `tf` (empty), and the rows that depend on it show no body (`obs.cddl`, "Missing tables and references") |
 | `catalog` / `requires`, `complements` | the key of that table |
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
@@ -275,6 +277,7 @@ A section has `sid`, `level` (integer), `role` and `lang` and `md` (text), and, 
 | --- | --- | --- |
 | `stories` | list | never |
 | `notes`, `questions`, `links`, `study-notes`, `study-questions` | `{"res", "rows"}` | the table is not in the file or not read |
+| `tf` | object | the file has no `tf-parts`, or the reader does not read it |
 
 - A **story** has `res` (the resource key), `n`, `title` (text) and `frames` (list) always, and `reference` (text) and
   `refs` (list of `[from, to]`) when the file has them. A **frame** has `n`, `text`, and `image` when the file has it.
@@ -289,6 +292,9 @@ A section has `sid`, `level` (integer), `role` and `lang` and `md` (text), and, 
   ```
 
   The second row has the text `10:03` in `refText`: it is kept as `frame`, and `frameId` still says where it is.
+
+- **`tf`** (the Five Movements manual; `obs.cddl`, "OBS Five Movements") has `res` (the resource key), `stories` (the coverage, a list of integers) and the lists `parts`, `questions`, `terms`, `shared`, `frames` and `framework`, each in the order of its table (a table the file lacks gives `[]`).
+  A `parts` row has `story`, `part`, and `list`, `title`, `text`, `shared` (the key of a `shared` row) when it has them; a `questions` row has `story`, `part`, `list`, `k`, `frames` (a list of frame ids, `[]` for none), `q`, and `a`, `refText` when it has them; a `terms` row has `frame`, `k`, `text`, and `term`, `refText` when it has them; a `shared` row has `key`, `title`, and `text` when it has it; a `frames` row has `frame` and `text`; a `framework` row has `code`, and `name`, `text` when it has them. A code is the fixed text (`m1`, `observation`), never its number.
 
 ### `catalog`
 
@@ -544,6 +550,7 @@ The order of the checks between a defect in the container and one in a table is 
 | 22 | `catalogo-parche` (`catalog.seg`) | A patch catalog (`catalog.md`, "Patch catalogs"): the optional `source` and `review` of a resource | The published catalog `hi-x-aquifer`: one resource `aquifer/hi/tn` with `source: "aquifer"` and `review: "none"`, one book unit `book:tit` (no text, one note) whose only need is `orig:tit`, and `requires` the common catalog | The catalog with the resource's `source` and `review` as written, and the unit `book:tit` with `needs` `["orig:tit"]` (no `map`, no `art:`) |
 | 23 | `macula-v2` (`orig-rut.seg`) | The MACULA trees and referents of `orig`, version 2 (`orig.cddl`, `macula`) | Ruth 1:1-5 of the UHB (`v3.0.0#2026-08-14T18_44_01Z`) with the real MACULA Hebrew rows of Ruth (`3b8aa380e8#2026-10-15T02_19_35.000Z`), trimmed: `data/originals-rut.langpack.zip` (format 1.1 originals pack read by `zipSource`), built by `extractOrig` and `origSegment` | `macula.v` 2, the release stamp, 5 trees (one sentence per verse; no real sentence of the slice crosses a verse), 31 referent rows over verses 1:1 to 1:5: kinds `a`, `r` and `p`, targets in the same verse (`x,y = 0,0` in the source) and in another (1:4 and 1:5 point to 1:3), rows with `ante` and rows without. Both readers give the same output |
 | 24 | `obsimg` (`obsimg.seg`) | The pictures of an OBS story (`obsimg.cddl`): frames with bytes, and the credit row | Story `01` with two frames (640 by 360, `image/webp`, 6 and 3 made-up bytes; the reader does not decode them) and the `meta` of the real catalog (CC BY-SA 3.0, Sweet Publishing), built by `obsimgSegments` | `h.lang` `zxx-obsimg`, `h.group` `01`, no `res`; `frames` with `data` as hex (`524946460001`, `ff007f`) and the `meta` object. Both readers give the same output |
+| 25 | `obs-5m` (`obs-5m.seg`) | The Five Movements tables of an OBS segment (`obs.cddl`): the six `tf-*` tables | An English OBS segment with story 1 (two frames) and its session (intro; m1 with an observation and a terms list; m2 with discourse and theology; two shared blocks; a question with a corrected frame label; a term without a bold span; a term of story 2 with a corrected label), plus story 2, which the OBS unit lacks, with its two frames in `tf-frames` (the approved fallback) and its title on the `frames` row, and a framework with an `overview` row; built by `obsSegment` from a model written by hand | `tf` with `res` `unfoldingWord/en/obs-tf`, coverage `[1, 2]`, 11 `parts` rows, 4 `questions`, 3 `terms`, 2 `shared`, 2 `frames` and 3 `framework` rows. Both readers give the same output |
 
 Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).
 

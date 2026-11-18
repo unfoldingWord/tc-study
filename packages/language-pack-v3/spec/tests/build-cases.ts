@@ -37,7 +37,7 @@ import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, readHeader, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { bookSet, verseId } from '../../src/ids'
-import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel, TopicName } from '../../src/model'
+import type { BookModel, HelpRow, MapCore, MapPart, ObsModel, OrigModel, TextModel, TopicName } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
@@ -595,6 +595,58 @@ async function obsPictures(): Promise<Uint8Array> {
   return (await writeSegment(seg)).bytes
 }
 
+// Case 25: the Five Movements tables of an Open Bible Stories segment (`obs` with `tf-*`)
+
+/** The segment of case 25: story 1 of an English OBS with its session (all six tables), and story 2, which the OBS unit lacks, with its frames from the manual. */
+async function obsFiveMovements(): Promise<Uint8Array> {
+  const OBS = 'unfoldingWord/en/obs'
+  const TF = 'unfoldingWord/en/obs-tf'
+  const model: ObsModel = {
+    lang: 'en',
+    res: [[OBS, 'v9'], [TF, 'v4']],
+    stories: [{ res: OBS, n: 1, title: 'The Creation', reference: 'A Bible story from: Genesis 1-2', frames: [{ n: 1, text: 'God made it all.', image: 'https://cdn.door43.org/obs/jpg/360px/obs-en-01-01.jpg' }, { n: 2, text: 'And it was good.' }] }],
+    tf: {
+      res: TF,
+      stories: [1, 2],
+      parts: [
+        { story: 1, part: 'intro', title: 'Introduction', text: '### Key Idea\nGod made everything.' },
+        { story: 1, part: 'frames' },
+        { story: 1, part: 'm1', title: 'Biblical Interpretation', text: 'Read the frames.' },
+        { story: 1, part: 'm1', list: 'observation', title: 'Observation Questions' },
+        { story: 1, part: 'm1', list: 'terms', title: 'Translation Questions' },
+        { story: 1, part: 'm2', title: 'Theological Dialogue' },
+        { story: 1, part: 'm2', list: 'discourse', title: 'Discourse Questions' },
+        { story: 1, part: 'm2', list: 'theology', title: 'Theological Questions' },
+        { story: 1, part: 'drafting', shared: 'movement_2_drafting' },
+        { story: 1, part: 'm4', shared: 'movement_4' },
+        { story: 2, part: 'frames', title: 'The Fall' },
+      ],
+      questions: [
+        { story: 1, part: 'm1', list: 'observation', k: 1, frames: [101], q: 'Who made it?', a: 'God.' },
+        { story: 1, part: 'm1', list: 'observation', k: 2, frames: [102], q: 'What did he say?' },
+        { story: 1, part: 'm2', list: 'discourse', k: 1, frames: [101, 102], q: 'Why is it good?', a: 'Because he made it.', refText: '01-1, 01-2' },
+        { story: 1, part: 'm2', list: 'theology', k: 2, frames: [], q: 'What does it show about God?' },
+      ],
+      terms: [
+        { frame: 101, k: 1, term: 'made', text: '**made** means created.' },
+        { frame: 101, k: 2, text: 'A paragraph without a term.' },
+        { frame: 202, k: 1, term: 'ate', text: '**ate** means ate.', refText: '2-2' },
+      ],
+      shared: [
+        { key: 'movement_2_drafting', title: 'Movement 2: Drafting', text: 'Draft the story.' },
+        { key: 'movement_4', title: 'Movement 4: Apply' },
+      ],
+      frames: [{ frame: 201, text: 'The serpent spoke.' }, { frame: 202, text: 'She ate.' }],
+      framework: [
+        { code: 'm1', name: 'Biblical Interpretation' },
+        { code: 'm2', name: 'Theological Dialogue' },
+        { code: 'overview', text: 'Welcome.' },
+      ],
+    },
+  }
+  return (await writeSegment(obsSegment(model))).bytes
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -633,6 +685,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   const outOfRange = await integerOutOfRange()
   out.set('macula-v2/orig-rut.seg', await maculaV2())
   out.set('obsimg/obsimg.seg', await obsPictures())
+  out.set('obs-5m/obs-5m.seg', await obsFiveMovements())
   out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
   out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out

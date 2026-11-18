@@ -58,6 +58,7 @@ describe('the case files', () => {
       'idioma-parcial/map-core.seg',
       'macula-v2/orig-rut.seg',
       'nota-varios-versiculos/book.seg',
+      'obs-5m/obs-5m.seg',
       'obsimg/obsimg.seg',
       'nota-varios-versiculos/map-core.seg',
       'nota-varios-versiculos/map-tit.seg',

@@ -58,7 +58,8 @@ KNOWN_TABLES = {
     "orig": {"words", "text", "macula"},
     "art": {"articles"},
     "lex": {"entries"},
-    "obs": {"strings", "stories", "notes", "questions", "links", "study-notes", "study-questions"},
+    "obs": {"strings", "stories", "notes", "questions", "links", "study-notes", "study-questions", "tf-parts", "tf-questions",
+            "tf-terms", "tf-shared", "tf-frames", "tf-framework"},
     "obsimg": {"frames", "meta"},
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
@@ -1206,6 +1207,265 @@ def _decode_obs_helps(p: Segment, name: str, strings: list[str]) -> dict:
     return {"res": res, "rows": out}
 
 
+# ---- the Five Movements tables (obs.cddl, "OBS Five Movements") ----
+
+TF_PARTS = ("intro", "frames", "community", "m1", "m2", "drafting", "m3", "checking", "m4", "m5", "conclusion")
+TF_LISTS = ("observation", "terms", "discourse", "theology", "journal")
+TF_FIXED = TF_PARTS + TF_LISTS
+TF_FRAMEWORK = ("m1", "m2", "m3", "m4", "m5", "overview")
+
+
+def _tf_column(col, n: int, kind: str, may_have: bool) -> list:
+    """A text or number column of the tf tables: only ``kind`` and ``has``; None for a row without a value."""
+    if type(col) is not dict or any(k not in (kind, "has") for k in col) or kind not in col:
+        _bad()
+    if "has" in col:
+        if not may_have:
+            _bad()
+        present = bits(col["has"], n)
+        if all(present):
+            _bad()                          # a "has" that is all ones
+    else:
+        present = [True] * n
+    m = sum(present)
+    if kind == "texts":
+        vals = texts_column(col["texts"])
+        if any(v == "" for v in vals):
+            _bad()
+    else:
+        vals = uvarints(col["uints"])
+    if len(vals) != m:
+        _bad()
+    it = iter(vals)
+    return [next(it) if x else None for x in present]
+
+
+def _tf_codes(x, fixed) -> list:
+    if not is_strlist(x):
+        _bad()
+    last = -1
+    for c in x:
+        if c not in fixed or fixed.index(c) <= last:
+            _bad()
+        last = fixed.index(c)
+    return list(x)
+
+
+def _tf_head(p: Segment, name: str, nres: int):
+    tab = p.table(name)
+    if type(tab) is not dict:
+        _bad()
+    res = _need(tab, "res", is_uint)
+    if res >= nres:
+        _bad()
+    n = _need(tab, "n", is_uint)
+    if n > p.ulen:
+        _bad()
+    return tab, res, n
+
+
+def _tf_uints(tab, key, n) -> list:
+    v = uvarints(_need(tab, key, is_bytes))
+    if len(v) != n:
+        _bad()
+    return v
+
+
+def _tf_ref_text(tab, n) -> dict:
+    out = {}
+    if "refText" not in tab:
+        return out
+    items = tab["refText"]
+    if type(items) is not list:
+        _bad()
+    last = -1
+    for it in items:
+        if type(it) is not list or len(it) != 2 or not is_uint(it[0]) or not is_str(it[1]):
+            _bad()
+        if it[0] >= n or it[0] <= last:
+            _bad()
+        last = it[0]
+        out[it[0]] = it[1]
+    return out
+
+
+def _decode_obs_tf(p: Segment, stories: list):
+    if not p.has("tf-parts"):
+        return None
+    nres = len(p.h["res"])
+    P, res_i, n = _tf_head(p, "tf-parts", nres)
+    coverage = uvarints(_need(P, "stories", is_bytes))
+    last = 0
+    for s in coverage:
+        if s < 1 or s > 50 or s <= last:
+            _bad()
+        last = s
+    cov = set(coverage)
+    codes = _tf_codes(P.get("codes"), TF_FIXED)
+    story = _tf_uints(P, "story", n)
+    part = _tf_uints(P, "part", n)
+    lst = _tf_column(P.get("list"), n, "uints", True)
+    title = _tf_column(P.get("title"), n, "texts", True)
+    text = _tf_column(P.get("text"), n, "texts", True)
+    sh = _tf_column(P.get("shared"), n, "uints", True)
+    shared_tab = None
+    if p.has("tf-shared"):
+        shared_tab = _tf_head(p, "tf-shared", nres)
+
+    def rank(pp, ll):
+        return TF_PARTS.index(pp) * 10 + (0 if ll is None else 1 + TF_LISTS.index(ll))
+
+    parts, before, before_story = [], -1, 0
+    for i in range(n):
+        if story[i] not in cov or part[i] >= len(codes):
+            _bad()
+        pc = codes[part[i]]
+        if pc not in TF_PARTS:
+            _bad()
+        lc = None
+        if lst[i] is not None:
+            if lst[i] >= len(codes):
+                _bad()
+            lc = codes[lst[i]]
+            if lc not in TF_LISTS:
+                _bad()
+        r = rank(pc, lc)
+        if story[i] < before_story or (story[i] == before_story and r < before):
+            _bad()
+        before_story, before = story[i], r
+        row = {"story": story[i], "part": pc}
+        if lc is not None:
+            row["list"] = lc
+        if sh[i] is not None:
+            if title[i] is not None or text[i] is not None:
+                _bad()
+            if shared_tab is not None and sh[i] >= shared_tab[2]:
+                _bad()
+        if title[i] is not None:
+            row["title"] = title[i]
+        if text[i] is not None:
+            row["text"] = text[i]
+        parts.append(row)
+    shared = []
+    if shared_tab is not None:
+        S, sres, sn = shared_tab
+        if sres != res_i:
+            _bad()
+        key = _tf_column(S.get("key"), sn, "texts", False)
+        stitle = _tf_column(S.get("title"), sn, "texts", False)
+        stext = _tf_column(S.get("text"), sn, "texts", True)
+        seen = set()
+        for i in range(sn):
+            if key[i] in seen:
+                _bad()
+            seen.add(key[i])
+            row = {"key": key[i], "title": stitle[i]}
+            if stext[i] is not None:
+                row["text"] = stext[i]
+            shared.append(row)
+        for i, row in enumerate(parts):
+            if sh[i] is not None:
+                row["shared"] = shared[sh[i]]["key"]
+    known = {s["n"] * 100 + f["n"] for s in stories for f in s["frames"]}
+    frames = []
+    if p.has("tf-frames"):
+        F, fres, fn = _tf_head(p, "tf-frames", nres)
+        if fres != res_i:
+            _bad()
+        fr = _tf_uints(F, "frame", fn)
+        ftext = _tf_column(F.get("text"), fn, "texts", False)
+        for i, f in enumerate(fr):
+            if (i > 0 and f <= fr[i - 1]) or f // 100 not in cov:
+                _bad()
+            if f in known:
+                _bad()                      # the frame is in "stories" already
+            frames.append({"frame": f, "text": ftext[i]})
+            known.add(f)
+    questions = []
+    if p.has("tf-questions"):
+        Q, qres, qn = _tf_head(p, "tf-questions", nres)
+        if qres != res_i:
+            _bad()
+        qc = _tf_codes(Q.get("codes"), TF_FIXED)
+        qs, qp, ql, qk = (_tf_uints(Q, k, qn) for k in ("story", "part", "list", "k"))
+        fr = _need(Q, "frames", lambda x: type(x) is dict)
+        counts = _tf_uints(fr, "count", qn)
+        ids = uvarints(_need(fr, "ids", is_bytes))
+        if sum(counts) != len(ids):
+            _bad()
+        qq = _tf_column(Q.get("q"), qn, "texts", False)
+        qa = _tf_column(Q.get("a"), qn, "texts", True)
+        ref = _tf_ref_text(Q, qn)
+        at, last_place, k = 0, None, 0
+        for i in range(qn):
+            if qs[i] not in cov or qp[i] >= len(qc) or ql[i] >= len(qc):
+                _bad()
+            pc, lc = qc[qp[i]], qc[ql[i]]
+            if pc not in TF_PARTS or lc not in TF_LISTS:
+                _bad()
+            place = (qs[i], pc)
+            if place != last_place:
+                if last_place is not None and (qs[i] < last_place[0] or (
+                        qs[i] == last_place[0] and TF_PARTS.index(pc) <= TF_PARTS.index(last_place[1]))):
+                    _bad()
+                last_place, k = place, 0
+            k += 1
+            if qk[i] != k:
+                _bad()
+            named = ids[at:at + counts[i]]
+            at += counts[i]
+            if any(f not in known for f in named):
+                _bad()
+            row = {"story": qs[i], "part": pc, "list": lc, "k": qk[i], "frames": named, "q": qq[i]}
+            if qa[i] is not None:
+                row["a"] = qa[i]
+            if i in ref:
+                row["refText"] = ref[i]
+            questions.append(row)
+    terms = []
+    if p.has("tf-terms"):
+        T, tres, tn = _tf_head(p, "tf-terms", nres)
+        if tres != res_i:
+            _bad()
+        tfr, tk = _tf_uints(T, "frame", tn), _tf_uints(T, "k", tn)
+        tterm = _tf_column(T.get("term"), tn, "texts", True)
+        ttext = _tf_column(T.get("text"), tn, "texts", False)
+        ref = _tf_ref_text(T, tn)
+        k = 0
+        for i in range(tn):
+            if tfr[i] // 100 not in cov or (i > 0 and tfr[i] < tfr[i - 1]):
+                _bad()
+            k = k + 1 if i > 0 and tfr[i] == tfr[i - 1] else 1
+            if tk[i] != k or tfr[i] not in known:
+                _bad()
+            row = {"frame": tfr[i], "k": k, "text": ttext[i]}
+            if tterm[i] is not None:
+                row["term"] = tterm[i]
+            if i in ref:
+                row["refText"] = ref[i]
+            terms.append(row)
+    framework = []
+    if p.has("tf-framework"):
+        W, wres, wn = _tf_head(p, "tf-framework", nres)
+        if wres != res_i:
+            _bad()
+        wc = _tf_codes(W.get("codes"), TF_FRAMEWORK)
+        code = _tf_uints(W, "code", wn)
+        name = _tf_column(W.get("name"), wn, "texts", True)
+        body = _tf_column(W["text"], wn, "texts", True) if "text" in W else None
+        for i, c in enumerate(code):
+            if c >= len(wc) or (i > 0 and c <= code[i - 1]):
+                _bad()
+            row = {"code": wc[c]}
+            if name[i] is not None:
+                row["name"] = name[i]
+            if body is not None and body[i] is not None:
+                row["text"] = body[i]
+            framework.append(row)
+    return {"res": p.res_key(res_i), "stories": coverage, "parts": parts, "questions": questions, "terms": terms,
+            "shared": shared, "frames": frames, "framework": framework}
+
+
 def _decode_obs(p: Segment) -> dict:
     _header_needs(p, "lang", "res", nonempty_res=True)
     for key in REQUIRED_TABLES["obs"]:
@@ -1250,6 +1510,9 @@ def _decode_obs(p: Segment) -> dict:
     for name in ("notes", "questions", "links", "study-notes", "study-questions"):
         if p.has(name):
             out[name] = _decode_obs_helps(p, name, strings)
+    tf = _decode_obs_tf(p, stories)
+    if tf is not None:
+        out["tf"] = tf
     return out
 
 

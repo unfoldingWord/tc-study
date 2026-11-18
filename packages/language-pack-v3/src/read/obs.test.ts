@@ -76,7 +76,7 @@ describe('obsView', () => {
   })
 
   test('the known tables', () => {
-    expect(Object.keys(OBS_TABLES).sort()).toEqual(['links', 'notes', 'questions', 'stories', 'strings', 'study-notes', 'study-questions'])
+    expect(Object.keys(OBS_TABLES).sort()).toEqual(['links', 'notes', 'questions', 'stories', 'strings', 'study-notes', 'study-questions', 'tf-frames', 'tf-framework', 'tf-parts', 'tf-questions', 'tf-shared', 'tf-terms'])
     expect(Object.values(OBS_TABLES).every((versions) => versions.length === 1 && versions[0] === 1)).toBe(true)
   })
 

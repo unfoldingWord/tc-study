@@ -14,6 +14,7 @@ export { type MapUnit, openFromSegments, type PackReader, type ReaderProblem } f
 export { patchedReader } from './patch'
 export type { Answer, Cite, PatchMark, CellState, NotInstalled, QueryName } from './query/envelope'
 export type { PassageData, PassageRow } from './query/passage'
+export type { TfFrameData, TfListData, TfPartData, TfQuestionData, TfSessionData, TfTermData, TfTermsOfFrame } from './query/obsTf'
 export type { ArticleData, ContextData } from './query/article'
 export type { BookCell, BooksData } from './query/maps'
 export type { LookupData, LookupMatch } from './query/lookup'

@@ -37,6 +37,7 @@ import { type PassageData, passageQuery } from './query/passage'
 import { type StoryData, type StoryRef, storiesQuery, storyQuery } from './query/stories'
 import { type SectionsData, sectionsQuery } from './query/sections'
 import { type FramesAtData, framesAtQuery, type FrameVersesData, frameVersesQuery } from './query/obsFrames'
+import { obsPartOf, obsSessionOf, type TfPartData, type TfSessionData } from './query/obsTf'
 import { searchQuery } from './query/search'
 import { memoryIndex } from './search/memory'
 import type { Hit, SearchFilters, SearchIndex } from './search/types'
@@ -149,6 +150,14 @@ export interface PackReader {
   obsImage(story: number, frame: number): Promise<{ bytes: Uint8Array; media: string; w: number; h: number } | null>
   /** The credit the pictures carry (license, credit, changes, source), from the first segment of the unit; `null` when `obsimg` is not installed. */
   obsImageCredit(): Promise<{ license: string; credit: string; changes: string; source: string } | null>
+  /**
+   * The Five Movements session of story `n` (1 to 50) from the `tf-*` tables of the `obs` unit: the parts in order with their lists, the
+   * story's frames, and the release of the manual its ids belong to. `null` when the `obs` unit has no such tables or the story is outside
+   * the language's coverage (`coverage` of the session lists the stories that have one).
+   */
+  obsSession(n: number): Promise<TfSessionData | null>
+  /** One part of that session by its fixed code (`intro`, `frames`, `community`, `m1`, `m2`, `drafting`, `m3`, `checking`, `m4`, `m5`, `conclusion`); `null` when absent. */
+  obsPart(n: number, code: string): Promise<TfPartData | null>
 }
 
 export type ReaderInput = {
@@ -418,6 +427,8 @@ export function makeReader(o: ReaderInput): PackReader {
     obs: () => single('obs', obsView),
     obsImage,
     obsImageCredit,
+    obsSession: async (n) => obsSessionOf(await reader.obs(), n),
+    obsPart: async (n, code) => obsPartOf(await reader.obs(), n, code),
     async articles(group) {
       return (await single(`art:${group}`, artView))?.articles
     },

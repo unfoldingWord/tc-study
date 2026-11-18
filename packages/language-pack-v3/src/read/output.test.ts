@@ -362,7 +362,7 @@ describe('tables a reader does not know (case 9)', () => {
     expect(Object.keys(KNOWN.orig).sort()).toEqual(['macula', 'text', 'words'])
     expect(Object.keys(KNOWN.art)).toEqual(['articles'])
     expect(Object.keys(KNOWN.lex)).toEqual(['entries'])
-    expect(Object.keys(KNOWN.obs).sort()).toEqual(['links', 'notes', 'questions', 'stories', 'strings', 'study-notes', 'study-questions'])
+    expect(Object.keys(KNOWN.obs).sort()).toEqual(['links', 'notes', 'questions', 'stories', 'strings', 'study-notes', 'study-questions', 'tf-frames', 'tf-framework', 'tf-parts', 'tf-questions', 'tf-shared', 'tf-terms'])
     expect(Object.keys(KNOWN.catalog).sort()).toEqual(['about', 'complements', 'requires', 'resources', 'segments', 'units'])
     for (const [cls, tables] of Object.entries(KNOWN)) {
       for (const [name, versions] of Object.entries(tables)) expect(versions).toEqual(cls === 'orig' && name === 'macula' ? [1, 2] : [1])
