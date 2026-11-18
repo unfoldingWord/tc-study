@@ -163,7 +163,7 @@ export function buildTopics(o: {
   }
 
   // People: what the language calls people where nothing else in the pack says it
-  const people = o.acai === undefined ? undefined : buildPeople({ lang, xtopics, mapNames: o.mapNames ?? {}, acai: o.acai.people, report })
+  const people = o.acai === undefined ? undefined : buildPeople({ lang, xtopics, mapNames: o.mapNames ?? {}, acai: o.acai.people, records: o.records, report })
   if (people !== undefined) touch(o.acai!.res[0], [])
   const releases = new Map(o.releases)
   if (o.acai !== undefined) releases.set(o.acai.res[0], o.acai.res[1])
