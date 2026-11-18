@@ -201,7 +201,16 @@ describe('buildPeople: an alias that names its person rarely and another person 
       alias('person:Saul.2', 'person:Paul', 'Saul (Paul)', 'Saulo (Pablo)'),
     ]
     expect(buildPeople({ lang: 'en', xtopics: sp, mapNames: {}, acai: acaiSp, records: recs, report: [] })!.aliases.Saul).toBeUndefined()
+    // control: the same build without TIPNR records keeps it
+    expect(buildPeople({ lang: 'en', xtopics: sp, mapNames: {}, acai: acaiSp, records: undefined, report: [] })!.aliases.Saul).toEqual(['per:paul'])
     expect(buildPeople({ lang: 'es-419', xtopics: sp, mapNames: {}, acai: acaiSp, records: recs, report: [] })!.aliases.Saulo).toEqual(['per:paul'])
+    // the report: two left out, given in reverse order and one twice, come out sorted and once each
+    const report: string[] = []
+    const reversed = [...acaiSp, alias('person:David.3', 'person:Judah', 'David (Judah)', 'David (Judá)')].reverse()
+    buildPeople({ lang: 'en', xtopics: sp, mapNames: {}, acai: reversed, records: recs, report })
+    expect(report.find((l) => l.includes('left out'))).toBe(
+      "people: en: 2 aliases left out, mostly another person's name: «David» → per:judah (1 verses by that name; per:david 964); «Saul» → per:paul (22 verses by that name; per:saul 327)",
+    )
   })
   test('an alias left out no longer makes a note', () => {
     // David's note "rey" is stored only while another person (Judah, by the alias) is also found by «David»
