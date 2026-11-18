@@ -56,6 +56,8 @@ export { OBSIMG_TABLES, obsimgView } from './read/obsimg'
 export { origView } from './read/orig'
 export { topicsView, xtopicsView } from './read/topics'
 export { parseTipnr, type TipnrRecord } from './source/tipnr'
+export { ACAI_LANGS, ACAI_SOURCE, type AcaiPerson, parseAcai, splitLabel, trimAcai } from './source/acai'
+export { derivedPersonName, personName, twOfPeople } from './build/topics/people'
 export {
   type ComplementFile,
   type KnownTables,

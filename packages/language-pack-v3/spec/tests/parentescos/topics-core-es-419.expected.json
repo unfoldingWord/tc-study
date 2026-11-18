@@ -1,0 +1,78 @@
+{
+  "coverage": {
+    "BibleAquifer/ACAI": {
+      "whole": []
+    },
+    "es-419_gl/es-419/glt": {
+      "whole": [
+        "gen"
+      ]
+    }
+  },
+  "h": {
+    "class": "topics",
+    "lang": "es-419",
+    "part": "core",
+    "res": [
+      [
+        "BibleAquifer/ACAI",
+        "5375d0d3"
+      ],
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "names": [
+        1,
+        true
+      ],
+      "people": [
+        1,
+        false
+      ]
+    },
+    "v": 1
+  },
+  "id": "235a19d984668bfadeb7e5c99481efba6d07e0d58b96d19043c0bdee4e640dda",
+  "names": {
+    "per:isaac": [
+      [
+        "Isaac",
+        "alignment",
+        3,
+        [
+          "gen"
+        ]
+      ]
+    ]
+  },
+  "people": {
+    "aliases": {
+      "Abram": [
+        "per:abraham"
+      ],
+      "Ismael hijo de Agar": [
+        "per:ishmael"
+      ],
+      "Jacob": [
+        "per:israel"
+      ]
+    },
+    "names": {
+      "per:esau": "Esaú",
+      "per:hagar": "Agar",
+      "per:rebekah": "Rebeca",
+      "per:sarah": "Sara"
+    },
+    "notes": {
+      "per:israel": "patriarca",
+      "per:jacob": "padre de José"
+    }
+  }
+}

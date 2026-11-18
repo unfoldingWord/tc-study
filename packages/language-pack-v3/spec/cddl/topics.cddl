@@ -34,7 +34,7 @@ topics-core-tables = {
 topics-people = {
   "names": { * topic-id => tstr },      ; per: id -> its name, not empty
   "notes": { * topic-id => tstr },      ; per: id -> what tells it apart ("padre de José"), not empty; only for a person whose
-                                        ; name in this language another person also has, as name or alias
+                                        ; name in this language another person can also be found by (ids.md)
   "aliases": { * tstr => [+ topic-id] },  ; another name (not empty) -> the per: ids it names, sorted by code point, no
                                         ; repeat; only a name the rule above and the tW articles do not already give
 }

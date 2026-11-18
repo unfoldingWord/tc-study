@@ -95,7 +95,8 @@ export function buildPeople(o: {
   }
   for (const name of [...aliasSets.keys()].sort(compareCodePoints)) people.aliases[name] = [...aliasSets.get(name)!].sort(compareCodePoints)
 
-  // notes: only for a name two people share (as name, or one's name and another's alias)
+  // notes: only for a person whose name another person can also be found by (its name, an alias, the first map name of a tW
+  // article joined to it, or its English title)
   const holders = new Map<string, Set<string>>()
   const hold = (name: string, per: string): void => {
     if (name === '') return
@@ -103,7 +104,12 @@ export function buildPeople(o: {
     if (set === undefined) holders.set(name, (set = new Set()))
     set.add(per)
   }
-  for (const [id, t] of o.xtopics.topics) if (t.kind === 'person' && id.startsWith('per:')) hold(nameOf(id), id)
+  for (const [id, t] of o.xtopics.topics) {
+    if (t.kind !== 'person' || !id.startsWith('per:')) continue
+    hold(nameOf(id), id)
+    hold(t.title, id)
+    for (const c of tw.get(id) ?? []) hold(o.mapNames[c]?.[0] ?? '', id)
+  }
   for (const [name, ids] of Object.entries(people.aliases)) for (const id of ids) hold(name, id)
   for (const [per, note] of [...noteOf].sort((a, b) => compareCodePoints(a[0], b[0]))) {
     if ((holders.get(nameOf(per))?.size ?? 0) > 1) people.notes[per] = note

@@ -32,12 +32,13 @@ import { versesOf } from '../../src/build/maps/verses'
 import { extractOrig, origSegment } from '../../src/build/orig'
 import { buildXmap } from '../../src/build/xmap/build'
 import { xmapSegment } from '../../src/build/xmap/segment'
-import { topicsSegment } from '../../src/build/topics/segment'
+import { topicsSegment, xtopicsSegment } from '../../src/build/topics/segment'
+import { encodeUvarints } from '../../src/codec/columns'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, readHeader, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { bookSet, verseId } from '../../src/ids'
-import type { BookModel, HelpRow, MapCore, MapPart, ObsModel, OrigModel, TextModel, TopicName } from '../../src/model'
+import type { BookModel, HelpRow, MapCore, MapPart, ObsModel, OrigModel, TextModel, Topic, TopicName, XtopicsCore } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
@@ -647,6 +648,85 @@ async function obsFiveMovements(): Promise<Uint8Array> {
   return (await writeSegment(obsSegment(model))).bytes
 }
 
+// Case 26: the people tables: `gender` of the xtopics core and `people` of a language's topics core (from ACAI)
+
+/**
+ * The files of case 26: an xtopics core with the family of Isaac (TIPNR relations, a `same-as` of TIPNR and one of ACAI) and its
+ * `gender` column; an es-419 topics core with a `people` table; and the same two with one defect each, which a reader rejects.
+ */
+async function kinship(): Promise<Map<string, Uint8Array>> {
+  const TIPNR = 'STEPBible/STEPBible-Data/TIPNR'
+  const ACAI = 'BibleAquifer/ACAI'
+  const person = (title: string): Topic => ({ kind: 'person', source: TIPNR, ref: `${title}@Gen.1.1`, title, ustrong: '' })
+  const topics = new Map<string, Topic>([
+    ['lug:hebron', { kind: 'place', source: TIPNR, ref: 'Hebron@Gen.13.18', title: 'Hebron', ustrong: '' }],
+    ['per:abraham', person('Abraham')],
+    ['per:esau', person('Esau')],
+    ['per:hagar', person('Hagar')],
+    ['per:isaac', person('Isaac')],
+    ['per:ishmael', person('Ishmael')],
+    ['per:israel', person('Israel')],
+    ['per:jacob', person('Jacob')],
+    ['per:rebekah', person('Rebekah')],
+    ['per:sarah', person('Sarah')],
+  ])
+  const rel = (from: string, type: string, to: string, source = TIPNR, confidence = 100) => ({ from, to, type, source, confidence })
+  const core: XtopicsCore = {
+    part: 'core',
+    res: [[ACAI, '5375d0d3'], [TIPNR, 'be4191f0']],
+    coverage: new Map([[ACAI, { whole: [], partial: [] }], [TIPNR, { whole: ['gen'], partial: ['mat'] }]]),
+    topics,
+    occurrences: new Map([...topics.keys()].map((id) => [id, new Map([['gen', [2, 2] as [number, number]]])])),
+    relations: [
+      rel('per:abraham', 'parent-of', 'per:isaac'),
+      rel('per:abraham', 'parent-of', 'per:ishmael'),
+      rel('per:abraham', 'partner-of', 'per:sarah'),
+      rel('per:esau', 'sibling-of', 'per:israel'),
+      rel('per:hagar', 'parent-of', 'per:ishmael'),
+      rel('per:isaac', 'parent-of', 'per:esau'),
+      rel('per:isaac', 'parent-of', 'per:israel'),
+      rel('per:isaac', 'partner-of', 'per:rebekah'),
+      rel('per:rebekah', 'parent-of', 'per:esau'),
+      rel('per:rebekah', 'parent-of', 'per:israel'),
+      rel('per:sarah', 'parent-of', 'per:isaac'),
+      rel('tw:names/isaac', 'same-as', 'per:isaac', TIPNR, 70),
+      rel('tw:names/jacob', 'same-as', 'per:israel', TIPNR, 70),
+      rel('tw:names/rebekah', 'same-as', 'per:rebekah', ACAI, 75),
+    ],
+    gender: { 'per:abraham': 1, 'per:esau': 1, 'per:hagar': 2, 'per:isaac': 1, 'per:ishmael': 1, 'per:israel': 1, 'per:jacob': 1, 'per:rebekah': 2, 'per:sarah': 2 },
+  }
+  const x = xtopicsSegment(core)
+  const lang = topicsSegment({
+    lang: ES,
+    part: 'core',
+    res: [[ACAI, '5375d0d3'], [GLT, 'v42']],
+    coverage: new Map([[ACAI, { whole: [], partial: [] }], [GLT, { whole: ['gen'], partial: [] }]]),
+    names: { 'per:isaac': [['Isaac', 'alignment', 3, ['gen']]] },
+    people: {
+      names: { 'per:esau': 'Esaú', 'per:hagar': 'Agar', 'per:rebekah': 'Rebeca', 'per:sarah': 'Sara' },
+      notes: { 'per:israel': 'patriarca', 'per:jacob': 'padre de José' },
+      aliases: { Abram: ['per:abraham'], Jacob: ['per:israel'], 'Ismael hijo de Agar': ['per:ishmael'] },
+    },
+  })
+  const write = async (seg: Segment): Promise<Uint8Array> => (await writeSegment(seg)).bytes
+  const withX = (t: Record<string, unknown>): Segment => ({ h: x.h, t: { ...x.t, ...t } as Segment['t'] })
+  const withPeople = (people: unknown): Segment => ({ h: lang.h, t: { ...lang.t, people } as Segment['t'] })
+  const ids = [...topics.keys()]
+  const genderOf = (over: Record<string, number>, n = ids.length) => encodeUvarints(ids.slice(0, n).map((id) => over[id] ?? core.gender![id] ?? 0))
+  const people = lang.t.people as { names: Record<string, string>; notes: Record<string, string>; aliases: Record<string, string[]> }
+  const out = new Map<string, Uint8Array>()
+  out.set('parentescos/xtopics-core.seg', await write(x))
+  out.set('parentescos/topics-core-es-419.seg', await write(lang))
+  out.set('parentescos/genero-de-un-lugar.seg', await write(withX({ gender: genderOf({ 'lug:hebron': 1 }) })))
+  out.set('parentescos/genero-3.seg', await write(withX({ gender: genderOf({ 'per:isaac': 3 }) })))
+  out.set('parentescos/genero-corto.seg', await write(withX({ gender: genderOf({}, ids.length - 1) })))
+  out.set('parentescos/personas-id-de-lugar.seg', await write(withPeople({ ...people, names: { 'lug:hebron': 'Hebrón', ...people.names } })))
+  out.set('parentescos/personas-nota-vacia.seg', await write(withPeople({ ...people, notes: { ...people.notes, 'per:jacob': '' } })))
+  out.set('parentescos/personas-alias-desordenado.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Jacob: ['per:jacob', 'per:israel'] } })))
+  out.set('parentescos/personas-sin-aliases.seg', await write(withPeople({ names: people.names, notes: people.notes })))
+  return out
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -686,6 +766,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('macula-v2/orig-rut.seg', await maculaV2())
   out.set('obsimg/obsimg.seg', await obsPictures())
   out.set('obs-5m/obs-5m.seg', await obsFiveMovements())
+  for (const [name, bytes] of await kinship()) out.set(name, bytes)
   out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
   out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out

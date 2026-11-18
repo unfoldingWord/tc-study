@@ -64,8 +64,8 @@ KNOWN_TABLES = {
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
-    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks", "obs-frames"},
-    "topics": {"names", "local", "coverage"},
+    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks", "obs-frames", "gender"},
+    "topics": {"names", "local", "coverage", "people"},
     "aligned": {"keys", "strongs", "data"},
 }
 REQUIRED_TABLES = {
@@ -1697,8 +1697,8 @@ BOOK_SOURCES = ("text", "list", "none")
 # Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
 CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
              "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"},
-             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks", "obs-frames"},
-             "topics": {"coverage", "local"}}
+             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks", "obs-frames", "gender"},
+             "topics": {"coverage", "local", "people"}}
 
 
 def _map_header(p: Segment) -> tuple[bool, int | None]:
@@ -2029,6 +2029,18 @@ def _decode_xtopics_core(p: Segment) -> dict:
         if any(x[0] // 1000 != x[1] // 1000 for v in f.values() for x in v):
             _bad()
         out["obs-frames"] = {k: [list(x) for x in v] for k, v in f.items()}
+    if p.has("gender"):
+        g = uvarints(_need(p.t, "gender", is_bytes))
+        if len(g) != len(ids):
+            _bad()                          # one number per row of topics.ids
+        gender = {}
+        for tid, v in zip(ids, g):
+            if v == 0:
+                continue
+            if v > 2 or topics[tid]["kind"] != "person" or not tid.startswith("per:"):
+                _bad()
+            gender[tid] = v
+        out["gender"] = gender
     return out
 
 
@@ -2075,6 +2087,34 @@ def _decode_topics(p: Segment) -> dict:
         # Only the keys of local-topics: any other key of an entry is ignored, as the TypeScript reader does
         out["local"] = {k: {key: jsonable(v[key]) for key in ("names", "refs", "related") if key in v} for k, v in local.items()}
     out["coverage"] = _coverage(p.t["coverage"])
+    if p.has("people"):
+        out["people"] = _topics_people(p.t["people"])
+    return out
+
+
+def _topics_people(t) -> dict:
+    """The table people of a topics core (topics.cddl): names, notes, aliases; any other key is ignored."""
+    if type(t) is not dict or any(k not in t for k in ("names", "notes", "aliases")):
+        _bad()
+    out = {}
+    for key in ("names", "notes"):
+        m = t[key]
+        if type(m) is not dict or any(type(k) is not str or not k.startswith("per:") for k in m):
+            _bad()
+        if any(not is_str(v) or v == "" for v in m.values()):
+            _bad()
+        out[key] = dict(m)
+    a = t["aliases"]
+    if type(a) is not dict:
+        _bad()
+    aliases = {}
+    for k, v in a.items():
+        if type(k) is not str or k == "" or type(v) is not list or len(v) == 0:
+            _bad()
+        if any(not is_str(x) or not x.startswith("per:") for x in v) or any(x >= y for x, y in zip(v, v[1:])):
+            _bad()                          # per: ids, sorted by code point, no repeat
+        aliases[k] = list(v)
+    out["aliases"] = aliases
     return out
 
 

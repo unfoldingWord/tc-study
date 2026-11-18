@@ -1,0 +1,301 @@
+{
+  "coverage": {
+    "BibleAquifer/ACAI": {
+      "whole": []
+    },
+    "STEPBible/STEPBible-Data/TIPNR": {
+      "partial": [
+        "mat"
+      ],
+      "whole": [
+        "gen"
+      ]
+    }
+  },
+  "gender": {
+    "per:abraham": 1,
+    "per:esau": 1,
+    "per:hagar": 2,
+    "per:isaac": 1,
+    "per:ishmael": 1,
+    "per:israel": 1,
+    "per:jacob": 1,
+    "per:rebekah": 2,
+    "per:sarah": 2
+  },
+  "h": {
+    "class": "xtopics",
+    "part": "core",
+    "res": [
+      [
+        "BibleAquifer/ACAI",
+        "5375d0d3"
+      ],
+      [
+        "STEPBible/STEPBible-Data/TIPNR",
+        "be4191f0"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "gender": [
+        1,
+        false
+      ],
+      "occurrences": [
+        1,
+        true
+      ],
+      "relations": [
+        1,
+        false
+      ],
+      "topics": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "22bd9e8468144d68e6e376fed08dc59311138aca87dfe9161dcbf7463f38c3cd",
+  "occurrences": {
+    "rows": {
+      "lug:hebron": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:abraham": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:esau": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:hagar": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:isaac": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:ishmael": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:israel": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:jacob": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:rebekah": {
+        "gen": [
+          2,
+          2
+        ]
+      },
+      "per:sarah": {
+        "gen": [
+          2,
+          2
+        ]
+      }
+    },
+    "unit": "verses"
+  },
+  "relations": [
+    {
+      "confidence": 100,
+      "from": "per:abraham",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:isaac",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:abraham",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:ishmael",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:abraham",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:sarah",
+      "type": "partner-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:esau",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:israel",
+      "type": "sibling-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:hagar",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:ishmael",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:isaac",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:esau",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:isaac",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:israel",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:isaac",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:rebekah",
+      "type": "partner-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:rebekah",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:esau",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:rebekah",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:israel",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 100,
+      "from": "per:sarah",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:isaac",
+      "type": "parent-of"
+    },
+    {
+      "confidence": 70,
+      "from": "tw:names/isaac",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:isaac",
+      "type": "same-as"
+    },
+    {
+      "confidence": 70,
+      "from": "tw:names/jacob",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "to": "per:israel",
+      "type": "same-as"
+    },
+    {
+      "confidence": 75,
+      "from": "tw:names/rebekah",
+      "source": "BibleAquifer/ACAI",
+      "to": "per:rebekah",
+      "type": "same-as"
+    }
+  ],
+  "topics": {
+    "lug:hebron": {
+      "kind": "place",
+      "ref": "Hebron@Gen.13.18",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Hebron",
+      "ustrong": ""
+    },
+    "per:abraham": {
+      "kind": "person",
+      "ref": "Abraham@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Abraham",
+      "ustrong": ""
+    },
+    "per:esau": {
+      "kind": "person",
+      "ref": "Esau@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Esau",
+      "ustrong": ""
+    },
+    "per:hagar": {
+      "kind": "person",
+      "ref": "Hagar@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Hagar",
+      "ustrong": ""
+    },
+    "per:isaac": {
+      "kind": "person",
+      "ref": "Isaac@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Isaac",
+      "ustrong": ""
+    },
+    "per:ishmael": {
+      "kind": "person",
+      "ref": "Ishmael@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Ishmael",
+      "ustrong": ""
+    },
+    "per:israel": {
+      "kind": "person",
+      "ref": "Israel@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Israel",
+      "ustrong": ""
+    },
+    "per:jacob": {
+      "kind": "person",
+      "ref": "Jacob@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Jacob",
+      "ustrong": ""
+    },
+    "per:rebekah": {
+      "kind": "person",
+      "ref": "Rebekah@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Rebekah",
+      "ustrong": ""
+    },
+    "per:sarah": {
+      "kind": "person",
+      "ref": "Sarah@Gen.1.1",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Sarah",
+      "ustrong": ""
+    }
+  }
+}

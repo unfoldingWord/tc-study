@@ -164,8 +164,9 @@ fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
 - **`aliases`**: the name of each alias record of `P` in `L` (its note dropped: `P` has its own), to `P`; only when it is not
   `P`'s name in `L` (the rule above, with `names`), its English title, or the first `map` name in `L` of a `tw:names/` concept
   joined to `P`. Two alias records with the same name are one key with all their people.
-- **`notes`**: the note of `P`'s label in `L`, only when `P`'s name in `L` is also the name in `L` of another person, or an
-  alias of another person, compared byte for byte; there it tells the two apart. A label with no note gives none.
+- **`notes`**: the note of `P`'s label in `L`, only when `P`'s name in `L` is a name another person can also be found by in
+  `L`: that person's name in `L`, an alias in `L`, the first `map` name in `L` of a `tw:names/` concept joined to it, or its
+  English title; compared byte for byte. There the note tells the two apart. A label with no note gives none.
 
 A client that compares names folds them its own way; the pack does not fold. An `L` with no `people` table (an older pack, or a
 language ACAI does not name) uses steps 2 and 3.
