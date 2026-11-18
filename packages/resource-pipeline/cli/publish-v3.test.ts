@@ -102,6 +102,14 @@ describe('publish-v3', () => {
     expect(run.err.join(' ')).toContain('--ta-config')
   })
 
+  test('--obs-tf and --obs-tf-release are passed to the build: a folder that does not exist fails it, and one flag alone fails it', async () => {
+    const missing = await publish(en(temp(), EN, ['--no-upload', '--obs-tf', join(temp(), 'no-such-folder'), '--obs-tf-release', 'v4']))
+    expect(missing.code).toBe(1)
+    expect(missing.err.join(' ')).toContain('--obs-tf')
+    const alone = await publish(en(temp(), EN, ['--no-upload', '--obs-tf-release', 'v4']))
+    expect(alone.code).not.toBe(0)
+  })
+
   test('a language other than the map language downloads the art segments of the published map language as role hints', async () => {
     const bucket = temp()
     expect((await publish(en(bucket))).code).toBe(0)
