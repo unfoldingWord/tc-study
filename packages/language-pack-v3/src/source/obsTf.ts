@@ -254,7 +254,8 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         open.text += `## ${h}\n${withoutTransclusions(s.body)}`
         continue
       }
-      if (open !== undefined && s.level <= Math.max(open.level, 2)) closeBlock()
+      const namesBlock = Object.keys(H.blocks).some((text) => startsWithAny(h, [text]))
+      if (open !== undefined && (s.level <= Math.max(open.level, 2) || (s.level === 3 && namesBlock))) closeBlock()
       if (open !== undefined) {
         takeTransclusions(s.body)
         open.text += `${'#'.repeat(s.level)} ${h}\n${withoutTransclusions(s.body)}`
@@ -361,14 +362,19 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
       }
       // A third-level heading that no list uses would lose its questions without a word: it is an error.
       // In a list of questions or terms, one that the conversion turned into a heading is the text of the question or term before it.
-      if (s.level === 3 && (mode === 'm1:observation' || mode === 'm1:terms')) {
+      // Not one that looks like the heading of a list, a part or a block that was misspelled: that one would take the questions below it with it.
+      const looksLikeHeading = /^(pertanyaan|refleksi|dialog|percakapan|penafsiran|interpretasi|question|journal|theolog|discourse)/.test(fold(h))
+      if (s.level === 3 && (mode === 'm1:observation' || mode === 'm1:terms') && !looksLikeHeading) {
         const last = mode === 'm1:observation' ? questions.filter((q) => q.story === n && q.list === 'observation').at(-1) : undefined
         const lastTerm = mode === 'm1:terms' ? terms.filter((t) => Math.floor(t.frame / 100) === n).at(-1) : undefined
         takeTransclusions(s.body)
         const text = [h, ...paras(withoutTransclusions(s.body))].join('\n')
         if (last !== undefined) last.a = last.a === undefined ? text : `${last.a}\n${text}`
         else if (lastTerm !== undefined) lastTerm.text = `${lastTerm.text}\n\n${text}`
-        else errors.push(`${where}: the heading ${JSON.stringify(h)} comes before any question or term of its list`)
+        else {
+          errors.push(`${where}: the heading ${JSON.stringify(h)} comes before any question or term of its list`)
+          continue
+        }
         warnings.push(`${where}: the heading ${JSON.stringify(h.slice(0, 60))} inside a list was taken as the text of the ${last !== undefined ? 'question' : 'term'} before it`)
         continue
       }
