@@ -86,7 +86,7 @@ export function strongKeyOfDStrong(dStrong: string): string | null {
 }
 
 /** The part of a Strong key two sources can share: the letter and the four digits of the number (`G54850` is `G5485`). */
-const strongBase = (key: string): string | null => {
+export const strongBase = (key: string): string | null => {
   const m = /^([HG])(\d+)/.exec(key.slice(key.lastIndexOf(':') + 1))
   if (m === null) return null
   // Greek: the first four digits, leading zeros kept (`G00110` is `G0011`); Hebrew: the number, padded to four digits

@@ -181,6 +181,21 @@ fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
 - **`aliases`**: the name of each alias record of `P` in `L` (its note dropped: `P` has its own), to `P`; only when it is not
   `P`'s name in `L` (the rule above, with `names`), its English title, or the first `map` name in `L` of a `tw:names/` concept
   joined to `P`. Two alias records with the same name are one key with all their people.
+  - **Not an alias that mostly means someone else.** Let `Q` be, of the other people the name finds in `L` without the
+    aliases (their name in `L`, their English title, the first `map` name of a `tw:names/` concept joined to them), the one in
+    the most verses (the `xtopics` counts; ties: the first by id). The alias is left out when TIPNR calls `P` by it in at most
+    a tenth of `Q`'s verses while `P` is in more than a tenth of them. "TIPNR calls `P` by it" counts the distinct verses of
+    `P`'s TIPNR name lines whose name (the part before `|` of the line's key; a line may list several spellings, separated by
+    commas) is the English name of the alias record, or whose dStrong has the Strong number of one of `Q`'s Strong keys (letter
+    and four digits, as for `same-as`). Example: ACAI makes «David» an alias of Judah from a textual variant TIPNR lists in one
+    verse (2 Chronicles 25:28), while David is in 964 verses and Judah in 1022: a client's ten-times rule on all their verses
+    could not choose, so «David» is not stored for Judah. «Simon» for Peter (45 verses) and «Jehoram» for Joram (filed under
+    Joram's line of H3088) stay. The build report lists what is left out.
+    The rule does not apply (the alias stays) when the alias record has no English name, when `P` has no TIPNR record, or
+    when `Q` is in no verse; a build without TIPNR records (none given, or an empty list) or without counts weighs no alias
+    and says so. The names compared are those of `L`, so the result can differ between languages: in English «Saul» for
+    Paul is left out (King Saul is in 327 verses, TIPNR calls Paul «Saul» in 22), while in Spanish «Saulo» finds no one else
+    and stays. `notes` are decided after this, so an alias left out no longer makes a note.
 - **`notes`**: the note of `P`'s label in `L`, only when `P`'s name in `L` is a name another person can also be found by in
   `L`: that person's name in `L`, an alias in `L`, the first `map` name in `L` of a `tw:names/` concept joined to it, or its
   English title; compared byte for byte. There the note tells the two apart.
