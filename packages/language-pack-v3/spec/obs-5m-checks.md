@@ -83,7 +83,11 @@ The reference reader is `src/source/obsTf.ts` (`parseObsTf`); it reads no disk a
 same model. The headings are those of the language: `OBS_TF_HEADINGS` has the English ones (`en_obs-tf`) and the Indonesian ones
 (`id_obs-tf`, a conversion of PDFs: some headings come in two wordings, with another case or hyphenation, and a title split in two
 by the conversion is joined). A heading matches a text when it starts with it, ignoring case, accents, hyphens and spacing. A
-language with no table of headings is an error, not a guess. The rest of this section is written for the English manual; the
+language with no table of headings is an error, not a guess. A third-level heading that no list and no block of the language uses is an error too
+(it would lose its questions without a word), with one exception: inside the list of observation questions or of terms, one that the
+conversion turned into a heading (a line of an answer) is the text of the question or term before it, and the report says so. The headings
+of the Indonesian manual include the wordings of its conversion (`Penafsiran Alkitab(iah)`, `Interpretasi Alkitab`, `Percakapan Teologis`,
+and the misspellings `Terjemahan` and `Diskurus` for `Penerjemahan` and `Diskursus`). The rest of this section is written for the English manual; the
 Indonesian one differs only where it says so.
 
 - **Files.** `obs_story_{N}.md` for each story present (the coverage is the stories read), `transclusions/{name}.md`, and
@@ -106,7 +110,9 @@ file (`# Studi Komunitas…`, `# Pemeriksaan Tim`, `# Praktik Pelayanan…`, `# 
 `# Kesimpulan`) instead of `![[…]]` lines. Such a section runs from its heading to the next heading of the first or second level, with
 the sections below it; it becomes a row with `shared` whose `tf-shared` key is `obs_story_N.md#{its heading}`, so each story has its
 own. A second-level heading that no part uses, right after such a heading, is the rest of a split title and stays in the block. A
-first-level heading that no block of the language uses is an error. A transclusion that follows such a section is a row of its own
+first-level heading that no block of the language uses is an error. The conversion sometimes levelled such a heading as a third-level one
+  inside a part (`### Pemeriksaan Tim` under `## Refleksi Pribadi`): a third-level heading that a block of the language names is a block too, and runs to the next
+  heading of the third level or above. A transclusion that follows such a section is a row of its own
 and is not left in the block text. The check that every transclusion became a row counts only the `![[…]]` lines.
 - **Transclusions** `![[name]]` (shared blocks: `movement_2_drafting`, `movement_3_checking`, `movement_4`, `movement_5`,
   `conclusion` and `obs-devotionals-unit-N#Community Study…`) become a row with `shared`. `![[file#heading]]` takes the

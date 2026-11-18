@@ -317,6 +317,31 @@ Selesai.
       expect(r.warnings.filter((w) => w.includes('title differs') || w.includes('reference differs'))).toEqual([])
     })
 
+    test('a second-level heading that no part uses is the rest of a split title only right after the heading; a block twice is an error', () => {
+      // after the text of a block has begun, an unknown second-level heading is not absorbed: it is an unknown part
+      const lost = idStory.replace('## Percakapan Teologis: Membahas', '## Dialog Teologi: Membahas')
+      expect(parseObsTf(idFiles({ 'obs_story_1.md': lost }), 'unfoldingWord/id/obs-tf', idObs, 'id').errors.join('\n')).toContain('the part heading "Dialog Teologi: Membahas" is not known')
+      const twice = idStory.replace('# Kesimpulan', '# Pemeriksaan Tim')
+      expect(parseObsTf(idFiles({ 'obs_story_1.md': twice }), 'unfoldingWord/id/obs-tf', idObs, 'id').errors.join('\n')).toContain('is in the story twice')
+    })
+
+    test('a block the conversion levelled as third-level, a variant misspelling, a line of an answer turned into a heading, and an unknown third-level heading', () => {
+      const levelled = idStory.replace('# Pemeriksaan Tim\nPeriksa bersama.\n\n### Langkah\nSatu.\n', '### Pemeriksaan Tim\nPeriksa bersama.\n').replace('# Praktik Pelayanan', '### Praktik Pelayanan')
+      const r = parseObsTf(idFiles({ 'obs_story_1.md': levelled }), 'unfoldingWord/id/obs-tf', idObs, 'id')
+      expect(r.errors).toEqual([])
+      expect(r.model.shared.find((b) => b.key === 'obs_story_1.md#Pemeriksaan Tim')!.text).toBe('Periksa bersama.')
+      expect(r.model.parts.some((b) => b.part === 'checking' && b.shared === 'obs_story_1.md#Pemeriksaan Tim')).toBe(true)
+      const typo = idStory.replace('### Pertanyaan-pertanyaan Diskursus', '### Pertanyaan-pertanyaan Diskurus').replace('### Pertanyaan-Pertanyaan Penerjemahan', '### Pertanyaan-Pertanyaan terjemahan')
+      expect(parseObsTf(idFiles({ 'obs_story_1.md': typo }), 'unfoldingWord/id/obs-tf', idObs, 'id').model.questions.some((q) => q.list === 'discourse')).toBe(true)
+      const glued = idStory.replace('Allah.\n\n### Pertanyaan-Pertanyaan Penerjemahan', 'Allah.\n### Dan Ia melihatnya baik.\n\n### Pertanyaan-Pertanyaan Penerjemahan')
+      const g = parseObsTf(idFiles({ 'obs_story_1.md': glued }), 'unfoldingWord/id/obs-tf', idObs, 'id')
+      expect(g.errors).toEqual([])
+      expect(g.model.questions[0].a).toBe('Allah.\nDan Ia melihatnya baik.')
+      expect(g.warnings.some((w) => w.includes('taken as the text of the question before it'))).toBe(true)
+      const unknown = idStory.replace('### Refleksi Jurnal', '### Lain Lagi')
+      expect(parseObsTf(idFiles({ 'obs_story_1.md': unknown }), 'unfoldingWord/id/obs-tf', idObs, 'id').errors.join('\n')).toContain('is not a heading of a list or a block')
+    })
+
     test('a first-level heading that no block uses is an error; a language with no headings is an error', () => {
       const bad = idStory.replace('# Kesimpulan', '# Lain')
       expect(parseObsTf(idFiles({ 'obs_story_1.md': bad }), 'unfoldingWord/id/obs-tf', idObs, 'id').errors.join('\n')).toContain('the first-level heading "Lain" is not known')

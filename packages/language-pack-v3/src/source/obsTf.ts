@@ -86,8 +86,8 @@ export const OBS_TF_HEADINGS: Record<string, ObsTfHeadings> = {
     parts: { m1: ['Penafsiran Alkitab', 'Interpretasi Alkitab'], m2: ['Dialog Teologis', 'Percakapan Teologis'], m3: ['Refleksi Pribadi'] },
     lists: {
       observation: ['Pertanyaan-Pertanyaan Observasi'],
-      terms: ['Pertanyaan-Pertanyaan Penerjemahan'],
-      discourse: ['Pertanyaan-Pertanyaan Diskursus'],
+      terms: ['Pertanyaan-Pertanyaan Penerjemahan', 'Pertanyaan-Pertanyaan Terjemahan'],
+      discourse: ['Pertanyaan-Pertanyaan Diskursus', 'Pertanyaan-Pertanyaan Diskurus'],
       theology: ['Pertanyaan-Pertanyaan Teologis'],
       journal: ['Refleksi Jurnal'],
     },
@@ -230,8 +230,8 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
 
     let mode = ''
     const intro: string[] = []
-    // A block of the story itself (`H.blocks`): its first-level heading, and the sections below it up to the next heading of the first or second level.
-    let open: { part: string; head: string; text: string } | undefined
+    // A block of the story itself (`H.blocks`): its heading (first level, or third when the conversion levelled it so), and the sections below it up to the next heading of its level or above (never below the second).
+    let open: { part: string; head: string; text: string; level: number } | undefined
     const closeBlock = (): void => {
       if (open === undefined) return
       const key = `${file}#${open.head}`
@@ -247,29 +247,31 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
     }
     for (const s of secs) {
       const h = s.head
-      // A heading of the second level that no part uses, right after a block's heading, is the rest of a title that the conversion split in two.
+      // A heading of the second level that no part uses, right after a block's heading and before any of its text, is the rest of a title that the conversion split in two.
       const knownSecond = startsWithAny(h, H.intro) || (['m1', 'm2', 'm3'] as const).some((c) => startsWithAny(h, H.parts[c]))
-      if (open !== undefined && s.level === 2 && !knownSecond) {
+      if (open !== undefined && open.level === 1 && s.level === 2 && !knownSecond && open.text.trim() === '') {
         takeTransclusions(s.body)
         open.text += `## ${h}\n${withoutTransclusions(s.body)}`
         continue
       }
-      if (s.level >= 1 && s.level <= 2) closeBlock()
-      if (open !== undefined && s.level >= 3) {
+      if (open !== undefined && s.level <= Math.max(open.level, 2)) closeBlock()
+      if (open !== undefined) {
         takeTransclusions(s.body)
         open.text += `${'#'.repeat(s.level)} ${h}\n${withoutTransclusions(s.body)}`
         continue
       }
-      if (s.level === 1 && Object.keys(H.blocks).length > 0) {
+      if ((s.level === 1 || s.level === 3) && Object.keys(H.blocks).length > 0) {
         const part = Object.entries(H.blocks).find(([text]) => startsWithAny(h, [text]))?.[1]
-        if (part === undefined) {
+        if (part === undefined && s.level === 1) {
           errors.push(`${where}: the first-level heading ${JSON.stringify(h)} is not known`)
           continue
         }
-        mode = 'block'
-        takeTransclusions(s.body)
-        open = { part, head: h, text: withoutTransclusions(s.body) }
-        continue
+        if (part !== undefined) {
+          mode = 'block'
+          takeTransclusions(s.body)
+          open = { part, head: h, text: withoutTransclusions(s.body), level: s.level }
+          continue
+        }
       }
       if (s.level === 2 && startsWithAny(h, H.intro)) {
         mode = 'intro'
@@ -357,6 +359,20 @@ export function parseObsTf(files: ReadonlyMap<string, string>, res: string, obs:
         questions.push({ story: n, part: 'm2', list: 'discourse', k: nextK('m2'), frames: ids, q, ...(answer === '' ? {} : { a: answer }), ...(m && mapped.some((x) => x.corrected) ? { refText: m[2].trim() } : {}) })
         continue
       }
+      // A third-level heading that no list uses would lose its questions without a word: it is an error.
+      // In a list of questions or terms, one that the conversion turned into a heading is the text of the question or term before it.
+      if (s.level === 3 && (mode === 'm1:observation' || mode === 'm1:terms')) {
+        const last = mode === 'm1:observation' ? questions.filter((q) => q.story === n && q.list === 'observation').at(-1) : undefined
+        const lastTerm = mode === 'm1:terms' ? terms.filter((t) => Math.floor(t.frame / 100) === n).at(-1) : undefined
+        takeTransclusions(s.body)
+        const text = [h, ...paras(withoutTransclusions(s.body))].join('\n')
+        if (last !== undefined) last.a = last.a === undefined ? text : `${last.a}\n${text}`
+        else if (lastTerm !== undefined) lastTerm.text = `${lastTerm.text}\n\n${text}`
+        else errors.push(`${where}: the heading ${JSON.stringify(h)} comes before any question or term of its list`)
+        warnings.push(`${where}: the heading ${JSON.stringify(h.slice(0, 60))} inside a list was taken as the text of the ${last !== undefined ? 'question' : 'term'} before it`)
+        continue
+      }
+      if (s.level === 3 && mode !== '' && mode !== 'frames') errors.push(`${where}: the heading ${JSON.stringify(h)} is not a heading of a list or a block of this language`)
       if (s.level >= 1 && mode !== '') takeTransclusions(s.body)
     }
     closeBlock()
