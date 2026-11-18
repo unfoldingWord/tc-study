@@ -8,7 +8,8 @@ import { parseObsRefs } from '../../source/obsRefs'
 import { parseTheographic } from '../../source/theographic'
 import { parseTipnr } from '../../source/tipnr'
 import { xtopicsSegment } from './segment'
-import { buildXtopics, chapterLengths, strongKeyOfDStrong, type XtopicsSources } from './xtopics'
+import type { AcaiPerson } from '../../source/acai'
+import { buildXtopics, chapterLengths, foldTitle, strongKeyOfDStrong, type XtopicsSources } from './xtopics'
 
 const DATA = join(import.meta.dir, '../../../spec/tests/data/topics')
 
@@ -130,6 +131,60 @@ describe('buildXtopics: same-as', () => {
     expect(report.some((l) => l.startsWith('review: tw:names/sarah same-as'))).toBe(true)
     expect(report.some((l) => l.startsWith('review: tw:names/nobody same-as'))).toBe(true)
     expect(xtopicsView(xtopicsSegment(core))).toMatchObject({ relations: expect.anything() })
+  })
+})
+
+describe('buildXtopics: ACAI', () => {
+  const ACAI_RES: [string, string] = ['BibleAquifer/ACAI', '5375d0d3']
+  const p = (id: string, tipnr: string, gender: 0 | 1 | 2, tw: string[] = []): AcaiPerson => ({ id, primary: id, tipnr: [tipnr], tw, gender, labels: {} })
+  const people = [
+    p('person:Abraham', 'Abraham@Gen.11.26-1Pe', 1, ['Abraham']),
+    p('person:Isaac', 'Isaac@Gen.17.19-Jas', 1, ['Isaac', 'Nobody']),
+    p('person:Rebekah', 'Rebekah@Gen.22.23-Rom', 0),
+    p('person:Sarah', 'Sarah@Gen.11.29-1Pe', 2, ['Sarah']),
+  ]
+  const twNames = new Map([
+    ['tw:names/abraham', { strongs: ['H0085'], verses: [verseId('gen', 17, 5)] }],
+    ['tw:names/sarah', { strongs: ['H8283'], verses: [verseId('exo', 1, 1)] }],
+  ])
+  const twTitles = new Map([
+    ['tw:names/abraham', 'Abraham, Abram'],
+    ['tw:names/sarah', 'Sarah, Sarai'],
+    ['tw:names/isaac', 'Isaac'],
+  ])
+  function withAcai(acai: AcaiPerson[] | undefined) {
+    const issues: string[] = []
+    const tipnr = parseTipnr(readFileSync(join(DATA, 'tipnr-subset.txt'), 'utf8'), issues)
+    const events = parseTheographic(theographicFixture(), issues)
+    const obs = parseObsRefs(obsStories(), issues, chapterLengths(origs))
+    return buildXtopics({ tipnr, events, obs, outlines: new Map(), origs, res: { ...RES, acai: ACAI_RES }, twNames, twTitles, acai })
+  }
+  const { core, parts, report } = withAcai(people)
+
+  test('gender: 1 man, 2 woman, nothing for no data; the column reads back', () => {
+    expect(core.gender).toEqual({ 'per:abraham': 1, 'per:isaac': 1, 'per:sarah': 2 })
+    expect((xtopicsView(xtopicsSegment(core)) as typeof core).gender).toEqual(core.gender)
+  })
+  test('same-as of ACAI only for a tW name TIPNR joined to no one, confidence 75; the rest to the review list', () => {
+    const same = core.relations!.filter((r) => r.type === 'same-as')
+    expect(same).toEqual([
+      { from: 'tw:names/abraham', to: 'per:abraham', type: 'same-as', source: 'STEPBible/TIPNR', confidence: 70 },
+      { from: 'tw:names/isaac', to: 'per:isaac', type: 'same-as', source: 'BibleAquifer/ACAI', confidence: 75 },
+      { from: 'tw:names/sarah', to: 'per:sarah', type: 'same-as', source: 'BibleAquifer/ACAI', confidence: 75 },
+    ])
+    expect(report).toContain('review: acai person:Isaac (per:isaac) tW "Nobody": no tw:names/ article has that title')
+    expect(report).toContain('acai: 2 same-as added from the tW titles of ACAI, 1 left to the TIPNR rule')
+  })
+  test('ACAI is in res of the core; the parts are the same bytes as without it', () => {
+    expect(core.res.map(([k]) => k)).toContain('BibleAquifer/ACAI')
+    const without = withAcai(undefined)
+    expect(without.core.res.map(([k]) => k)).not.toContain('BibleAquifer/ACAI')
+    expect(without.core.gender).toBeUndefined()
+    expect(parts.map((x) => xtopicsSegment(x))).toEqual(without.parts.map((x) => xtopicsSegment(x)))
+  })
+  test('foldTitle', () => {
+    expect(foldTitle('Abi-Albon')).toBe('abialbon')
+    expect(foldTitle(' Ésaü ')).toBe('esau')
   })
 })
 

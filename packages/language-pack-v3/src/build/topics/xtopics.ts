@@ -23,6 +23,7 @@ import { compareCodePoints } from '../../codec/columns'
 import type { CountRows } from '../../codec/counts'
 import { bookNumber, BOOKS, verseId } from '../../ids'
 import type { OrigModel, Relation, Topic, XtopicsCore, XtopicsPart } from '../../model'
+import { type AcaiPerson, joinAcai } from '../../source/acai'
 import type { TheoEvent } from '../../source/theographic'
 import type { TipnrRecord, TipnrRelationType } from '../../source/tipnr'
 import { Tally } from '../maps/tally'
@@ -36,6 +37,7 @@ export type XtopicsSources = {
   theographic: [string, string]
   obs: [string, string]
   outlines?: [string, string]
+  acai?: [string, string]
 }
 
 /** The key of the builder's list of events (`ids.md`, "Ids of events") and its release. */
@@ -56,6 +58,17 @@ const RELATION_OF: Record<TipnrRelationType, string> = {
   inhabitant: 'inhabitant-of',
 }
 const SYMMETRIC = new Set(['sibling-of', 'partner-of'])
+
+/**
+ * A title as the `same-as` of ACAI compares it (`ids.md`, "People of ACAI"): lowercase, no diacritics, only letters and digits
+ * (`Abi-Albon` and `abialbon` are the same).
+ */
+export const foldTitle = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '')
 
 /** The book code of a verse id. */
 const bookOf = (verse: number): string => BOOKS[Math.floor(verse / 1_000_000) - 1]
@@ -103,6 +116,10 @@ export function buildXtopics(o: {
   origs: OrigModel[]
   res: XtopicsSources
   twNames?: Map<string, TwName>
+  /** The English titles of the `tw:names/` concepts (the tW of the map language), for the `same-as` of ACAI. */
+  twTitles?: Map<string, string>
+  /** The ACAI people ({@link parseAcai}): the `gender` table and the `same-as` of ACAI. Needs `res.acai`. */
+  acai?: AcaiPerson[]
 }): { core: XtopicsCore; parts: XtopicsPart[]; report: string[] } {
   const report: string[] = []
   const review = (line: string): void => {
@@ -312,8 +329,64 @@ export function buildXtopics(o: {
     }
   }
 
+  // ACAI: the gender of each person it joins, and a same-as from a tW name no TIPNR record was joined to
+  const gender: Record<string, 1 | 2> = {}
+  let acaiUsed = false
+  if (o.acai !== undefined) {
+    if (o.res.acai === undefined) throw new Error('acai: the people of ACAI need res.acai (its key and release)')
+    const acaiKey = o.res.acai[0]
+    const perOfRef = new Map<string, string>()
+    for (const [id, t] of [...topics].sort((a, b) => compareCodePoints(a[0], b[0]))) {
+      if (t.kind !== 'person' || !id.startsWith('per:')) continue
+      if (perOfRef.has(t.ref)) report.push(`review: acai: ${perOfRef.get(t.ref)} and ${id} have the same TIPNR name ${t.ref}: ACAI joins ${id}`)
+      perOfRef.set(t.ref, id)
+    }
+    const joined = joinAcai(o.acai, perOfRef, report)
+    for (const [per, p] of [...joined.byPer].sort((a, b) => compareCodePoints(a[0], b[0]))) if (p.gender !== 0) gender[per] = p.gender
+    if (Object.keys(gender).length > 0) acaiUsed = true
+    if (o.twTitles === undefined) report.push('acai: no tW titles (no map language): no same-as of ACAI')
+    else {
+      const linked = new Set(relations.filter((r) => r.type === 'same-as').map((r) => r.from))
+      const byFolded = new Map<string, Set<string>>()
+      const index = (text: string, concept: string): void => {
+        const f = foldTitle(text)
+        if (f === '') return
+        let set = byFolded.get(f)
+        if (set === undefined) byFolded.set(f, (set = new Set()))
+        set.add(concept)
+      }
+      for (const [concept, title] of o.twTitles) {
+        if (!concept.startsWith('tw:names/')) continue
+        index(concept.slice('tw:names/'.length), concept)
+        index(title, concept)
+        for (const piece of title.split(',')) index(piece, concept)
+      }
+      let kept = 0
+      let added = 0
+      for (const [per, p] of [...joined.byPer].sort((a, b) => compareCodePoints(a[0], b[0]))) {
+        for (const title of p.tw) {
+          const found = [...(byFolded.get(foldTitle(title)) ?? [])].sort(compareCodePoints)
+          if (found.length !== 1) {
+            review(`acai ${p.id} (${per}) tW ${JSON.stringify(title)}: ${found.length === 0 ? 'no tw:names/ article has that title' : `${found.length} articles (${found.join(', ')})`}`)
+            continue
+          }
+          if (linked.has(found[0])) {
+            if (!relations.some((r) => r.type === 'same-as' && r.from === found[0] && r.to === per)) review(`acai ${p.id} (${per}) tW ${found[0]}: the article is joined by TIPNR to another person: kept`)
+            kept++
+            continue
+          }
+          relate(found[0], 'same-as', per, acaiKey, 75)
+          added++
+          acaiUsed = true
+        }
+      }
+      report.push(`acai: ${added} same-as added from the tW titles of ACAI, ${kept} left to the TIPNR rule`)
+    }
+  }
+
   // The core and the parts
   const sources: [string, string][] = [o.res.tipnr, o.res.theographic, o.res.obs]
+  if (acaiUsed) sources.push(o.res.acai!)
   if (builderUsed) sources.push(BUILDER_SOURCE)
   if (o.res.outlines !== undefined && [...topics.values()].some((t) => t.source === outlineKey)) sources.push(o.res.outlines)
   const res = sources.map(([k, r]) => [k, r] as [string, string]).sort((a, b) => compareCodePoints(a[0], b[0]))
@@ -334,6 +407,7 @@ export function buildXtopics(o: {
     occurrences,
   }
   if (relations.length > 0) core.relations = relations
+  if (Object.keys(gender).length > 0) core.gender = gender
   if (Object.keys(strongs).length > 0) core.strongs = strongs
   if (Object.keys(ranges).length > 0) core.ranges = ranges
   const parts: XtopicsPart[] = []

@@ -1052,6 +1052,17 @@
       "path": "templates/OBS/10/50.md",
       "sha256": "7f1540afbc10fec70535ae1b8d7ed58550711c25bc6134617e425629f2bcb778",
       "target": "bsb_obs/10/50.md"
+    },
+    {
+      "name": "acai-people",
+      "repository": "BibleAquifer/ACAI",
+      "host": "github",
+      "commit": "5375d0d334bb6d635ef1813e4d3df58eb30efcca",
+      "path": "people/json/",
+      "tree": "acai",
+      "manifestSha256": "9ba49ab18be3a8feb01e467d537d464d7e7bcc4a33a85fe1330f5a58aac38633",
+      "sha256": "84d1f2dc8946a80c2d8d1cb9f5f54baf22dba3c38f331c39fed3f1be3f662ff4",
+      "target": "acai/people.json"
     }
   ]
 }

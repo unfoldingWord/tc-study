@@ -124,3 +124,7 @@ These are in the phase 0 sample, and a later task may need them:
 - `topics/obs-refs.txt`: the closing line `_A Bible story from: …_` of stories 1, 10 and 50 of "unfoldingWord® Open Bible Stories",
   English v9 (https://git.door43.org/unfoldingWord/en_obs), copyright © 2023 unfoldingWord, CC BY-SA 4.0
   (https://creativecommons.org/licenses/by-sa/4.0/). The `obsRefs` reader test uses it. The whole text is not in the repository.
+- `topics/acai-people.json`: a trimmed ACAI file (`src/source/acai.ts`, `trimAcai`) for 14 people of the family of Abraham and one
+  Zechariah, in the shape of ACAI's `people/json/` files but written by hand (`make-acai-people.ts` writes it; nothing is copied from
+  ACAI), with a made-up commit. Not every person is a record of `tipnr-subset.txt`: the others are the ACAI records a build finds no
+  TIPNR person for. The tests of the CLI and the old-client check use it.

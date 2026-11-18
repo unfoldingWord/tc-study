@@ -1,0 +1,60 @@
+{
+  "coverage": {
+    "BibleAquifer/ACAI": {
+      "whole": []
+    },
+    "es-419_gl/es-419/glt": {
+      "whole": [
+        "gen"
+      ]
+    }
+  },
+  "h": {
+    "class": "topics",
+    "lang": "es-419",
+    "part": "core",
+    "res": [
+      [
+        "BibleAquifer/ACAI",
+        "5375d0d3"
+      ],
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "names": [
+        1,
+        true
+      ],
+      "people": [
+        1,
+        false
+      ]
+    },
+    "v": 1
+  },
+  "id": "e0e98909727d6d21b4c0812eb66366b8400221e9df85e2c42a65481678f72c37",
+  "names": {
+    "per:isaac": [
+      [
+        "Isaac",
+        "alignment",
+        3,
+        [
+          "gen"
+        ]
+      ]
+    ]
+  },
+  "people": {
+    "aliases": {},
+    "names": {},
+    "notes": {}
+  }
+}
