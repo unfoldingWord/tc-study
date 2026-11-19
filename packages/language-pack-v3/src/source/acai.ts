@@ -153,3 +153,86 @@ export function joinAcai(
   )
   return { byPer, aliases }
 }
+
+/**
+ * One place record of ACAI (`places/json/`), trimmed. `id` and `primary` are ACAI's own ids (`place:Bethel`); a record whose `primary` is
+ * another id is an alias record. `tipnr`: the TIPNR names ACAI gives (`Luz|Bethel@Gen.12.8-Zec`), as ACAI writes them. `tw`: the titles of
+ * the uW Translation Words articles ACAI names. `types`: `place_types.acai` in ACAI's order (the first is the one the map form is taken
+ * from), each trimmed. `labels`: the preferred label per ACAI language code (the six of Mini), in NFC.
+ */
+export type AcaiPlace = { id: string; primary: string; tipnr: string[]; tw: string[]; types: string[]; labels: Record<string, string> }
+
+/** One ACAI file's record (an object, or a list whose first item is the record), trimmed; `undefined` when it is not a place record. */
+function trimOnePlace(json: unknown): AcaiPlace | undefined {
+  const d = Array.isArray(json) ? json[0] : json
+  if (!isRecord(d) || typeof d.id !== 'string' || !d.id.startsWith('place:')) return undefined
+  const alt = isRecord(d.alternate_sources) ? d.alternate_sources : {}
+  const tw = strings(alt.aquifer)
+    .map((a) => a.split('|'))
+    .filter((p) => p.length === 3 && p[2] === 'UWTranslationWords' && p[1].trim() !== '')
+    .map((p) => nfc(p[1]))
+  const labels: Record<string, string> = {}
+  const loc = isRecord(d.localizations) ? d.localizations : {}
+  for (const code of [...KEEP_LANGS].sort(compareCodePoints)) {
+    const l = loc[code]
+    if (isRecord(l) && typeof l.preferred_label === 'string' && nfc(l.preferred_label) !== '') labels[code] = nfc(l.preferred_label)
+  }
+  const pt = isRecord(d.place_types) ? d.place_types : {}
+  return {
+    id: d.id,
+    primary: typeof d.primary_id === 'string' && d.primary_id !== '' ? d.primary_id : d.id,
+    tipnr: [...new Set(strings(alt.tipnr).map((t) => t.trim()))].sort(compareCodePoints),
+    tw: [...new Set(tw)].sort(compareCodePoints),
+    types: strings(pt.acai)
+      .map((t) => t.trim())
+      .filter((t) => t !== ''),
+    labels,
+  }
+}
+
+/**
+ * The trimmed text of the ACAI places: the files of `places/json/` (path to text), each read as JSON. Keeps only `id`, `primary_id`,
+ * `alternate_sources.tipnr`, the `UWTranslationWords` titles, `place_types.acai` and the `preferred_label` of the six languages. A file that
+ * is not JSON or not a place record goes to `issues` and is left out. Records sorted by id; the same files give the same text.
+ * ({@link trimAcai}, which reads the people, is not changed.)
+ */
+export function trimAcaiPlaces(files: Map<string, string>, commit: string, issues: string[]): string {
+  const places: AcaiPlace[] = []
+  const seen = new Set<string>()
+  for (const path of [...files.keys()].sort(compareCodePoints)) {
+    let json: unknown
+    try {
+      json = JSON.parse(files.get(path)!)
+    } catch {
+      issues.push(`acai: ${path} is not JSON: left out`)
+      continue
+    }
+    const p = trimOnePlace(json)
+    if (p === undefined) issues.push(`acai: ${path} is not a place record: left out`)
+    else if (seen.has(p.id)) issues.push(`acai: ${path}: ${p.id} is twice: the second is left out`)
+    else {
+      seen.add(p.id)
+      places.push(p)
+    }
+  }
+  places.sort((a, b) => compareCodePoints(a.id, b.id))
+  return `${JSON.stringify({ source: ACAI_SOURCE.key, commit, places })}\n`
+}
+
+/** The places of a trimmed ACAI text ({@link trimAcaiPlaces}). Throws `Error` when the text is not one. */
+export function parseAcaiPlaces(text: string): { commit: string; places: AcaiPlace[] } {
+  const d: unknown = JSON.parse(text)
+  if (!isRecord(d) || d.source !== ACAI_SOURCE.key || typeof d.commit !== 'string' || !Array.isArray(d.places)) {
+    throw new Error('not a trimmed ACAI places file (acai/places.json): run fetch-topic-sources again')
+  }
+  const places = d.places.map((p, i) => {
+    if (!isRecord(p) || typeof p.id !== 'string' || typeof p.primary !== 'string' || !isRecord(p.labels)) {
+      throw new Error(`acai/places.json: record ${i} is not a trimmed place`)
+    }
+    const labels: Record<string, string> = {}
+    for (const [k, v] of Object.entries(p.labels)) if (typeof v === 'string') labels[k] = v
+    return { id: p.id, primary: p.primary, tipnr: strings(p.tipnr), tw: strings(p.tw), types: strings(p.types), labels }
+  })
+  places.sort((a, b) => compareCodePoints(a.id, b.id))
+  return { commit: d.commit, places }
+}

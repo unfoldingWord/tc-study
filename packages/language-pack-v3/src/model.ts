@@ -445,7 +445,28 @@ export type XtopicsCore = {
    * segment holds it as a column aligned with `topics.ids` (0 for no data and for every topic that is not a person).
    */
   gender?: Record<string, 1 | 2>
+  /**
+   * The point, certainty and form of each place (`geo`; `xtopics.cddl` and `ids.md`, "Builder rules: geo"): per topic of kind place (every one has an
+   * entry). The segment holds it as four columns aligned with `topics.ids`, 0 for every topic that is not a place.
+   */
+  geo?: Record<string, GeoPoint>
+  /** The routes of the builder's list (`routes`; `xtopics.cddl` and `ids.md`, "Builder rules: routes"), in the order they are shown (not sorted). */
+  routes?: Route[]
 }
+
+/** The values of `GeoPoint.sure`: 0 no point, 1 low, 2 medium, 3 high. */
+export type GeoSure = 0 | 1 | 2 | 3
+/** The values of `GeoPoint.form`: 1 point, 2 area, 3 water, 4 height, 5 port (a point that is also a seaport). */
+export type GeoForm = 1 | 2 | 3 | 4 | 5
+
+/**
+ * The `geo` row of a place. `lat` and `lon` are degrees x 100 rounded to an integer (0.01 degrees, about 1 km): latitude -9000 to 9000, longitude
+ * -18000 to 18000; both 0 when `sure` is 0 (0, 0 with `sure` above 0 is a valid point).
+ */
+export type GeoPoint = { lat: number; lon: number; sure: GeoSure; form: GeoForm }
+
+/** A route of `routes`: the event (a topic of kind event) and its stops (topics of kind place) in travel order, 2 or more, a place never twice in a row. */
+export type Route = { event: string; stops: string[] }
 
 /** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */
 export type XtopicsPart = { part: string; occurrences: VerseLists }
@@ -463,6 +484,8 @@ export type TopicsCore = {
   coverage: Coverage
   /** What this language calls people where the pack cannot derive it (`people`, from ACAI; `topics.cddl` and `ids.md`, "Names of people"). */
   people?: TopicsPeople
+  /** What this language calls places where the pack cannot derive it (`places`, from ACAI; same shape and rules as `people`, with `lug:` ids). */
+  places?: TopicsPlaces
 }
 
 /**
@@ -472,6 +495,17 @@ export type TopicsCore = {
  * where the language cannot derive it. Each map may be empty.
  */
 export type TopicsPeople = { names: Record<string, string>; notes: Record<string, string>; aliases: Record<string, string[]> }
+
+/** The table `places` of a language's topics core: the shape of {@link TopicsPeople} with `lug:` ids (`topics.cddl`, `ids.md`, "Builder rules: places names"). */
+export type TopicsPlaces = TopicsPeople
+
+/**
+ * The bytes of the complement kind `basemap`, version 1, as a model (`catalog.md`, "The basemap complement"). `bbox` is
+ * `[west, south, east, north]` in degrees x 100. Each path is closed (`layer` 1 land, 2 lake: 3 points or more, the first point not repeated at the end)
+ * or open (`layer` 3 river: 2 points or more); every point `[x, y]` (longitude, latitude, degrees x 100) is inside `bbox`.
+ */
+export type Basemap = { bbox: [west: number, south: number, east: number, north: number]; paths: BasemapPath[] }
+export type BasemapPath = { layer: 1 | 2 | 3; points: [x: number, y: number][] }
 
 /** The part of one book: the verses each topic's alignment names were taken from. */
 export type TopicsPart = { lang: string; part: string; names?: VerseLists }
