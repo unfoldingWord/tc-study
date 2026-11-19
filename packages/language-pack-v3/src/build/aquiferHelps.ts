@@ -26,7 +26,7 @@ import { uniqueIds } from './bookHelps'
 // Input shapes (the fields of the Aquifer JSON that are read)
 
 type Passage = { start_ref?: string; end_ref?: string }
-type AssociatedResource = { content_id?: string | number; resource_code?: string; label?: string }
+type AssociatedResource = { content_id?: string | number; reference_id?: string | number; resource_code?: string; label?: string }
 /** An article of an Aquifer resource (`{book}.content.json` is an array of them). */
 export type AquiferArticle = {
   content_id: string | number
@@ -44,6 +44,24 @@ export type EnTaTitles = { tag?: string; titles: Record<string, string>; ambiguo
 export const MANUAL_CODE = 'UWTranslationManual'
 
 // The TA map
+
+/**
+ * A stand-in for a Manual Aquifer does not publish in a language (es-419 has none): the Manual articles the notes themselves are associated
+ * with (`associations.resource` with the Manual code), each with its `content_id`, its `reference_id` (the one of its English twin) and its
+ * label as the title. `buildTaMap` takes it as the language's Manual. A `content_id` seen twice keeps the first `reference_id`; a resource with no
+ * `content_id` or no `reference_id` is left out (its links stay text).
+ */
+export function taFromNotes(notes: readonly AquiferArticle[]): TaArticle[] {
+  const seen = new Map<string, TaArticle>()
+  for (const note of notes) {
+    for (const r of note.associations?.resource ?? []) {
+      if (r.resource_code !== MANUAL_CODE || r.content_id === undefined || r.reference_id === undefined) continue
+      const id = String(r.content_id)
+      if (!seen.has(id)) seen.set(id, { content_id: id, reference_id: r.reference_id, ...(r.label === undefined ? {} : { title: r.label }) })
+    }
+  }
+  return [...seen.values()]
+}
 
 /** Why an article of the Hindi Manual has no `ta:` id. */
 export type TaUnmatched = { contentId: string; title: string; reason: 'no-english-article' | 'no-door43-title' | 'ambiguous-title' }

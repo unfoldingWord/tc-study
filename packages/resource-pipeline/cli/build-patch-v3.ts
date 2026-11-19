@@ -2,12 +2,15 @@
  * Build the signed patch catalog of an aggregator (format 3, `spec/catalog.md`, "Patch catalogs"): the Aquifer notes and questions that
  * Door43 production lacks, as `book` segments of the catalog `{lang}-x-{source}`.
  *
- *   bun packages/resource-pipeline/cli/build-patch-v3.ts --lang hi --source aquifer --tn <dir> --tq <dir> --ta <dir> --ta-eng <dir>
+ *   bun packages/resource-pipeline/cli/build-patch-v3.ts --lang hi --source aquifer --tn <dir> [--tq <dir>] [--ta <dir>] --ta-eng <dir>
  *     --en-ta-titles <file.json> --base-books <file.json> --common <dir> --out <dir>
  *     [--sign-key <pem>] [--revision <n>] [--previous <64 hex>] [--published <url>] [--trusted <hex>] [--books tit,rut] [--built <RFC 3339>] [--publisher <name>]
  *
  * - `--tn`, `--tq`: what `fetch-aquifer.ts` wrote for UWTranslationNotes / UWTranslationQuestions (`json/NN.content.json`, `resource_metadata.json`,
  *   `manifest.json`); `--ta`, `--ta-eng`: the same for UWTranslationManual in the language and in English (every `json/*.content.json` is read).
+ *   `--tq` is left out for a language with no questions in Aquifer (es-419), and `--ta` for one with no Manual (es-419): the Manual articles the notes
+ *   themselves link to (`associations.resource`, with the `reference_id` of the English twin) then stand in for it (`taFromNotes`). `--lang` is a language tag
+ *   such as `hi` or `es-419` (no `-x-` suffix).
  * - `--en-ta-titles`: what `fetch-en-ta-titles.ts` wrote. `--base-books`: `{ "tn": [books], "tq": [books] }`, the books Door43 production already
  *   has (`door43-books.ts` writes it). A table of a book goes in only if Door43 lacks it; a book with neither table is not built.
  * - `--published`: the base URL of a packs Worker. Its published `{lang}-x-{source}` catalog is read (signature checked); if there is one the revision is its
@@ -43,6 +46,7 @@ import {
   readHeader,
   readSegment,
   signCatalog,
+  taFromNotes,
   verifyCatalog,
 } from '@bt-synergy/language-pack-v3'
 import { readSigningKey } from '../src/language/signKey'
@@ -50,7 +54,7 @@ import { readSigningKey } from '../src/language/signKey'
 export class UsageError extends Error {}
 
 export const USAGE =
-  'Usage: build-patch-v3 --lang <code> --source <name> --tn <dir> --tq <dir> --ta <dir> --ta-eng <dir> --en-ta-titles <file> --base-books <file> --common <dir> --out <dir>\n' +
+  'Usage: build-patch-v3 --lang <code> --source <name> --tn <dir> [--tq <dir>] [--ta <dir>] --ta-eng <dir> --en-ta-titles <file> --base-books <file> --common <dir> --out <dir>\n' +
   '  [--sign-key <pem>] [--revision <n>] [--previous <64 hex digits>] [--published <url>] [--trusted <hex>] [--books tit,rut] [--built <RFC 3339>] [--publisher <name>]'
 
 type Io = { log: (line: string) => void; error: (line: string) => void }
@@ -62,8 +66,10 @@ type Options = {
   lang: string
   source: string
   tn: string
-  tq: string
-  ta: string
+  /** `undefined` when not given: the language has no questions in Aquifer. */
+  tq?: string
+  /** `undefined` when not given: the Manual stand-in is taken from the notes' own associations (`taFromNotes`). */
+  ta?: string
   taEng: string
   enTaTitles: string
   baseBooks: string
@@ -98,14 +104,14 @@ export function optionsFromArgs(argv: string[]): Options {
     return value
   }
   const lang = need('lang')
-  if (!/^[a-z]{2,3}$/.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language code of 2 or 3 lowercase letters`)
+  if (!/^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*$/.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag without a private-use subtag (hi, es-419, pt-br)`)
   const source = need('source')
   if (!/^[a-z0-9]{1,8}$/.test(source)) throw new UsageError(`--source ${JSON.stringify(source)} is not 1 to 8 characters of a-z and 0-9`)
-  for (const name of ['tn', 'tq', 'ta', 'ta-eng']) {
+  for (const name of ['tn', 'ta-eng', ...(flags.has('tq') ? ['tq'] : []), ...(flags.has('ta') ? ['ta'] : [])]) {
     const dir = need(name)
     if (!existsSync(join(dir, 'json')) || !statSync(join(dir, 'json')).isDirectory()) throw new UsageError(`--${name}: ${join(dir, 'json')} is not a directory`)
   }
-  for (const name of ['tn', 'tq']) {
+  for (const name of flags.has('tq') ? ['tn', 'tq'] : ['tn']) {
     for (const file of ['manifest.json', 'resource_metadata.json']) {
       if (!existsSync(join(need(name), file))) throw new UsageError(`--${name}: ${join(need(name), file)} is not there`)
     }
@@ -145,8 +151,8 @@ export function optionsFromArgs(argv: string[]): Options {
     lang,
     source,
     tn: need('tn'),
-    tq: need('tq'),
-    ta: need('ta'),
+    tq: flags.get('tq'),
+    ta: flags.get('ta'),
     taEng: need('ta-eng'),
     enTaTitles: need('en-ta-titles'),
     baseBooks: need('base-books'),
@@ -312,9 +318,9 @@ async function build(o: Options, io: Io): Promise<void> {
     if (!Array.isArray(base[kind]) || !base[kind]!.every((b) => typeof b === 'string')) throw new Error(`${o.baseBooks}: "${kind}" is not a list of book codes`)
   }
   const tn = readFetched(o.tn, 'UWTranslationNotes', o.books)
-  const tq = readFetched(o.tq, 'UWTranslationQuestions', o.books)
+  const tq = o.tq === undefined ? undefined : readFetched(o.tq, 'UWTranslationQuestions', o.books)
   const titles = readJson<EnTaTitles>(o.enTaTitles, 'the TA titles')
-  const { map: taMap, unmatched } = buildTaMap(readManual(o.ta), readManual(o.taEng), titles)
+  const { map: taMap, unmatched } = buildTaMap(o.ta === undefined ? taFromNotes([...tn.books.values()].flat()) : readManual(o.ta), readManual(o.taEng), titles)
   const trusted = trustedKeys(o.trusted)
   const name = `${o.lang}-x-${o.source}`
   let revision = o.revision ?? 1

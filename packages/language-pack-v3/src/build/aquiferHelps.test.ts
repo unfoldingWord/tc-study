@@ -3,7 +3,7 @@ import { readSegment, writeSegment } from '../codec/container'
 import { verseId } from '../ids'
 import type { BookModel } from '../model'
 import { BOOK_TABLES, bookView } from '../read/book'
-import { type AquiferArticle, aquiferNotes, aquiferQuestions, buildTaMap, htmlToMarkdown, titleKey } from './aquiferHelps'
+import { type AquiferArticle, aquiferNotes, aquiferQuestions, buildTaMap, htmlToMarkdown, taFromNotes, titleKey } from './aquiferHelps'
 import fixture from './aquiferHelps.fixture.json'
 import { bookSegment } from './book'
 
@@ -14,6 +14,30 @@ const NOTES = 'aquifer/hi/tn'
 const QUESTIONS = 'aquifer/hi/tq'
 const TIT = 56_000_000
 const taMap = () => buildTaMap(fixture.hinTa, fixture.engTa, fixture.enTaTitles).map
+
+describe('taFromNotes', () => {
+  const note = (resource: NonNullable<AquiferArticle['associations']>['resource']): AquiferArticle => ({ content_id: 1, associations: { resource } })
+
+  test('takes the Manual articles the notes are associated with: content_id, reference_id of the English twin, label as title', () => {
+    const articles = taFromNotes([
+      note([
+        { content_id: '727920', reference_id: '26691', resource_code: 'UWTranslationManual', label: 'Frases Nominales Generales' },
+        { content_id: '5', reference_id: '9', resource_code: 'UWTranslationWords', label: 'not the Manual' },
+        { content_id: '6', resource_code: 'UWTranslationManual', label: 'no reference_id' },
+        { reference_id: '7', resource_code: 'UWTranslationManual', label: 'no content_id' },
+      ]),
+      note([{ content_id: 727920, reference_id: '99999', resource_code: 'UWTranslationManual', label: 'seen again' }]),
+      { content_id: 2 },
+    ])
+    expect(articles).toEqual([{ content_id: '727920', reference_id: '26691', title: 'Frases Nominales Generales' }])
+  })
+
+  test('buildTaMap, with it as the language Manual, finds the ta: ids through the English twins', () => {
+    const { map } = buildTaMap(taFromNotes(notes), fixture.engTa, fixture.enTaTitles)
+    expect(map.size).toBeGreaterThan(0)
+    for (const id of map.values()) expect(id).toMatch(/^ta:translate\//)
+  })
+})
 
 describe('buildTaMap', () => {
   test('matches Hindi articles to the Door43 ta: ids through the English title, lower case', () => {
