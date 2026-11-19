@@ -97,7 +97,7 @@ export function optionsFromArgs(argv: string[]): Options {
   const base = flags.get('base')
   if (base !== undefined) dir('base', base)
   const lang = flags.get('lang') ?? 'hi'
-  if (!/^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*$/.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag without a private-use subtag (hi, es-419, pt-br)`)
+  if (!/^[a-z]{2,3}(?:-(?!x(?:-|$))[a-z0-9]{1,8})*$/.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag without a private-use subtag (hi, es-419, pt-br)`)
   return { baseBooks, patch, common, outMd: need('out-md'), sample: whole('sample', 20), seed: whole('seed', 1), refs: flags.get('refs'), enTaTitles, base, lang }
 }
 

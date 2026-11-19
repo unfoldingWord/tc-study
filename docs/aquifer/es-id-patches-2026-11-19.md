@@ -5,13 +5,13 @@ Built locally from GitHub BibleAquifer (UWTranslationNotes@603546cd for `spa` an
 ## What changed in the code
 
 - `build-patch-v3`, `aquifer-measure`: `--lang` takes a tag with a region (`es-419`, `pt-br`), as `spec/catalog.md` already allows; a private-use subtag is still refused.
-- `build-patch-v3`: `--tq` is optional (Aquifer has no Spanish questions) and so is `--ta`. Without `--ta` the Manual is taken from the notes' own `associations.resource` (`taFromNotes`): their `content_id`, the `reference_id` of the English twin and the label. Aquifer publishes no Spanish Manual, but every Manual link in the Spanish notes (126 distinct) is in those associations, 111 with an English twin. `--ta-eng` and `--en-ta-titles` are still needed (the English twin and its Door43 title).
+- `build-patch-v3`: `--tq` is optional (Aquifer has no Spanish questions) and so is `--ta`. Without `--ta` the Manual is taken from the notes' own `associations.resource` (`taFromNotes`): their `content_id`, the `reference_id` of the English twin and the label. Aquifer publishes no Spanish Manual, but each of the 126 distinct Manual ids that the notes link inline (`data-content-id` with `UWTranslationManual`) is in those associations, 111 with an English twin; the other 15 stay text. The stand-in is built from the notes read, so `--books` narrows it too; a full build is the reference. If no note carries a Manual association, every `ta:` link stays text (the report's `ta map` line says 0 matched). `--ta-eng` and `--en-ta-titles` are still needed (the English twin and its Door43 title).
 
 ## es-419-x-aquifer (revision 1)
 
 - Notes of 24 books, 20,448 rows (exo lev jdg est job pro jol nam mal mat mrk luk jhn act rom col 1th 2th 1ti 2ti phm jas 1jn jud); Door43 has gen rut jon tit 3jn. No questions (Aquifer has none in Spanish). Book introductions travel inside the notes as introduction rows; the Open Study Notes book introductions are **not** in this patch (a new source and row kind, left for later).
 - Translation Academy links: 98.4 % resolved (18,967 inline `[[ta:…]]`, 314 left as text); 94.0 % of the notes carry a resolved `concept`.
-- Empty answers in the same 30 references as the Hindi pilot: 28 before, 25 after, as a minimum (the base reader here is the real `es-419` rev 10). Most of the 25 are verses with no note in a patched book, or books Aquifer has no notes for.
+- Empty answers in the same 30 references as the Hindi pilot: 28 before, 25 after, as a minimum (a book Door43 has counts as answered; the base reader here is the real `es-419` rev 10). The gain is smaller than Hindi's because 24 of 66 books are patched and not every verse of a patched book has a note. Most of the 25 are verses with no note in a patched book, or books Aquifer has no notes for.
 - Both readers (TypeScript and Python) agree on the 25 files. 20 notes read by hand: concepts and links name the article each note is about; an empty bold quote `**""**` shows where a note has no quote (as in Hindi).
 
 ## id-x-aquifer (revision 1)
@@ -29,7 +29,7 @@ Built locally from GitHub BibleAquifer (UWTranslationNotes@603546cd for `spa` an
 
 ## Commands
 
-As in `docs/aquifer/hi-pilot-2026-11-16.md`; for es-419:
+Numbers above come from `aquifer-measure.ts` and `report.txt` of each run (kept outside the repo in the author's work folder, not committed). Commands as in `docs/aquifer/hi-pilot-2026-11-16.md`; for es-419 (for `id` the same with `--lang id`, `--tn` of `ind`, and `--ta <UWTranslationManual ind>`; `<staging URL>` is the packs Worker base):
 
 ```
 bun packages/resource-pipeline/cli/fetch-aquifer.ts --repo UWTranslationNotes --lang spa --commit 603546cd949d694d42d2b85dc0e37fdacb20407f --out <dir>/tn

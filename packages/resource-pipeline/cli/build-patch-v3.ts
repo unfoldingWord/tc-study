@@ -104,7 +104,7 @@ export function optionsFromArgs(argv: string[]): Options {
     return value
   }
   const lang = need('lang')
-  if (!/^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*$/.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag without a private-use subtag (hi, es-419, pt-br)`)
+  if (!/^[a-z]{2,3}(?:-(?!x(?:-|$))[a-z0-9]{1,8})*$/.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag without a private-use subtag (hi, es-419, pt-br)`)
   const source = need('source')
   if (!/^[a-z0-9]{1,8}$/.test(source)) throw new UsageError(`--source ${JSON.stringify(source)} is not 1 to 8 characters of a-z and 0-9`)
   for (const name of ['tn', 'ta-eng', ...(flags.has('tq') ? ['tq'] : []), ...(flags.has('ta') ? ['ta'] : [])]) {
