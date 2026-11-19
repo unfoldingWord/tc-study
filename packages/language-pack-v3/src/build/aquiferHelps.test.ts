@@ -24,12 +24,18 @@ describe('taFromNotes', () => {
         { content_id: '727920', reference_id: '26691', resource_code: 'UWTranslationManual', label: 'Frases Nominales Generales' },
         { content_id: '5', reference_id: '9', resource_code: 'UWTranslationWords', label: 'not the Manual' },
         { content_id: '6', resource_code: 'UWTranslationManual', label: 'no reference_id' },
+        { content_id: '8', reference_id: 'UW_TXManual_Text', resource_code: 'UWTranslationManual', label: 'text reference_id first' },
+        { content_id: '8', reference_id: '26733', resource_code: 'UWTranslationManual', label: 'then a numeric one' },
+        { content_id: '33280', reference_id: '26694', resource_code: 'UWTranslationManual', label: 'known wrong' },
         { reference_id: '7', resource_code: 'UWTranslationManual', label: 'no content_id' },
       ]),
       note([{ content_id: 727920, reference_id: '99999', resource_code: 'UWTranslationManual', label: 'seen again' }]),
       { content_id: 2 },
     ])
-    expect(articles).toEqual([{ content_id: '727920', reference_id: '26691', title: 'Frases Nominales Generales' }])
+    expect(articles).toEqual([
+      { content_id: '727920', reference_id: '26691', title: 'Frases Nominales Generales' },
+      { content_id: '8', reference_id: '26733', title: 'then a numeric one' },
+    ])
   })
 
   test('buildTaMap, with it as the language Manual, finds the ta: ids through the English twins', () => {
