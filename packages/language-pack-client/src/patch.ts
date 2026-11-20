@@ -4,11 +4,12 @@
  * - The base always wins: a table (`notes`, `questions`, `links`) of a book the base has stays the base's, even when the patch has the
  *   book too. A patch only fills a table the base lacks for that book, or the whole book when the base has none of it.
  * - Every row and every cite that came from a patch carries `patch`: the patch language and the provenance of its resource entry.
+ * - Texts (a book of unaligned text, `-x-yaapi`) follow the same rule per book: a patch gives its texts only when the base has no text of the book, and each carries `patch`.
  * - Everything else (articles, maps, `orig`, search) is the base's: a patch has no `art:` groups and no map, so the `ta:` concepts of a
  *   patch row resolve through the base, and the coverage is the base's.
  * - With several patches the first that has the table wins (the order of `patches` is the order of preference).
  */
-import type { BookModel, CatalogResource, HelpRow, HelpTable } from '@bt-synergy/language-pack-v3'
+import type { BookModel, CatalogResource, HelpRow, HelpTable, TextModel } from '@bt-synergy/language-pack-v3'
 import { type Answer, missingUnit, type PatchMark } from './query/envelope'
 import { type ContextData, contextQuery } from './query/article'
 import { type PassageData, parsePassage, passageQuery } from './query/passage'
@@ -51,11 +52,19 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
       if (out === undefined) {
         // The base has no such book: the patch's rows, each marked. It has no texts, so the answer is notes only. The unit stays the
         // patch's (`lang` is the patch's, e.g. `hi-x-aquifer`), not the base's.
-        out = { ...theirs, notes: mark(p, theirs.notes), questions: mark(p, theirs.questions), links: mark(p, theirs.links) }
+        out = { ...theirs, res: [...theirs.res], texts: markTexts(theirs.texts), notes: mark(p, theirs.notes), questions: mark(p, theirs.questions), links: mark(p, theirs.links) }
         for (const k of KINDS) if (out[k] === undefined) delete out[k]
         continue
       }
       if (out === mine) out = { ...mine, res: [...mine.res] }
+      // Texts follow the same rule as the tables, per book: the first that has them wins, and a text is taken whole (all of a patch's texts or none).
+      if (out.texts.length === 0 && theirs.texts.length > 0) {
+        const marked = markTexts(theirs.texts)
+        if (marked.length > 0) {
+          out.texts = marked
+          for (const t of marked) for (const entry of theirs.res) if (entry[0] === t.res && !out.res.some((r) => r[0] === entry[0])) out.res.push(entry)
+        }
+      }
       for (const kind of KINDS) {
         const table = theirs[kind]
         if (out[kind] !== undefined || table === undefined) continue
@@ -64,6 +73,19 @@ export function patchedReader(base: PackReader, patches: PackReader[]): PackRead
         out[kind] = marked
         for (const entry of theirs.res) if (entry[0] === table.res && !out.res.some((r) => r[0] === entry[0])) out.res.push(entry)
       }
+    }
+    return out
+  }
+  /** The texts of a patch book, each with the `patch` mark of its resource; one with no resource entry is left out (and listed in `problems`). All or none: a patch's texts come together. */
+  function markTexts(texts: TextModel[]): TextModel[] {
+    const out: TextModel[] = []
+    for (const t of texts) {
+      const m = marks.get(t.res)
+      if (m === undefined) {
+        if (!noEntry.some((x) => x.id === t.res)) noEntry.push({ id: t.res, code: 'E_PATCH_RES' })
+        return []
+      }
+      out.push({ ...t, patch: m } as TextModel)
     }
     return out
   }

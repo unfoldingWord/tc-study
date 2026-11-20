@@ -159,19 +159,23 @@ where Door43 has none). It is a language catalog like any other, marked by its n
   (`pt-br`, `es-419`), so a patch name matches `^[a-z]{2,3}(?:-(?!x-)[a-z0-9]{1,8})*-x-[a-z0-9]{1,8}$`. **The base language is the tag
   with its `-x-{source}` suffix removed.** `about.catalog`, the header `lang`
   and the `lang` of its segments are that tag.
-- **Units.** Its units are `book:<book>` segments with `texts: []` (`book.cddl` already allows a language with notes and
-  no text of a book) that carry only `notes` and/or `questions`. A book unit needs **only `orig:<book>`**: no `art:` group (its `ta:` concepts resolve
+- **Units.** Its units are `book:<book>` segments. A segment carries either only `notes` and/or `questions` with `texts: []`
+  (`book.cddl` already allows a language with notes and no text of a book), or, in a Bible-text patch (`{lang}-x-yaapi`), only
+  `texts`: one or more texts without `align` (`book.cddl`: `align` is optional and a text without alignment has none), one per source
+  version, each with its own `res`, and no notes, questions or links. A book unit needs **only `orig:<book>`**: no `art:` group (its `ta:` concepts resolve
   in the base language, which the app opens beside the patch) and no `map` (the patch has no map unit and common has only
   `xmap`, so the need could never be met; the reader takes the map from the base language). It `requires` the
-  published common catalog like any language catalog. A patch has a book only where the base lacks that table.
+  published common catalog like any language catalog. A patch has a book only where the base lacks that table (for texts: where the base has no text of the book).
 - **Provenance.** It lives on the `resources` entries, the only provenance slot of format 3 (the `res` of a segment
   header points to it). A resource entry may carry two optional fields, which a Door43 resource does not:
   - `source`: the aggregator the data came from (`"aquifer"`);
   - `review`: the review level of the source's articles, one of `"none"`, `"community"`, `"professional"` or `"mixed"`
     (when the articles differ). A reader refuses any other value (`E_BODY`, like a bad `about.direction`).
   An app takes its notice from `review` and its credit from `attribution`, `rights` and `license`.
-- **Merging.** A reader that merges a patch does it per book and per table (`notes`, `questions`, `links`): the base's
-  table wins whenever the base has that table for that book installed, and the patch fills only a missing table.
+- **Merging.** A reader that merges a patch does it per book and per table (`notes`, `questions`, `links`, `texts`): the base's
+  table wins whenever the base has that table for that book installed, and the patch fills only a missing table. For `texts` the
+  table is the whole list: if the base has any text of the book, the patch's texts of that book are not used; otherwise all of them
+  are, in their order (the first is the default). Verses are never mixed between a base text and a patch text.
 - **Provenance of rows.** Every row shown from a patch carries its provenance: the `source`, `review`, `license`,
   `rights`, `attribution` and `release` of its resource entry.
 - **Article ids.** The `ta:` ids of patch rows resolve in the base language.

@@ -10,7 +10,7 @@ export type PassageRow = HelpRow & { patch?: PatchMark }
 export type PassageData = {
   book: string
   ref: string
-  texts: { res: string; text: string }[]
+  texts: { res: string; text: string; patch?: PatchMark }[]
   notes: PassageRow[]
   questions: PassageRow[]
   links: PassageRow[]
@@ -78,7 +78,7 @@ export async function passageQuery(reader: PackReader, input: string): Promise<A
   /** Rows in range by resource key, for the coverage. */
   const inRange = new Map<string, number>()
   for (const t of model.texts) {
-    data.texts.push({ res: t.res, text: textOfRange(book, t.pieces, t.events, from, to) })
+    data.texts.push({ res: t.res, text: textOfRange(book, t.pieces, t.events, from, to), ...((t as { patch?: PatchMark }).patch ? { patch: (t as { patch?: PatchMark }).patch } : {}) })
     out.cites.push({ res: t.res, release: releaseOf(model.res, t.res), ref: `${book} ${ref}` })
   }
   for (const kind of HELPS) {

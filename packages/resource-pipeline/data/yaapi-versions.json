@@ -1,0 +1,20 @@
+{
+  "note": "Versions of yaapi.bible a patch may use, checked by hand. Order = preference. `license` is what a person confirmed; the build fails if yaapi's own `license` field disagrees. yaapi's copyright text does not state the license version (4.0) for these two: the version is taken from the publishers' open-license terms and is to be confirmed.",
+  "languages": {
+    "es-419": {
+      "language": "Spanish",
+      "versions": [
+        { "abbr": "SPAPDDPT", "license": "CC-BY-4.0", "licenseUrl": "https://creativecommons.org/licenses/by/4.0/" },
+        { "abbr": "ONBV-AST", "license": "CC-BY-SA-4.0", "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/" }
+      ]
+    }
+  },
+  "excluded": {
+    "VBL": "licence field CCBYND, text says CC BY-SA 4.0 (contradiction)",
+    "BLT": "licence field CCBYND, text says CC BY-SA 4.0 (contradiction)",
+    "TOJB": "field CCBY but the copyright text has no license wording",
+    "ASV": "field CCBYNC, text says public domain",
+    "BSB": "field CCBYNCND, text says public domain",
+    "HSB": "CCBYNCND"
+  }
+}
