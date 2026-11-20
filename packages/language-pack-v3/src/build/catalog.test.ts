@@ -531,10 +531,18 @@ describe('patch catalogs', () => {
     expect('source' in view.resources[1] || 'review' in view.resources[1]).toBe(false)
   })
 
+  test('audience and style are written and read back', async () => {
+    const built = await buildCatalog({ about: patchAbout, resources: [aquifer({ audience: 'readers', style: 'dynamic' })], segments: [await bookStub()] })
+    const view = catalogView((await readSegment(built.bytes, { known: CATALOG_TABLES })).seg)
+    expect([view.resources[0].audience, view.resources[0].style]).toEqual(['readers', 'dynamic'])
+  })
+
   test('a review outside the four values, or a source that is not text, is refused', async () => {
     const refuses = (extra: object) => buildCatalog({ about: patchAbout, resources: [aquifer(extra as never)], segments: [] })
     await expect(refuses({ review: 'perfect' })).rejects.toThrow(/review/)
     await expect(refuses({ source: 1 })).rejects.toThrow(/source/)
+    await expect(refuses({ audience: 'everyone' })).rejects.toThrow(/audience/)
+    await expect(refuses({ style: 'free' })).rejects.toThrow(/style/)
     for (const name of ['hi', 'hi-x-aquifer1x', 'hi-x-Aq', 'hi-aquifer', 'pt-x-x-aq', 'pt-br']) {
       await expect(buildCatalog({ about: { ...patchAbout, catalog: name }, resources: [], segments: [], patch: true })).rejects.toThrow(/patch catalog name/)
     }

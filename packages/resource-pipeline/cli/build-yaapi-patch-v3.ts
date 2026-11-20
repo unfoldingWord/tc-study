@@ -44,7 +44,7 @@ async function baseTextBooks(base: string, lang: string, trusted: Record<string,
   const model = catalogView((await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })).seg)
   const out = new Set<string>()
   for (const r of model.resources) {
-    if (!/bible/i.test(r.subject)) continue
+    if (!/^(aligned )?bible$/i.test(r.subject)) continue
     BOOKS.forEach((b, i) => {
       if ((r.books[i >> 3] >> (i & 7)) & 1) out.add(b)
     })
@@ -53,11 +53,13 @@ async function baseTextBooks(base: string, lang: string, trusted: Record<string,
 }
 
 const lang = need('lang')
-const cfg = JSON.parse(readFileSync(arg('versions') ?? fileURLToPath(new URL('../data/yaapi-versions.json', import.meta.url)), 'utf8')).languages[lang] as { versions: { abbr: string; license: string; audience: 'translators' | 'readers'; style: 'literal' | 'simple' | 'dynamic'; notice?: string }[] } | undefined
+const config = JSON.parse(readFileSync(arg('versions') ?? fileURLToPath(new URL('../data/yaapi-versions.json', import.meta.url)), 'utf8'))
+const cfg = config.languages[lang] as { versions: { abbr: string; license: string; licenseUrl: string; audience: 'translators' | 'readers'; style: 'literal' | 'simple' | 'dynamic'; notice?: string }[] } | undefined
 if (!cfg) {
   console.error(`yaapi-versions.json has no language ${lang}`)
   process.exit(1)
 }
+for (const v of cfg.versions) if (v.abbr in (config.excluded ?? {})) throw new Error(`${v.abbr} is in the excluded list of yaapi-versions.json: ${config.excluded[v.abbr]}`)
 const snapDir = need('snap')
 const out = need('out')
 const trusted = trustedKeys(arg('trusted') ? [arg('trusted')!] : [])
@@ -74,6 +76,7 @@ const versions: YaapiVersionInfo[] = cfg.versions.map((c) => {
     link: snap.version.link,
     field: snap.version.license,
     license: c.license,
+    licenseUrl: c.licenseUrl,
     audience: c.audience,
     style: c.style,
     ...(c.notice !== undefined ? { notice: c.notice } : {}),

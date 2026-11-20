@@ -6,7 +6,7 @@
  *   order of the list. A text is never mixed from two versions. The first text is the default.
  * - A version's book is complete when every verse of the original (`origVerses`, `"chapter:verse"` as the `orig` segment numbers them) is in it and it has
  *   no other. A book that is not complete is left out of that version, with a line in the report.
- * - The text is not edited. {@link plainText} turns the verses into pieces and events; the pieces joined are the verses joined by one space.
+ * - The text is not edited. {@link plainText} turns the verses into pieces and events; the pieces joined are the verses joined by one space, none added where the text already has white space at the join.
  * - Provenance is on the `resources` entry of each version (`yaapi/{lang}/{ABBR}`): its release is the pinned snapshot, the license is the one a person
  *   checked by hand (`YaapiVersionInfo`), `review` is left out.
  */
@@ -30,8 +30,9 @@ export type YaapiVersionInfo = {
   link: string
   /** yaapi's own `license` field (`CCBY`). */
   field: string
-  /** The SPDX license a person checked by hand, from `yaapi-versions.json`. */
+  /** The SPDX license a person checked by hand, from `yaapi-versions.json`, and the address of its text. */
   license: string
+  licenseUrl: string
   /** Extra credit the publisher's license asks for, appended to the attribution (`yaapi-versions.json`, `notice`). */
   notice?: string
   /** Who the text is for and how it renders its source, decided by a person (`yaapi-versions.json`); every yaapi text is labelled. */
@@ -94,9 +95,9 @@ export function plainText(res: string, verses: readonly { chapter: number; verse
       }
       chapter = v.chapter
       events.push([ps.length, 'chapter', String(v.chapter)], [ps.length, 'open', 'para:p'])
-    } else ps.push([' ', false])
+    } else if (!/\s$/.test(ps[ps.length - 1]?.[0] ?? '') && !/^\s/.test(v.text)) ps.push([' ', false])
     events.push([ps.length, 'verse', String(v.verse)])
-    ps.push(...pieces(v.text.trim()))
+    ps.push(...pieces(v.text))
   }
   if (chapter !== -1) events.push([ps.length, 'close', ''])
   return { res, pieces: ps, events }
@@ -182,7 +183,7 @@ export async function buildYaapiPatch(o: YaapiPatchInput): Promise<YaapiPatchBui
       release: v.release,
       license: v.license,
       rights: v.copyright.trim(),
-      attribution: `${v.name}. ${v.copyright.trim()} Text unmodified, from yaapi.bible (${v.link}), license ${v.license}.${share} Not aligned to the original.${v.notice !== undefined ? ` ${v.notice}` : ''}`,
+      attribution: `${v.name}. ${v.copyright.trim()} Text unmodified, from yaapi.bible (${v.link}), license ${v.license} (${v.licenseUrl}).${share} Not aligned to the original.${v.notice !== undefined ? ` ${v.notice}` : ''}`,
       source,
       audience: v.audience,
       style: v.style,

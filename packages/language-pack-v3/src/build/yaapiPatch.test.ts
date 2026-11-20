@@ -9,6 +9,7 @@ const ver = (abbr: string, over: Partial<YaapiVersionInfo> = {}): YaapiVersionIn
   link: 'https://example.org/x',
   field: 'CCBY',
   license: 'CC-BY-4.0',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
   audience: 'readers',
   style: 'literal',
   release: `${abbr}@sha256:abc`,
@@ -33,6 +34,10 @@ describe('plainText', () => {
     expect(pieces(t).filter((p) => p[1]).map((p) => p[0])).toContain('परमेश्वर')
     expect(pieces('हर्ष।')).toEqual([['हर्ष', true], ['।', false]])
     expect(pieces("don't a-b")).toEqual([["don't", true], [' ', false], ['a-b', true]])
+  })
+  test('white space at the edges of a verse is kept, and no space is added where there is one', () => {
+    const m = plainText('r', [{ chapter: 1, verse: 1, text: 'a ' }, { chapter: 1, verse: 2, text: 'b' }])
+    expect(m.pieces.map((p) => p[0]).join('')).toBe('a b')
   })
   test('events: chapter, para, verse and close; verses joined by one space; no align', () => {
     const m = plainText('r', [{ chapter: 1, verse: 1, text: 'a b' }, { chapter: 1, verse: 2, text: 'c' }, { chapter: 2, verse: 1, text: 'd' }])
