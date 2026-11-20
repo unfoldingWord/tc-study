@@ -41,6 +41,7 @@ resource = {
   ? "attribution": tstr,       ; the credit line an app shows
   ? "source": tstr,            ; the aggregator the data came from ("aquifer"): a patch catalog's resource
   ? "review": "none" / "community" / "professional" / "mixed",   ; the review level of the source's articles; "mixed" when they differ
+  ? "tcReady": false,          ; only ever false: the resource came in without Door43's `tc-ready` topic (an accepted exception, e.g. a literal aligned text); absent otherwise
   "books": book-set,           ; the books it has (all zeros for resources without books)
 }
 

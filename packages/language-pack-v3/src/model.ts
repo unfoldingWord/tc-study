@@ -310,6 +310,8 @@ export type CatalogResource = {
   source?: string
   /** The `review_level` of the source's articles; `"mixed"` when they differ. */
   review?: ReviewLevel
+  /** Only ever `false`: the resource came in without Door43's `tc-ready` topic (`catalog.md`, "Resources without tc-ready"). Absent otherwise. */
+  tcReady?: false
   books: Uint8Array
 }
 

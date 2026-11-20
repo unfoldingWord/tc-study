@@ -178,6 +178,10 @@ where Door43 has none). It is a language catalog like any other, marked by its n
 - **Signed** like every published catalog (above), with the same publisher key. `about.publisher` is the one who
   publishes the pack; the source and the original publisher are on the resource entry.
 
+## Resources without tc-ready
+
+The packs are built from Door43 resources that carry the `tc-ready` topic. When a language has no `tc-ready` literal aligned text (the eligibility rule needs one), the build may take the language's literal aligned Bible without the topic. Its `resources` entry then carries `"tcReady": false`, the only value the field takes; it is absent for every other resource. A reader refuses any other value (`E_BODY`). An app can show the text as an accepted exception, and the list of such texts is derived from the catalogs (`resources[].tcReady === false`). Older readers skip the field, so it needs no new format version.
+
 ## Complements
 
 Complements are files a reader is not obliged to read: question classifiers, vectors, number words, models. They
