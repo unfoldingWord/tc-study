@@ -417,7 +417,7 @@ describe('door43-books', () => {
       return page(url)
     }) as unknown as typeof fetch
     expect(await door43Books('hi', fetcher, 'http://x')).toEqual({ lang: 'hi', tn: ['act'], tq: ['gen', 'rut'] })
-    expect(urls).toEqual(['http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=1', 'http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=2'])
+    expect(urls).toEqual(['http://x/api/v1/catalog/search?lang=hi&stage=prod&topic=tc-ready&limit=100&page=1', 'http://x/api/v1/catalog/search?lang=hi&stage=prod&topic=tc-ready&limit=100&page=2'])
   })
 
   test('follows the pages until an empty one, when the server caps a page at 50', async () => {

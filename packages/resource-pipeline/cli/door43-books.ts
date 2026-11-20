@@ -3,8 +3,8 @@
  *
  *   bun packages/resource-pipeline/cli/door43-books.ts --lang hi [--out <file.json>]
  *
- * Reads `https://git.door43.org/api/v1/catalog/search?lang=<lang>&stage=prod&limit=100` (every page, until an empty one or the `X-Total-Count` the server announces: it may cap a page below the limit) and counts only the subjects
- * `TSV Translation Notes` and `TSV Translation Questions` (the tc-ready ones). Writes `{ "lang": "hi", "tn": [books], "tq": [books] }`, the books in
+ * Reads `https://git.door43.org/api/v1/catalog/search?lang=<lang>&stage=prod&topic=tc-ready&limit=100` (every page, until an empty one or the `X-Total-Count` the server announces: it may cap a page below the limit) and counts only the subjects
+ * `TSV Translation Notes` and `TSV Translation Questions`. Only `topic=tc-ready` resources count: they are the ones the packs are built from (`discoverLanguage`), so a book that only another production repo has (es-419_obt's Genesis) is still a gap the patch may fill. Writes `{ "lang": "hi", "tn": [books], "tq": [books] }`, the books in
  * the order of the canon, to `--out`, or to stdout without it. Exit 0 when written, 1 when the catalog cannot be read, 2 for bad arguments.
  */
 import { writeFileSync } from 'node:fs'
@@ -27,7 +27,7 @@ export async function door43Books(lang: string, fetcher: typeof fetch = fetch, b
   let seen = 0
   for (let page = 1; ; page++) {
     if (page > MAX_PAGES) throw new Error(`${base}: the catalog has more than ${MAX_PAGES} pages; the server may be ignoring page`)
-    const url = `${base}/api/v1/catalog/search?lang=${encodeURIComponent(lang)}&stage=prod&limit=${LIMIT}&page=${page}`
+    const url = `${base}/api/v1/catalog/search?lang=${encodeURIComponent(lang)}&stage=prod&topic=tc-ready&limit=${LIMIT}&page=${page}`
     const response = await fetcher(url)
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
     const body = (await response.json()) as { data?: Entry[] }
