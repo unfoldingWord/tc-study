@@ -28,6 +28,7 @@
   --color-accent-fill: var(--theme-accent-fill);
   --color-accent-fill-hover: var(--theme-accent-fill-hover);
   --color-accent-fill-press: var(--theme-accent-fill-press);
+  --color-accent-fill-fg: var(--theme-accent-fill-fg);
   --color-scripture: var(--theme-scripture);
   --color-scripture-fg: var(--theme-scripture-fg);
   --color-scripture-muted: var(--theme-scripture-muted);
@@ -38,6 +39,9 @@
   --color-danger-soft: var(--theme-danger-soft);
   --color-warning: var(--theme-warning);
   --color-warning-fg: var(--theme-warning-fg);
+  --color-warning-soft: var(--theme-warning-soft);
+  --color-valid-soft: var(--theme-valid-soft);
+  --color-valid-fg: var(--theme-valid-fg);
   --color-panel-1-soft: var(--theme-panel-1-soft);
   --color-panel-1: var(--theme-panel-1);
   --color-panel-1-fg: var(--theme-panel-1-fg);
@@ -47,6 +51,7 @@
   --color-helps: var(--theme-helps);
   --color-helps-soft: var(--theme-helps-soft);
   --color-helps-fg: var(--theme-helps-fg);
+  --color-helps-border: var(--theme-helps-border);
   --color-chip-quote: var(--theme-chip-quote);
   --color-chip-quote-hover: var(--theme-chip-quote-hover);
   --color-chip-quote-fg: var(--theme-chip-quote-fg);
@@ -119,6 +124,8 @@
   --theme-accent-fill: var(--uw-inspire);
   --theme-accent-fill-hover: var(--tc-accent-hover);
   --theme-accent-fill-press: var(--uw-inspire-600);
+  /* tC4 --t-accent-on-fill: 2.56:1, only at 13.5 px weight 800 or larger */
+  --theme-accent-fill-fg: #ffffff;
 
   --theme-scripture: #ffffff;
   --theme-scripture-fg: var(--uw-black);
@@ -134,6 +141,10 @@
   /* Kindle — CVD-safe pair with the accent (TW vs TA footers) */
   --theme-warning: var(--uw-kindle);
   --theme-warning-fg: var(--tc-warn-text);
+  --theme-warning-soft: var(--tc-warn-surface);
+
+  --theme-valid-soft: var(--tc-valid-surface);
+  --theme-valid-fg: var(--tc-valid-strong);
 
   --theme-panel-1-soft: var(--uw-inspire-50);
   --theme-panel-1: var(--uw-inspire);
@@ -149,6 +160,8 @@
   --theme-helps: var(--uw-ocean);
   --theme-helps-soft: var(--uw-frost);
   --theme-helps-fg: var(--uw-ocean);
+  /* Outline button stroke: solid Ocean in light (dark uses composited white 40% below) */
+  --theme-helps-border: var(--uw-ocean);
 
   /* Helps reading chips (scripture / OBS quotes) — verse headers use muted/50 */
   --theme-chip-quote: var(--uw-inspire-50);
@@ -188,6 +201,7 @@
   --theme-accent-fill: var(--uw-inspire);
   --theme-accent-fill-hover: var(--tc-accent-hover);
   --theme-accent-fill-press: var(--uw-inspire-600);
+  --theme-accent-fill-fg: #ffffff;
 
   /* Reading paper, between surface and elevated */
   --theme-scripture: #0f3044;
@@ -204,6 +218,10 @@
 
   --theme-warning: var(--uw-kindle);
   --theme-warning-fg: #f2ce99; /* Kindle's light end */
+  --theme-warning-soft: #313b48;
+
+  --theme-valid-soft: #184246; /* valid 16% on surface */
+  --theme-valid-fg: #9bdaaf; /* valid's light end */
 
   --theme-panel-1-soft: #144761;
   --theme-panel-1: var(--uw-inspire);
@@ -217,6 +235,7 @@
   --theme-helps: var(--uw-inspire-200);
   --theme-helps-soft: #1f3b4c;
   --theme-helps-fg: #ffffff;
+  --theme-helps-border: #6d7f8a; /* white 40% on surface: 3:1 on surface and elevated */
 
   --theme-chip-quote: #123f57; /* Inspire 16% on surface */
   --theme-chip-quote-hover: #154964; /* Inspire 24% on surface */
