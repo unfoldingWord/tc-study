@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { CatalogManager } from '@bt-synergy/catalog-manager/core'
-import { discoverLanguage, obsOwnHelpsSubjects } from './discoverLanguage'
+import { compareLiteralCandidates, discoverLanguage, obsOwnHelpsSubjects } from './discoverLanguage'
 import { createHeadlessResourceTypeRegistry } from './resourceTypeRegistry'
 
 function memoryStore() {
@@ -118,6 +118,13 @@ describe('discoverLanguage', () => {
     const withIt = await discoverLanguage({ language: 'es-419', door43Client: es.door43 as never, catalogManager: es.catalogManager, resourceTypeRegistry: createHeadlessResourceTypeRegistry(es.catalogManager) })
     expect(withIt.withoutTcReady).toEqual([])
     expect(es.door43.calls.some((c) => !c.topic && c.subject === 'Aligned Bible')).toBe(false)
+  })
+
+  test('the fallback picks the ULT/GLT with the most files, never by owner name', () => {
+    const withFiles = (owner: string, name: string, n: number) => ({ ...hit(owner, 'ru', name, 'Aligned Bible'), ingredients: Array.from({ length: n }, () => ({})) })
+    const list = [withFiles('a_fork', 'ru_glt', 3), withFiles('ru_gt', 'ru_glt', 66), withFiles('a_other', 'ru_bolt', 66)]
+    const sorted = [...list].sort(compareLiteralCandidates('ru')).map((e) => (e as { owner: string }).owner)
+    expect(sorted).toEqual(['ru_gt', 'a_fork', 'a_other'])
   })
 
   test('obsOwnHelpsSubjects keeps only OBS subjects', () => {

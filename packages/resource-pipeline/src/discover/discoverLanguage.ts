@@ -19,7 +19,7 @@ import { isLiteralTextId, literalTextOf } from '../language/literalText'
 import { catalogHitRelease, door43ResourceForHit } from './catalogHits'
 import { ensureOriginalLanguageInCatalog } from './originalLanguageCatalog'
 import { obsKindOfSubject, pickObs, type ObsPick } from './obsPick'
-import { catalogIdentity } from './readCatalogIdentity'
+import { catalogIdentity, type CatalogEntry } from './readCatalogIdentity'
 import { searchAlignedBibles, searchCatalogHitsForTarget, searchObsStories, type CatalogSearchClient } from './readCatalogSearch'
 import { createResourceMetadata, type Door43Resource, type MetadataCreationOptions } from './ResourceMetadataFactory'
 
@@ -57,6 +57,24 @@ export interface LanguageDiscovery {
 /** The OBS helps subjects that are OBS's own (`TSV OBS Translation Notes`…), not the TW and TA OBS also links to. */
 export function obsOwnHelpsSubjects(subjects: readonly string[]): string[] {
   return subjects.filter((subject) => /\bOBS\b/.test(subject))
+}
+
+/**
+ * The order the no-tc-ready fallback picks its literal text in, so the choice never depends on how owners sort by name: the ULT/GLT ids
+ * first (`ult`, `glt`, as `isLiteralTextId` roles them) over any other `*lt`, then the text with more files (books), then the key.
+ */
+export function compareLiteralCandidates(language: string) {
+  const rank = (entry: CatalogEntry) => {
+    const id = catalogIdentity(entry, language)!
+    const official = /^(ult|glt)$/.test(id.resourceId) ? 0 : 1
+    const files = Array.isArray((entry as { ingredients?: unknown }).ingredients) ? (entry as { ingredients: unknown[] }).ingredients.length : 0
+    return { official, files, key: id.resourceKey }
+  }
+  return (a: CatalogEntry, b: CatalogEntry) => {
+    const x = rank(a)
+    const y = rank(b)
+    return x.official - y.official || y.files - x.files || (x.key < y.key ? -1 : x.key > y.key ? 1 : 0)
+  }
 }
 
 function errorText(error: unknown): string {
@@ -107,7 +125,7 @@ export async function discoverLanguage(options: {
         const id = catalogIdentity(entry, language)
         return id !== null && id.langStr === language && isLiteralTextId(id.resourceId, language)
       })
-      .sort((a, b) => (catalogIdentity(a, language)!.resourceKey < catalogIdentity(b, language)!.resourceKey ? -1 : 1))
+      .sort(compareLiteralCandidates(language))
     if (candidates.length > 0) {
       withoutTcReady.add(catalogIdentity(candidates[0], language)!.resourceKey)
       pages.push({ hydrateTarget: 'text' as const, catalogResults: [candidates[0]] })
