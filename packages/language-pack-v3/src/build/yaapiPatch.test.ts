@@ -64,6 +64,12 @@ describe('buildYaapiPatch', () => {
     expect(b.report.join('\n')).toMatch(/jud: left out, the base language has text/)
     expect(b.report.join('\n')).toMatch(/rut B: left out, 1 verses of the original missing/)
   })
+  test('a stricter license than yaapi field is built only when a person said so', async () => {
+    await expect(buildYaapiPatch(input([ver('A', { license: 'CC-BY-SA-4.0' })]))).rejects.toThrow(/contradiction/)
+    const b = await buildYaapiPatch(input([ver('A', { license: 'CC-BY-SA-4.0', stricter: true })]))
+    expect(b.resources[0]!.license).toBe('CC-BY-SA-4.0')
+    expect(b.resources[0]!.attribution).toContain('Shared under the same license')
+  })
   test('a contradicting or closed license is refused', async () => {
     await expect(buildYaapiPatch(input([ver('A', { field: 'CCBYND' })]))).rejects.toThrow(/contradiction/)
     await expect(buildYaapiPatch(input([ver('A', { license: 'CC-BY-ND-4.0' })]))).rejects.toThrow(/not one of/)

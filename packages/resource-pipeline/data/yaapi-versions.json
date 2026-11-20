@@ -1,19 +1,21 @@
 {
-  "note": "Versions of yaapi.bible a patch may use, checked by hand (20 nov 2026). Order = preference. `license` is what a person confirmed; the build fails if yaapi's own `license` field disagrees. SPAPDDPT: yaapi CCBY, eBible.org (publisher's distribution) CC BY 4.0 with 'Copyright 2020 Asociacion Biblica Latinoamericana'; Bible.com's page says CC BY-SA 4.0 (conflict, not resolved by the publisher). ONBV-AST: Biblica's own notice (via eBible.org) says CC BY-SA 4.0 and asks for the notice below.",
+  "note": "Versions of yaapi.bible a patch may use, checked by hand (20 nov 2026). Order = preference. `license` is what a person confirmed; the build fails if yaapi's own `license` field disagrees. SPAPDDPT: yaapi CCBY, eBible.org (publisher's distribution) CC BY 4.0 with 'Copyright 2020 Asociacion Biblica Latinoamericana'; Bible.com's page says CC BY-SA 4.0; Abel decided CC BY-SA 4.0 (stricter) on 20 Nov 2026. ONBV-AST: Biblica's own notice (via eBible.org) says CC BY-SA 4.0 and asks for the notice below.",
   "languages": {
     "es-419": {
       "language": "Spanish",
       "versions": [
         {
           "abbr": "SPAPDDPT",
-          "license": "CC-BY-4.0",
-          "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
           "evidence": [
             "https://ebible.org/spapddpt/copyright.htm"
           ],
-          "conflict": "https://www.bible.com/es/versions/3544 says CC BY-SA 4.0",
+          "conflict": "decided by Abel (20 nov 2026): CC BY-SA 4.0. Sources: yaapi CCBY; eBible.org CC BY 4.0; https://www.bible.com/es/versions/3544 CC BY-SA 4.0",
           "audience": "readers",
-          "style": "literal"
+          "style": "literal",
+          "stricter": true,
+          "notice": "Redistributed here under CC BY-SA 4.0, the stricter of the terms published for this text (yaapi.bible and eBible.org state CC BY 4.0; Bible.com states CC BY-SA 4.0). Copyright © 2020 Asociación Bíblica Latinoamericana."
         },
         {
           "abbr": "ONBV-AST",

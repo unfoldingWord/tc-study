@@ -33,6 +33,8 @@ export type YaapiVersionInfo = {
   /** The SPDX license a person checked by hand, from `yaapi-versions.json`, and the address of its text. */
   license: string
   licenseUrl: string
+  /** The license is deliberately stricter than yaapi's field (CCBY read as CC BY-SA, where the sources conflict); a person decided it (`yaapi-versions.json`, `stricter`). */
+  stricter?: boolean
   /** Extra credit the publisher's license asks for, appended to the attribution (`yaapi-versions.json`, `notice`). */
   notice?: string
   /** Who the text is for and how it renders its source, decided by a person (`yaapi-versions.json`); every yaapi text is labelled. */
@@ -114,7 +116,7 @@ export async function buildYaapiPatch(o: YaapiPatchInput): Promise<YaapiPatchBui
   const report: string[] = []
   for (const v of o.versions) {
     if (!OPEN_LICENSES.includes(v.license)) throw new Error(`${v.abbr}: the license ${JSON.stringify(v.license)} is not one of ${OPEN_LICENSES.join(', ')}`)
-    if (v.field !== FIELD[v.license]) throw new Error(`${v.abbr}: yaapi's license field says ${JSON.stringify(v.field)} and the list says ${v.license}: a contradiction is not built`)
+    if (v.field !== FIELD[v.license] && !(v.stricter === true && v.field === 'CCBY' && v.license === 'CC-BY-SA-4.0')) throw new Error(`${v.abbr}: yaapi's license field says ${JSON.stringify(v.field)} and the list says ${v.license}: a contradiction is not built`)
     if (v.audience === undefined || v.style === undefined) throw new Error(`${v.abbr}: audience and style are required for a yaapi version`)
     if (v.copyright.trim() === '') throw new Error(`${v.abbr}: yaapi gives no copyright text`)
   }

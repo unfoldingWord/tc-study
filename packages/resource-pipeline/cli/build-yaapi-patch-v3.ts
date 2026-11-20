@@ -54,7 +54,7 @@ async function baseTextBooks(base: string, lang: string, trusted: Record<string,
 
 const lang = need('lang')
 const config = JSON.parse(readFileSync(arg('versions') ?? fileURLToPath(new URL('../data/yaapi-versions.json', import.meta.url)), 'utf8'))
-const cfg = config.languages[lang] as { versions: { abbr: string; license: string; licenseUrl: string; audience: 'translators' | 'readers'; style: 'literal' | 'simple' | 'dynamic'; notice?: string }[] } | undefined
+const cfg = config.languages[lang] as { versions: { abbr: string; license: string; licenseUrl: string; audience: 'translators' | 'readers'; style: 'literal' | 'simple' | 'dynamic'; notice?: string; stricter?: boolean }[] } | undefined
 if (!cfg) {
   console.error(`yaapi-versions.json has no language ${lang}`)
   process.exit(1)
@@ -77,6 +77,7 @@ const versions: YaapiVersionInfo[] = cfg.versions.map((c) => {
     field: snap.version.license,
     license: c.license,
     licenseUrl: c.licenseUrl,
+    ...(c.stricter ? { stricter: true } : {}),
     audience: c.audience,
     style: c.style,
     ...(c.notice !== undefined ? { notice: c.notice } : {}),
