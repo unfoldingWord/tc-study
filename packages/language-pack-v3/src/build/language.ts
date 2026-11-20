@@ -45,6 +45,7 @@ import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOfBook } from './catalog'
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
+import { parseObsTf } from '../source/obsTf'
 import { extractText } from './bookTexts'
 import { extractOrig, OrigIndex, origSegment } from './orig'
 import { buildAligned, isBridgeText } from './aligned/build'
@@ -60,8 +61,10 @@ import { outlineOf } from './topics/outline'
 import { topicsSegment, xtopicsSegment } from './topics/segment'
 import { buildTopics } from './topics/topics'
 import { chunksOfText, chunksTable } from './topics/chunks'
+import { parseObsFrames } from '../source/obsFrames'
 import { buildXtopics, chapterLengths, type TwName, type XtopicsSources } from './topics/xtopics'
 import { parseObsRefs } from '../source/obsRefs'
+import { ACAI_SOURCE, type AcaiPerson, parseAcai } from '../source/acai'
 import { parseTheographic } from '../source/theographic'
 import { parseTipnr } from '../source/tipnr'
 import type { XmapCore, XmapPart, XtopicsCore } from '../model'
@@ -102,6 +105,21 @@ async function originalRowKeys(source: RowSource, book: string): Promise<RowKey[
 // Resources
 
 const tagOf = (stamp: string): string => stamp.split('#')[0]
+
+/**
+ * The Five Movements manual of a language (`obs.cddl`, "OBS Five Movements") as `buildLanguage` takes it: the files of the release of
+ * the OBS Theological Formation resource (`obs_story_{N}.md`, `transclusions/{name}.md`), and what the catalog says of the resource.
+ * `key` is the resource key (`unfoldingWord/en/obs-tf`) and `release` its tag (`v4`).
+ */
+export type ObsTfInput = {
+  key: string
+  release: string
+  title: string
+  license: string
+  rights?: string
+  attribution: string
+  files: ReadonlyMap<string, string>
+}
 
 /** The license texts a catalog knows by their SPDX id, by the text without case, spaces, hyphens and underscores. */
 const SPDX: ReadonlyMap<string, string> = new Map([
@@ -252,8 +270,11 @@ export async function buildLanguage(o: {
   requires?: [string, number, string][]
   bookNames?: Record<string, [string, string, string]>
   partial?: boolean
-  topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
+  /** `acai`: the ACAI people ({@link parseAcai}) and its release: the `people` table of the topics core (`ids.md`, "Names of people"). */
+  topics?: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; release: string } }
   aligned?: boolean
+  /** The Five Movements manual: the tables `tf-*` of the `obs` segment. Off by default: without it every segment is the same bytes. The build throws when the manual has errors (`obs-5m-checks.md`). */
+  obsTf?: ObsTfInput
   withOrig?: boolean
   taConfigs?: TaConfigs
   /** The text of the `toc.yaml` of each manual of each tA resource: its titles are more names of the articles. */
@@ -300,7 +321,9 @@ export async function buildLanguage(o: {
       continue
     }
     const issues: string[] = []
-    const orig = await extractOrig(source, book)
+    const origIssues: string[] = []
+    const orig = await extractOrig(source, book, origIssues, { macula: o.withOrig === true })
+    if (o.withOrig === true) issues.push(...origIssues)
     origs.set(book, orig)
     // The rows `extractBook` reads are the ones the inputs name: they are read once.
     const read: RowKey[] = []
@@ -363,15 +386,37 @@ export async function buildLanguage(o: {
   }
 
   // Open Bible Stories
+  let obsTfResource: CatalogResource | undefined
+  /** The names of the language map (titles of the articles in this language): the names of people come from them (`ids.md`). */
+  let mapNames: Record<string, string[]> = {}
+  let acaiResource: CatalogResource | undefined
   const obsIssues: string[] = []
   const obs = await extractObs(source, lang, obsIssues)
   report.push(...obsIssues.map((line) => `obs: ${line}`))
+  if (obs === null && o.obsTf !== undefined) throw new Error(`The OBS 5M manual ${o.obsTf.key} was given, and ${lang} has no Open Bible Stories for it to go with`)
   if (obs !== null) {
     const keys = obs.res.map(([key]) => key)
     const rows: RowKey[] = []
     for (const resource of keys) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
+    let model = obs
+    let stamps = stampsOf(keys)
+    if (o.obsTf !== undefined) {
+      // The manual is the segment's own: `obs` (for the map and the inputs of the rows) stays as the source gave it.
+      const tf = o.obsTf
+      const parsed = parseObsTf(tf.files, tf.key, obs.stories, lang)
+      report.push(...parsed.warnings.map((line) => `obs-tf: ${line}`))
+      if (parsed.errors.length > 0) throw new Error(`The OBS 5M manual ${tf.key} ${tf.release} has errors:\n${parsed.errors.join('\n')}`)
+      if (obs.res.some(([key]) => key === tf.key)) throw new Error(`${tf.key} is also a resource of the source`)
+      const res = [...obs.res, [tf.key, tf.release] as [string, string]].sort((a, b) => compareCodePoints(a[0], b[0]))
+      model = { ...obs, res, tf: parsed.model }
+      for (const [name, text] of [...tf.files].sort((a, b) => compareCodePoints(a[0], b[0]))) rows.push({ layer: 'obs-tf', key: `${name}|${sha256Hex(text)}` })
+      stamps = [...stamps, { key: tf.key, stamp: tf.release }]
+      const resource: CatalogResource = { key: tf.key, title: tf.title, subject: 'OBS Theological Formation', release: tf.release, license: tf.license, attribution: tf.attribution, books: bookSet([]) }
+      if (tf.rights !== undefined) resource.rights = tf.rights
+      obsTfResource = resource
+    }
     // The stories are shown with the titles and book names of the map: the unit needs it.
-    const built = await add(obsSegment(obs), inputsOf(rows, stampsOf(keys)), keys)
+    const built = await add(obsSegment(model), inputsOf(rows, stamps), keys)
     needs.set(built.id, ['map'])
   }
 
@@ -393,6 +438,7 @@ export async function buildLanguage(o: {
       }
     }
     const built = buildMap({ lang, refs, books: mapBooks, articles: [...articles.values()].flat(), obs, bookNames: o.bookNames, partial: o.partial, tocTitles })
+    mapNames = built.core.names
     const all = refs.map((ref) => ref.key)
     const coreRows: RowKey[] = [...[...mapRows.values()].flat(), ...tocRows]
     for (const list of artRows.values()) coreRows.push(...list)
@@ -428,14 +474,19 @@ export async function buildLanguage(o: {
       obs: stories,
       obsRes: obs?.res.map(([key]) => key),
       releases: new Map(refs.map((ref) => [ref.key, tagOf(ref.stamp)])),
+      ...(o.topics.acai === undefined ? {} : { acai: { people: o.topics.acai.people, res: [ACAI_SOURCE.key, o.topics.acai.release] as [string, string] }, mapNames }),
     })
     report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
     const rows: RowKey[] = [...mapRows.values()].flat()
     if (tn !== undefined) for (const book of origs.keys()) if (tn.books.includes(book)) await addKeys(rows, source.rows({ lang, book, resource: tn.key }))
     if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
     rows.push({ layer: 'topics', key: `tipnr|${sha256Hex(JSON.stringify(o.topics.records))}` }, { layer: 'topics', key: `xtopics|${sha256Hex([...xt.topics.keys()].join('\n'))}` })
+    if (built.core.people !== undefined) {
+      rows.push({ layer: 'topics', key: `acai|${sha256Hex(JSON.stringify(o.topics.acai!.people))}` })
+      acaiResource = { key: ACAI_SOURCE.key, title: ACAI_CREDIT.title, subject: 'Topics', release: o.topics.acai!.release, license: ACAI_CREDIT.license, attribution: ACAI_CREDIT.attribution, books: bookSet([]) }
+    }
     const keys = built.core.res.map(([key]) => key)
-    const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp }))])
+    const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp })), ...(built.core.people === undefined ? [] : [{ key: ACAI_SOURCE.key, stamp: o.topics.acai!.release }])])
     await add(topicsSegment(built.core), inputs, keys)
     for (const part of built.parts) await add(topicsSegment(part), inputs, keys)
   }
@@ -452,7 +503,7 @@ export async function buildLanguage(o: {
   segments.sort(compareSegments)
   const catalog = await buildCatalog({
     about: { ...o.about, catalog: lang },
-    resources: [...catalogResources(refs, used), ...catalogResources(originals, usedOriginals)],
+    resources: [...catalogResources(refs, used), ...catalogResources(originals, usedOriginals), ...(obsTfResource === undefined ? [] : [obsTfResource]), ...(acaiResource === undefined ? [] : [acaiResource])],
     segments,
     requires: o.requires,
     needs: (built) => needs.get(built.id) ?? [],
@@ -471,8 +522,31 @@ const TITLE_ROW = /^helps-text:(tw|ta)-title:/
 const ULT_LANG = 'en'
 const ULT_KEY = 'unfoldingWord/en/ult'
 
+/** The source of the `obs-frames` table of the xtopics core (`spec/fuentes.md`), at its pinned commit. */
+export const OBS_FRAMES_SOURCE = {
+  key: 'bcv-commons/bible-story-builder',
+  release: 'c07d4539',
+  title: 'Bible Story Builder: the verses of each Open Bible Stories frame',
+  license: 'MIT',
+  attribution:
+    'Bible Story Builder (https://github.com/bcv-commons/bible-story-builder), templates/OBS at commit c07d45395d01b987c31f4e06871314f129c975e8. ' +
+    'MIT License. Copyright (c) 2024 unfoldingWord Box3. ' +
+    'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: ' +
+    'The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. ' +
+    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. ' +
+    'Changed: only the verse references of the OBS frames were read, as verse ids, each range within one chapter.',
+} as const
+
+/** What the catalogs say of ACAI (`spec/fuentes.md`): the common for `gender` and the `same-as` of ACAI, a language for `people`. */
+export const ACAI_CREDIT = {
+  title: 'ACAI Biblical Entity Data: people',
+  license: 'CC-BY-SA-4.0',
+  attribution:
+    'ACAI Biblical Entity Data © 2024 BiblioNexus (https://github.com/BibleAquifer/ACAI), CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changed: only the gender, the names and other names in six languages and the uW Translation Words titles of the people were extracted, joined to TIPNR and reduced; the names are reproduced where the pack cannot derive them',
+} as const
+
 /** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */
-const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines'> = {
+const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines' | 'acai'> = {
   tipnr: ['STEPBible/STEPBible-Data/TIPNR', 'be4191f0'],
   theographic: ['robertrouse/theographic-bible-metadata', '744355c7'],
   obs: ['unfoldingWord/en/obs', 'v9'],
@@ -550,6 +624,10 @@ export async function buildCommon(o: {
     theographic: { events: string; verses: string; people: string; places: string }
     obs: Map<number, string>
     releases?: Partial<Omit<XtopicsSources, 'outlines'>>
+    /** The `templates/OBS/<category>/<story>.md` files of bible-story-builder (path below `templates/OBS` to text): the `obs-frames` table */
+    frames?: Map<string, string>
+    /** The trimmed ACAI people (`acai/people.json`, `trimAcai`): the `gender` table and the `same-as` of ACAI */
+    acai?: string
   }
 }): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[] }> {
   const refs = await o.source.resources(ORIGINALS)
@@ -558,8 +636,11 @@ export async function buildCommon(o: {
   const used = new Set<string>()
   const origs: OrigModel[] = []
   const origRows = new Map<string, RowKey[]>()
+  const origReport: string[] = []
   for (const book of books) {
-    const orig = await extractOrig(o.source, book)
+    const bookIssues: string[] = []
+    const orig = await extractOrig(o.source, book, bookIssues)
+    origReport.push(...bookIssues.map((line) => `book ${book}: ${line}`))
     origs.push(orig)
     const having = refs.filter((ref) => ref.books.includes(book))
     const rows: RowKey[] = []
@@ -571,7 +652,7 @@ export async function buildCommon(o: {
     for (const ref of having) used.add(ref.key)
   }
 
-  const report: string[] = []
+  const report: string[] = [...origReport]
   const listed = [...refs]
   const lang = o.mapLang
   if (lang !== undefined && origs.length === 0) report.push(`no original was built, so the xmap of ${lang} is not built: the publisher needs the originals`)
@@ -642,7 +723,29 @@ export async function buildCommon(o: {
     }
     const res: XtopicsSources = { ...TOPIC_SOURCES, ...t.releases }
     if (tn !== undefined) res.outlines = [tn.key, tagOf(tn.stamp)]
-    const built = buildXtopics({ tipnr, events, obs, outlines, origs, res, twNames })
+    // ACAI: the people, and the English titles of the tW names its same-as compares with
+    let acai: AcaiPerson[] | undefined
+    let twTitles: Map<string, string> | undefined
+    const twUsed: { key: string; stamp: string }[] = []
+    if (t.acai !== undefined) {
+      const parsed = parseAcai(t.acai)
+      acai = parsed.people
+      res.acai = [ACAI_SOURCE.key, parsed.commit.slice(0, 8)]
+      if (lang !== undefined) {
+        twTitles = new Map()
+        for (const ref of (await o.source.resources(lang)).filter((r) => r.kind === 'Translation Words').sort((a, b) => compareCodePoints(a.key, b.key))) {
+          twUsed.push({ key: ref.key, stamp: tagOf(ref.stamp) })
+          for await (const row of o.source.rows({ lang, resource: ref.key, layer: 'text' })) {
+            const m = /^helps-text:tw-title:([^@]+)@[^:]*:(names\/[A-Za-z0-9_-]+)$/.exec(row.key)
+            const value = row.value as { content?: unknown } | null
+            if (m === null || m[1] !== ref.key || typeof value !== 'object' || value === null || typeof value.content !== 'string') continue
+            const concept = `tw:${m[2].toLowerCase()}`
+            if (!twTitles.has(concept)) twTitles.set(concept, value.content)
+          }
+        }
+      }
+    }
+    const built = buildXtopics({ tipnr, events, obs, outlines, origs, res, twNames, ...(acai === undefined ? {} : { acai, twTitles }) })
     report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
     const resWithoutUlt = built.core.res
     // The section map: the sections of the English ULT (its ts milestones), per book of the originals built
@@ -687,15 +790,49 @@ export async function buildCommon(o: {
         built.core.coverage.set(ult.key, { whole: [...byBook.keys()].sort((a, b) => bookNumber(a) - bookNumber(b)), partial: [] })
       } else if (noBook.length + noVerses.length + noBreaks.length === 0) report.push(`topics: chunks: no book of the originals was built: the xtopics have no section map`)
     }
+    // The verses of each OBS frame (bible-story-builder): the core only, like the section map
+    const frameRows: RowKey[] = []
+    if (t.frames === undefined) report.push('topics: obs-frames: no bible-story-builder files: the xtopics have no frame map')
+    else {
+      const frameReport: string[] = []
+      const frames = parseObsFrames(t.frames, frameReport, lastVerse)
+      // The frames whose verses are not all in their story's ranges (the closing line of English OBS): reported, not dropped
+      const outside: string[] = []
+      for (const [frame, list] of frames) {
+        const story = built.core.ranges?.[`obs:${frame.split(':')[0]}`]
+        if (story === undefined) continue
+        if (list.some(([a, b]) => !story.some(([x, y]) => x <= a && b <= y))) outside.push(frame)
+      }
+      if (outside.length > 0) frameReport.push(`obs-frames: ${outside.length} frames have verses outside their story's ranges: ${outside.join(', ')}`)
+      report.push(...frameReport.map((line) => `topics: ${line}`))
+      if (frames.size > 0) {
+        built.core.obsFrames = Object.fromEntries(frames)
+        built.core.res = [...built.core.res, [OBS_FRAMES_SOURCE.key, OBS_FRAMES_SOURCE.release] as [string, string]].sort((a, b) => compareCodePoints(a[0], b[0]))
+        const books = [...new Set([...frames.values()].flat(2).map((v) => BOOKS[Math.floor(v / 1_000_000) - 1]))].sort((a, b) => bookNumber(a) - bookNumber(b))
+        built.core.coverage.set(OBS_FRAMES_SOURCE.key, { whole: [], partial: books })
+        for (const [path, text] of [...t.frames].sort((a, b) => compareCodePoints(a[0], b[0]))) frameRows.push({ layer: 'topics', key: `obs-frames ${path}|${sha256Hex(text)}` })
+        extra.push({ key: OBS_FRAMES_SOURCE.key, title: OBS_FRAMES_SOURCE.title, subject: 'Topics', release: OBS_FRAMES_SOURCE.release, license: OBS_FRAMES_SOURCE.license, attribution: OBS_FRAMES_SOURCE.attribution, books: bookSet(books) })
+      }
+    }
     const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))
+    // ACAI is read by the core only (gender, same-as): the parts keep the inputs and bytes of a build without it
+    const acaiUsed = res.acai !== undefined && built.core.res.some(([key]) => key === res.acai![0])
+    const acaiRows = acaiUsed ? [{ layer: 'topics', key: `acai|${sha256Hex(t.acai!)}` }] : []
     const stamps = [
-      ...resWithoutUlt.map(([key, release]) => ({ key, stamp: release })),
+      ...resWithoutUlt.filter(([key]) => key !== res.acai?.[0]).map(([key, release]) => ({ key, stamp: release })),
       ...origs.map((orig) => ({ key: orig.key, stamp: orig.stamp })),
     ]
     const inputs = inputsOf(rows, stamps)
     // The core also reads the rows of the ULT; the parts do not, so their inputs and bytes are those of a build without it
-    const coreInputs = built.core.chunks === undefined ? inputs : inputsOf([...rows, ...chunkRows], [...stamps, { key: ult!.key, stamp: tagOf(ult!.stamp) }])
+    const coreStamps = [
+      ...stamps,
+      ...(built.core.chunks === undefined ? [] : [{ key: ult!.key, stamp: tagOf(ult!.stamp) }]),
+      ...(built.core.obsFrames === undefined ? [] : [{ key: OBS_FRAMES_SOURCE.key, stamp: OBS_FRAMES_SOURCE.release }]),
+      // ACAI's same-as compares its titles with those of the tW of the map language: that tW is an input of the core too
+      ...(acaiUsed ? [{ key: res.acai![0], stamp: res.acai![1] }, ...twUsed] : []),
+    ]
+    const coreInputs = built.core.chunks === undefined && built.core.obsFrames === undefined && !acaiUsed ? inputs : inputsOf([...rows, ...chunkRows, ...frameRows, ...acaiRows], coreStamps)
     segments.push(await builtSegment(xtopicsSegment(built.core), coreInputs))
     for (const part of built.parts) segments.push(await builtSegment(xtopicsSegment(part), inputs))
     const topicKeys = new Set(built.core.res.map(([key]) => key))
@@ -704,6 +841,7 @@ export async function buildCommon(o: {
       if (!topicKeys.has(key)) continue
       extra.push({ key, title: info.title, subject: 'Topics', release, license: info.license, attribution: info.attribution, books: bookSet(built.core.coverage.get(key)?.whole ?? []) })
     }
+    if (acaiUsed) extra.push({ key: res.acai![0], title: ACAI_CREDIT.title, subject: 'Topics', release: res.acai![1], license: ACAI_CREDIT.license, attribution: ACAI_CREDIT.attribution, books: bookSet([]) })
     if (ult !== undefined && built.core.chunks !== undefined) {
       if (!listed.some((ref) => ref.key === ult.key)) listed.push(ult)
       used.add(ult.key)

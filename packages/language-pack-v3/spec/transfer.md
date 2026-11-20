@@ -37,13 +37,15 @@ and how much of it the device already has, by reading only the index and the cat
 ## Modes
 
 - **`full`**: everything needed to read from an empty device. That is:
-  - the language and common catalogs;
+  - the catalog and the catalogs it requires (a language catalog and the common catalog; for `zxx-obsimg`, only itself);
   - the language map and the common map;
   - for each chosen book, its segment and its original;
   - the article groups those books need;
   - optionally the lexicon, OBS and complements.
 - **`update`**: only the segments that changed since the `base` revisions, and the new catalogs. A receiver without a
   base revision cannot use it and says so.
+
+A reader that does not know a class refuses the whole file (`E_BODY`) before it writes anything, so an older reader refuses a `.tcpack` of `zxx-obsimg`.
 
 A patch catalog (`catalog.md`, "Patch catalogs") is transferred on its own, like any language catalog: exporting the base
 language does not include it. It is a published catalog, so the local-origin rule (R1, step 2 of "Receiving") does not

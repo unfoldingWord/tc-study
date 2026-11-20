@@ -22,6 +22,24 @@ topics-core-tables = {
                                ; keys of local-topics (names, refs, related) and ignores any other key of an entry,
                                ; as everywhere (tests/README.md)
   "coverage": coverage,        ; required, v1
+  ? "people": topics-people,   ; optional, v1; core only; from ACAI (ids.md, "Names of people")
+}
+
+; What this language calls people where the pack cannot derive it (ids.md, "Names of people", which is normative). The name a
+; client shows for a person is "names" here, else the first name in this language's map of the tW article joined to the person
+; by "same-as", else the English title of xtopics. The builder writes a name here only when it differs from what that rule gives
+; without it, so nothing is stored twice; the table is built against the common its catalog requires (ids.md says what another
+; common gives). Texts in NFC, as the builder normalized them; a reader neither folds nor normalizes, and does not check the order
+; of map keys (the encoder writes them in the deterministic order of container.md). Every per: id is meant to be a topic id of the
+; common xtopics; one the installed xtopics lacks is ignored by a client, never an error. A reader reads these three keys and
+; ignores any other. Each map may be empty; a builder does not write a table whose three maps are empty.
+topics-people = {
+  "names": { * topic-id => tstr },      ; per: id -> its name, not empty
+  "notes": { * topic-id => tstr },      ; per: id -> what tells it apart ("padre de José"), not empty; only for a person whose
+                                        ; name in this language another person can also be found by (ids.md)
+  "aliases": { * tstr => [+ topic-id] },  ; another name (not empty) -> the per: ids it names, sorted by code point, no
+                                        ; repeat; only a name not given by the rule above, the English title or the first
+                                        ; map name of a tW article joined to the person (ids.md)
 }
 
 ; "source" says where the name came from: the aligned text ("alignment"), the language's own book outline

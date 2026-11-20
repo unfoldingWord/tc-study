@@ -30,6 +30,8 @@ export const XTOPICS_TABLES: Record<string, number[]> = {
   occurrences: [1],
   ranges: [1],
   chunks: [1],
+  'obs-frames': [1],
+  gender: [1],
 }
 
 /** The tables the `topics` reader knows. */
@@ -37,10 +39,11 @@ export const TOPICS_TABLES: Record<string, number[]> = {
   names: [1],
   local: [1],
   coverage: [1],
+  people: [1],
 }
 
-const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks']
-const TOPICS_CORE_ONLY = ['local', 'coverage'] // "names" is in both: a map in the core, verse lists in a part
+const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks', 'obs-frames', 'gender']
+const TOPICS_CORE_ONLY = ['local', 'coverage', 'people'] // "names" is in both: a map in the core, verse lists in a part
 
 type Bad = (what: string) => never
 
@@ -213,8 +216,45 @@ function readXCore(seg: Segment): XtopicsCore {
     }
     core.chunks = out
   }
+  if (hasOwn(t, 'obs-frames')) {
+    const out: Record<string, [number, number][]> = {}
+    for (const [k, v] of Object.entries(table(t['obs-frames'], 'obs-frames', xbad))) {
+      if (!OBS_FRAME_KEY.test(k)) xbad(`obs-frames names ${JSON.stringify(k)}, which is not a frame "N:F"`)
+      if (!Array.isArray(v) || v.length === 0) xbad(`obs-frames[${JSON.stringify(k)}] is not a non-empty list`)
+      put(
+        out,
+        k,
+        v.map((pair) => {
+          if (!Array.isArray(pair) || pair.length !== 2 || !isVerseId(pair[0]) || !isVerseId(pair[1])) {
+            xbad(`obs-frames[${JSON.stringify(k)}] has a pair that is not two verse ids`)
+          }
+          const [a, b] = pair as [number, number]
+          if (a > b) xbad(`obs-frames[${JSON.stringify(k)}] has a range that runs backwards`)
+          if (Math.floor(a / 1000) !== Math.floor(b / 1000)) xbad(`obs-frames[${JSON.stringify(k)}] has a range across two chapters`)
+          return [a, b] as [number, number]
+        }),
+      )
+    }
+    core.obsFrames = out
+  }
+  if (hasOwn(t, 'gender')) {
+    const ids = [...topics.keys()]
+    const col = column(t.gender, 'gender', xbad)
+    if (col.length !== ids.length) xbad(`gender has ${col.length} entries and topics.ids ${ids.length}`)
+    const out: Record<string, 1 | 2> = {}
+    col.forEach((g, i) => {
+      if (g === 0) return
+      if (g > 2) xbad(`gender of ${JSON.stringify(ids[i])} is ${g}`)
+      if (topics.get(ids[i])!.kind !== 'person' || !ids[i].startsWith('per:')) xbad(`gender of ${JSON.stringify(ids[i])}, which is not a person, is ${g}`)
+      put(out, ids[i], g as 1 | 2)
+    })
+    core.gender = out
+  }
   return core
 }
+
+/** A frame key of `obs-frames`: story 1 to 50 and frame 1 to 99, decimal, no leading zeros ("1:3"). */
+export const OBS_FRAME_KEY = /^(?:[1-9]|[1-4][0-9]|50):[1-9][0-9]?$/
 
 function readXPart(seg: Segment, part: string): XtopicsPart {
   checkPart(seg, part, xbad)
@@ -297,7 +337,36 @@ function readTCore(seg: Segment): TopicsCore {
     }
     core.local = out
   }
+  if (hasOwn(t, 'people')) core.people = readPeople(t.people)
   return core
+}
+
+/** The table `people` (`topics.cddl`): every id a `per:` id, no empty text, the ids of an alias sorted and not repeated. Other keys are ignored. */
+function readPeople(value: unknown): NonNullable<TopicsCore['people']> {
+  const p = table(value, 'people', tbad)
+  for (const key of ['names', 'notes', 'aliases']) if (!hasOwn(p, key)) tbad(`people has no "${key}"`)
+  const perId = (id: string, what: string): void => {
+    if (!id.startsWith('per:')) tbad(`${what} ${JSON.stringify(id)}, which is not a per: id`)
+  }
+  const textMap = (key: 'names' | 'notes'): Record<string, string> => {
+    const out: Record<string, string> = {}
+    for (const [k, v] of Object.entries(table(p[key], `people.${key}`, tbad))) {
+      perId(k, `people.${key} names`)
+      if (typeof v !== 'string' || v === '') tbad(`people.${key}[${JSON.stringify(k)}] is not a non-empty text`)
+      put(out, k, v)
+    }
+    return out
+  }
+  const aliases: Record<string, string[]> = {}
+  for (const [k, v] of Object.entries(table(p.aliases, 'people.aliases', tbad))) {
+    if (k === '') tbad('people.aliases has an empty name')
+    const ids = texts(v, `people.aliases[${JSON.stringify(k)}]`, tbad)
+    if (ids.length === 0) tbad(`people.aliases[${JSON.stringify(k)}] is empty`)
+    for (const id of ids) perId(id, `people.aliases[${JSON.stringify(k)}] names`)
+    sortedUnique(ids, `the ids of people.aliases[${JSON.stringify(k)}]`, tbad)
+    put(aliases, k, [...ids])
+  }
+  return { names: textMap('names'), notes: textMap('notes'), aliases }
 }
 
 function readTPart(seg: Segment, part: string): TopicsPart {

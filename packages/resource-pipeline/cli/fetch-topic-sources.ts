@@ -14,14 +14,35 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { trimAcai } from '@bt-synergy/language-pack-v3'
+import { filesOfTarball, manifestOf } from './tarball'
 
-export type TopicSource = { name: string; repository: string; host: 'github' | 'door43'; commit: string; path: string; sha256: string; rawSha256?: string; eol?: 'crlf'; target: string }
+/**
+ * A pinned source: one file (`path`), or, with `tree: "acai"`, a folder of a GitHub repository. For a folder every file under `path` (it
+ * ends in `/`) is taken from the tarball of the commit; the sha256 of their manifest (`tarball.ts` `manifestOf`) must be
+ * `manifestSha256` (GitHub tarballs are not stable byte for byte, the files in them are), and the files are trimmed into `target` (ACAI's
+ * `trimAcai`), whose sha256 is `sha256`.
+ */
+export type TopicSource = {
+  name: string
+  repository: string
+  host: 'github' | 'door43'
+  commit: string
+  path: string
+  sha256: string
+  rawSha256?: string
+  eol?: 'crlf'
+  target: string
+  tree?: 'acai'
+  manifestSha256?: string
+}
 type Io = { log: (line: string) => void; error: (line: string) => void }
 type FetchFn = (url: string) => Promise<Response>
 
 const encodePath = (p: string): string => p.split('/').map(encodeURIComponent).join('/')
 
 export function urlOf(s: TopicSource): string {
+  if (s.tree !== undefined) return `https://codeload.github.com/${s.repository}/tar.gz/${s.commit}`
   return s.host === 'github'
     ? `https://raw.githubusercontent.com/${s.repository}/${s.commit}/${encodePath(s.path)}`
     : `https://git.door43.org/${s.repository}/raw/commit/${s.commit}/${encodePath(s.path)}`
@@ -38,6 +59,16 @@ export function toCrlf(bytes: Uint8Array): Uint8Array {
 }
 
 const sha256Of = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex')
+
+/** The trimmed bytes of a `tree` pin from the body of its tarball, or why the files are not the pinned ones. */
+export async function treeBytes(s: TopicSource, body: AsyncIterable<Uint8Array>): Promise<{ bytes: Uint8Array; files: number; issues: string[] } | { error: string }> {
+  const files = await filesOfTarball(body, s.path)
+  const manifest = sha256Of(new TextEncoder().encode(manifestOf(files)))
+  if (manifest !== s.manifestSha256) return { error: `${s.target}: the ${files.size} files under ${s.path} have the manifest sha256 ${manifest}, the pin says ${s.manifestSha256}` }
+  const texts = new Map([...files].map(([p, b]) => [p, new TextDecoder().decode(b)]))
+  const issues: string[] = []
+  return { bytes: new TextEncoder().encode(trimAcai(texts, s.commit, issues)), files: files.size, issues }
+}
 
 const USAGE = 'Usage: fetch-topic-sources --out <dir> [--work <dir>]'
 
@@ -103,7 +134,16 @@ export async function main(args: string[], io: Io, fetchFn: FetchFn = (u) => fet
         io.error(`${s.target}: HTTP ${res.status} from ${urlOf(s)}`)
         return 1
       }
-      bytes = new Uint8Array(await res.arrayBuffer())
+      if (s.tree !== undefined) {
+        if (res.body === null) throw new Error(`no body from ${urlOf(s)}`)
+        const got = await treeBytes(s, res.body as unknown as AsyncIterable<Uint8Array>)
+        if ('error' in got) {
+          io.error(got.error)
+          return 1
+        }
+        bytes = got.bytes
+        for (const line of got.issues) io.log(`${s.target}: ${line}`)
+      } else bytes = new Uint8Array(await res.arrayBuffer())
     } catch (e) {
       io.error(`${s.target}: ${e instanceof Error ? e.message : String(e)}`)
       return 1

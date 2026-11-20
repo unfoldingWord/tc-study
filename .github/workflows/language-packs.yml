@@ -65,6 +65,16 @@ on:
         required: false
         type: string
         default: 'true'
+      obs_images:
+        description: Build and publish only the OBS images catalog zxx-obsimg; language must be zxx-obsimg
+        required: false
+        type: boolean
+        default: false
+      obs_5m:
+        description: With parts, obs and v3, for en or id, add the OBS Five Movements manual (en_obs-tf v4, id_obs-tf v0.1.0) to the obs segment of format 3 (off by default)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -87,7 +97,9 @@ defaults:
     shell: bash
 
 jobs:
+  # The language packs. Not run for the OBS images catalog (obs_images), which has no language: its job is obs-images below.
   packs:
+    if: ${{ !inputs.obs_images }}
     # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
     runs-on: ubuntu-24.04
     timeout-minutes: 300
@@ -100,6 +112,7 @@ jobs:
       PARTS: ${{ inputs.parts }}
       COMPARE: ${{ inputs.compare }}
       OBS: ${{ inputs.obs }}
+      OBS_5M: ${{ inputs.obs_5m }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -343,6 +356,23 @@ jobs:
         continue-on-error: true
         run: bun packages/resource-pipeline/cli/fetch-topic-sources.ts --out "$RUNNER_TEMP/topics" --work "$RUNNER_TEMP/packs-v3-work"
 
+      # The OBS Five Movements manual of the language (en_obs-tf v4, id_obs-tf v0.1.0; only for those languages with obs, parts, v3 and staging: any other combination leaves it unfetched and the format 3 step skips), at the commit its tag points to: a moved tag fails the step instead of changing the pack.
+      - name: OBS 5M manual (format 3)
+        id: obs5m
+        if: inputs.obs_5m && (inputs.language == 'en' || inputs.language == 'id') && inputs.obs && inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -e
+          case "$LANGUAGE" in
+            en) repo=en_obs-tf; tag=v4; pin=59f74b7cc87815bd2991aa0db8b42a9606c5ce13 ;;
+            id) repo=id_obs-tf; tag=v0.1.0; pin=f0219a721f9d9a4ac093936307ab816afb78af74 ;;
+            *) echo "no OBS 5M manual for $LANGUAGE" >&2; exit 1 ;;
+          esac
+          git clone --quiet --depth 1 --branch "$tag" "https://git.door43.org/unfoldingWord/$repo.git" "$RUNNER_TEMP/obs-tf"
+          test "$(git -C "$RUNNER_TEMP/obs-tf" rev-parse HEAD)" = "$pin"
+          printf '%s\n' "$tag" > "$RUNNER_TEMP/obs-tf.tag"
+          test -f "$RUNNER_TEMP/obs-tf/obs_story_1.md"
+
       - name: Build and publish format 3
         id: v3
         timeout-minutes: 90
@@ -355,6 +385,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ inputs.mode == 'publish' && secrets.R2_SECRET_ACCESS_KEY || '' }}
           PACKS_V3_SIGNING_KEY: ${{ secrets.PACKS_V3_SIGNING_KEY }}
           TOPICS_OUTCOME: ${{ steps.topics.outcome }}
+          OBS5M_OUTCOME: ${{ steps.obs5m.outcome }}
         run: |
           # What Door43 or a library prints could look like a workflow command: none is read until the token comes back.
           token="$(openssl rand -hex 16)"
@@ -370,6 +401,12 @@ jobs:
               echo "### Format 3: $LANGUAGE"
               echo "Outcome: \`skipped\`: the topic sources step did not succeed, and a build without topics must not be published"
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # The OBS 5M manual was asked for and could not be fetched: no pack is built without it (a pack without it would drop the tables).
+          if [ "$OBS_5M" = true ] && [ "$OBS5M_OUTCOME" != success ]; then
+            echo '{"outcome":"skipped","reason":"the OBS 5M manual could not be fetched"}' > "$RUNNER_TEMP/packs-out/v3-result.json"
+            { echo; echo "### Format 3: $LANGUAGE"; echo "Outcome: \`skipped\`: the OBS 5M manual could not be fetched"; } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           # An upload without the key would put an unsigned catalog over a signed one: that fails this step (the 2.0 status is not touched).
@@ -393,6 +430,7 @@ jobs:
           # publish-v3 wants the tag in lowercase; the 2.0 files above keep the value as given.
           args=(--lang "${LANGUAGE,,}" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
           args+=(--topics "$RUNNER_TEMP/topics")
+          if [ "$OBS_5M" = true ]; then args+=(--obs-tf "$RUNNER_TEMP/obs-tf" --obs-tf-release "$(cat "$RUNNER_TEMP/obs-tf.tag")"); fi
           # The related of the tA articles needs the config.yaml of each manual, from the release the list names: without it the
           # build would lose those ties and say nothing, so a failed fetch fails this step (nothing was uploaded).
           if ! bun packages/resource-pipeline/cli/fetch-ta-config.ts --list "$list" --out "$RUNNER_TEMP/ta-config" >&2; then
@@ -467,5 +505,94 @@ jobs:
             ${{ runner.temp }}/packs-out
             ${{ runner.temp }}/packs-work/parts-report.json
             ${{ runner.temp }}/packs-work/catalog/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The OBS pictures (packages/resource-pipeline/cli/publish-obs-images.ts): the catalog zxx-obsimg, the same for every language and
+  # required by none. Staging only in this phase. `language` must be zxx-obsimg so that a mistyped code never silently skips a
+  # language; nothing of the packs job runs.
+  obs-images:
+    if: ${{ inputs.obs_images }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: packs-staging
+    env:
+      LANGUAGE: ${{ inputs.language }}
+      MODE: ${{ inputs.mode }}
+      TARGET: ${{ inputs.target }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Check inputs
+        run: |
+          if [ "$LANGUAGE" != zxx-obsimg ]; then
+            echo "::error::obs_images builds only the catalog zxx-obsimg: language must be zxx-obsimg"
+            exit 1
+          fi
+          if [ "$TARGET" != staging ]; then
+            echo "::error::obs_images publishes to staging only in this phase"
+            exit 1
+          fi
+          case "$MODE" in publish | no-upload) ;; *) echo "::error::mode must be publish or no-upload"; exit 1 ;; esac
+
+      - name: Checkout tc-study
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.3
+
+      # Installs with the frozen lockfile and builds the dist of the packages publish-obs-images reaches through
+      # publishLanguage (language-pack, resource-catalog, ...): a fresh runner has none.
+      - name: Build pack tools
+        run: bash scripts/build-pack-tools.sh
+
+      - name: Build and publish the OBS images
+        id: images
+        env:
+          R2_ENDPOINT: ${{ inputs.mode == 'publish' && secrets.R2_ENDPOINT || '' }}
+          R2_BUCKET: ${{ inputs.mode == 'publish' && secrets.R2_BUCKET || '' }}
+          R2_ACCESS_KEY_ID: ${{ inputs.mode == 'publish' && secrets.R2_ACCESS_KEY_ID || '' }}
+          R2_SECRET_ACCESS_KEY: ${{ inputs.mode == 'publish' && secrets.R2_SECRET_ACCESS_KEY || '' }}
+          PACKS_V3_SIGNING_KEY: ${{ secrets.PACKS_V3_SIGNING_KEY }}
+        run: |
+          # What a library prints could look like a workflow command: none is read until the token comes back.
+          token="$(openssl rand -hex 16)"
+          echo "::stop-commands::$token"
+          trap 'echo "::$token::"' EXIT
+          mkdir -p "$RUNNER_TEMP/packs-out"
+          # An upload without the key would put an unsigned catalog over a signed one.
+          if [ "$MODE" != no-upload ] && [ -z "$PACKS_V3_SIGNING_KEY" ]; then
+            echo "the signing secret is not set and this run would upload; nothing was uploaded" >&2
+            exit 1
+          fi
+          # The key is written only when the secret is set, readable by this user alone; it is never printed.
+          if [ -n "$PACKS_V3_SIGNING_KEY" ]; then
+            (umask 077; printf '%s\n' "$PACKS_V3_SIGNING_KEY" > "$RUNNER_TEMP/sign.pem")
+          fi
+          args=(--work "$RUNNER_TEMP/obsimg-work")
+          if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi
+          if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
+          status=0
+          bun packages/resource-pipeline/cli/publish-obs-images.ts "${args[@]}" > "$RUNNER_TEMP/packs-out/obsimg-stdout.txt" || status=$?
+          tail -n 1 "$RUNNER_TEMP/packs-out/obsimg-stdout.txt" > "$RUNNER_TEMP/packs-out/obsimg-result.json"
+          outcome="$(jq -r '.outcome // "unknown"' "$RUNNER_TEMP/packs-out/obsimg-result.json" || echo unknown)"
+          {
+            echo "### OBS images: zxx-obsimg"
+            echo "Outcome: \`$outcome\` (exit $status)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      # The signing key file never outlives the step that wrote it: removed whatever the outcome (also when the step failed or the run was cancelled).
+      - name: Remove the signing key
+        if: always()
+        run: shred -u "$RUNNER_TEMP/sign.pem" 2> /dev/null || rm -f "$RUNNER_TEMP/sign.pem"
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: obsimg-result
+          path: ${{ runner.temp }}/packs-out
           if-no-files-found: ignore
           retention-days: 14

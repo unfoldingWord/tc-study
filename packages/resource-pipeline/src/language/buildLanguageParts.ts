@@ -313,7 +313,7 @@ export type DiscoverInto = (o: {
   language: string
   catalogManager: CatalogManager
   door43Client: Door43Like
-}) => Promise<{ resources: string[]; originals: string[]; obs?: { lines: string[] } }>
+}) => Promise<{ resources: string[]; originals: string[]; obs?: { lines: string[] }; withoutTcReady?: string[] }>
 
 const defaultDiscover: DiscoverInto = async ({ language, catalogManager, door43Client }) => {
   const found = await discoverLanguage({
@@ -325,7 +325,7 @@ const defaultDiscover: DiscoverInto = async ({ language, catalogManager, door43C
     // zip step 1 hashes, not from a download of their own.
     ingredientsClient: door43Client as never,
   })
-  return { resources: found.resources.map((r) => r.resourceKey), originals: found.originals, obs: found.obs }
+  return { resources: found.resources.map((r) => r.resourceKey), originals: found.originals, obs: found.obs, withoutTcReady: found.withoutTcReady }
 }
 
 const DEFAULT_MEMORY_LIMIT_MB = 10_240
@@ -991,6 +991,7 @@ export async function buildLanguageParts(o: {
       await deleteDatabases('catalog', [discoveryCache], [DISCOVERY_DB])
     }
 
+    if (found.withoutTcReady?.length) say(`[${elapsed()}] sin tc-ready: ${found.withoutTcReady.join(', ')} (el texto literal alineado de ${language} no tiene ese tema en Door43; entra igual, marcado)`)
     const candidates: string[] = []
     for (const key of (await catalog.getAll()).sort()) {
       const m = await metaOf(key)

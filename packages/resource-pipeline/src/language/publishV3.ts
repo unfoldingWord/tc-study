@@ -181,3 +181,68 @@ export async function publishV3(o: {
   }
   return { outcome: 'published', uploaded, skipped }
 }
+
+/** What the bucket has of one catalog by name (a catalog that is neither common nor the registry's language), or undefined. */
+export async function readPublishedCatalog(bucket: PackBucket, name: string): Promise<Published | undefined> {
+  return publishedCatalog(bucket, name)
+}
+
+/**
+ * Uploads a catalog that requires nothing (`zxx-obsimg`): the segments the bucket lacks, in id order, then the catalog, from the folder
+ * `build-v3` wrote (`catalog-<name>.seg`, `segments/`). No common catalog, no registry. A catalog equal to the published one apart from
+ * `about` (and signed by `signer` when one is given) is `unchanged` and nothing is put. A catalog is only put when every segment it names
+ * is in the bucket.
+ */
+export async function publishStandalone(o: {
+  bucket: PackBucket
+  outDir: string
+  name: string
+  signer?: { keyId: string; publicKey: Uint8Array }
+  log: (line: string) => void
+}): Promise<{ outcome: 'published' | 'unchanged'; uploaded: string[]; skipped: string[] }> {
+  const { bucket, outDir, name, log } = o
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name) || name === 'common') throw new Error(`Not a catalog name for a standalone upload: ${JSON.stringify(name)}`)
+  const uploaded: string[] = []
+  const skipped: string[] = []
+  const catalogFile = join(outDir, `catalog-${name}.seg`)
+  if (!existsSync(catalogFile)) throw new Error(`The build folder has no catalog-${name}.seg`)
+  const bytes = new Uint8Array(readFileSync(catalogFile))
+  const { model } = await readCatalog(bytes)
+  if (model.about.catalog !== name) throw new Error(`catalog-${name}.seg is the catalog ${JSON.stringify(model.about.catalog)}`)
+  if ((model.requires ?? []).length > 0) throw new Error(`The catalog ${name} requires other catalogs; a standalone upload is for a catalog that requires nothing`)
+
+  const before = await publishedCatalog(bucket, name)
+  if (before !== undefined && (await sameAsPublished(before.bytes, bytes, o.signer))) {
+    log(`catalog ${name}: unchanged (revision ${before.revision})`)
+    return { outcome: 'unchanged', uploaded, skipped }
+  }
+  if (o.signer !== undefined && !(await signedBy(bytes, o.signer))) {
+    throw new Error(`The catalog ${name} in ${outDir} does not verify against the signing key ${o.signer.keyId}: nothing was uploaded`)
+  }
+
+  const classes = new Map<string, string>()
+  for (const entry of model.segments) classes.set(hex(entry.id), entry.class)
+  const ids = [...classes.keys()].sort()
+  for (const id of ids) {
+    const key = V3_KEYS.seg(id)
+    if (await bucket.has(key)) {
+      skipped.push(key)
+      continue
+    }
+    const path = join(outDir, 'segments', `${id}.seg`)
+    if (!existsSync(path)) throw new Error(`Segment ${id} is named by the catalog and is neither in the bucket nor in ${outDir}`)
+    const segBytes = new Uint8Array(readFileSync(path))
+    // The id is the sha256 of the decompressed body; a file that does not hash to its name is never uploaded.
+    await readSegment(segBytes, { known: KNOWN[classes.get(id) as keyof typeof KNOWN] ?? {}, expectedId: id })
+    await bucket.put(key, segBytes, { contentType: 'application/octet-stream', cacheControl: IMMUTABLE })
+    uploaded.push(key)
+  }
+  log(`segments: ${uploaded.length} uploaded, ${skipped.length} already there`)
+  for (const id of ids) {
+    if (!(await bucket.has(V3_KEYS.seg(id)))) throw new Error(`Segment ${id} is not in the bucket after its upload; no catalog was put`)
+  }
+  await bucket.put(V3_KEYS.catalog(name), bytes, { contentType: 'application/octet-stream', cacheControl: NO_CACHE })
+  uploaded.push(V3_KEYS.catalog(name))
+  log(`catalog ${name}: put`)
+  return { outcome: 'published', uploaded, skipped }
+}

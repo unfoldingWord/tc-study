@@ -95,7 +95,7 @@ name a person sees comes from each language's map.
 | --- | --- | --- | --- |
 | `tw:` | A word article | `tw:kt/grace`, `tw:names/abraham`, `tw:other/shepherd` | The tW path without `bible/` |
 | `ta:` | An Academy article | `ta:translate/figs-metaphor` | The tA manual and slug |
-| `per:` | A person | `per:abraham` | The id: TIPNR's unique name. The name shown: the language's `topics` names, else the English title in `xtopics` |
+| `per:` | A person | `per:abraham` | The id: TIPNR's unique name. The name shown: "Names of people" below |
 | `lug:` | A place | `lug:jerusalem` | As `per:` |
 | `ev:` | An event | `ev:plagues-of-egypt` | The id: Theographic's title or the builder's list. The name shown: the language's outline, else the English title in `xtopics` |
 | `tema:` | A topic (kind 4) | `tema:faith` | The builder's list; the language's name is in its `map` `names` (`map.cddl`). Part B builds no `tema:` id yet: the list is empty |
@@ -107,13 +107,14 @@ name a person sees comes from each language's map.
 - **Ids of events** (`ev:`): the slug of the Theographic title by the same rule, with `-2`, `-3` after it on a clash, in the order of the `eventID`; the `eventID` is kept beside the id as the topic's `ref`, and the title as its `title` (the English name shown when a language has none; for an event of the builder's list, that list's title). An event Theographic lacks comes from a short list the builder owns (source `builder`, confidence 100); it starts with `ev:plagues-of-egypt`, Exodus 7:14-12:36.
 - **Sections and stories.** `sec:{book}/{range}` comes from the outline of the English tN introduction (`sec:exo/7-12`); `obs:{n}` from English OBS v9, with the verse ranges of the story's closing line. The outline is the list under the first heading of the introduction (`front:intro`) whose text contains `Outline` or `Esquema` (English and Spanish, any case), up to the next heading of the same or a higher level. The introduction is the first note, in the order of the source, whose reference is `front:intro` or that is marked `isIntro` and has such a heading (a source in format 2.0 has no `front:intro` and uses the second form). Each item is a title and a verse range (`3:1-24`, `1:1-2:3`); of a label after the range, only the form `(3:1-24) - label` (a parenthesized range, a dash, then letters) is stripped from the title. A heading in another language is not recognised: that introduction gives no sections and no names, no local topics, and the build report says `no Outline section`; so does an item the builder cannot read as a range. An entry of a language's outline whose range equals that of an English `sec:` gives that section a name in the language; one that equals none becomes `{lang}:tema/{book}/{slug}`, where `{book}` is the book of the outline and `{slug}` the title in lower case without accents, runs of other characters made `-`; a title that leaves no slug gives the first verse of the range as `{slug}` (`tema/tit/56001005`, the book not repeated). The id never depends on which other books are built. Two entries of one book whose titles give the same slug and whose ranges differ get `-2`, `-3` after the slug, in the order of the outline; two with the same range are one topic with both names.
 - **The section map (`chunks`).** The unit `xtopics` of the common catalog has an optional table `chunks` (version 1) in its core: for each book, the sections of the English ULT (`unfoldingWord/en/ult`) as `[first verse id, last verse id]` pairs, in order. A section starts at the first verse at or after a `\ts\*` milestone of the ULT (the first one at the first verse of the book) and ends at the verse before the next; verse 0 and introductions are in none. A book whose ULT has no `\ts\*` has no entry (nothing is invented), and so has a book the ULT does not have. They are not the `sec:` topics, which come from the tN outlines and are much coarser. A client reads `chunks` from the `xtopics` core; the ULT is a resource of the core's `res` with its release. A reader that does not know the table skips it.
+- **The verses of each OBS frame (`obs-frames`).** The unit `xtopics` of the common catalog has an optional table `obs-frames` (version 1) in its core: for each frame of Open Bible Stories, the verse ranges it tells, from Bible Story Builder (`bcv-commons/bible-story-builder`, MIT, `fuentes.md`). The key is the frame's reference text, `N:F` with no leading zeros (`10:3`), the same as the piece id of a frame without its resource key (`es-419_gl/es-419/obs/10:3`), and the same in every language, because the translations keep the frames of English OBS. Each range is within one chapter (the builder splits a range of the source that crosses chapters, with the chapter lengths of the originals), so a client counts a frame's verses without a table of chapter lengths. The verses are in the original's numbering (the source uses the English one, which is the UHB's: no conversion). The story ranges stay in `ranges` (`obs:10`): `obs-frames` is finer and comes from another source, so the two can disagree; the builder reports a frame whose verses are outside its story's ranges. A frame that tells no verse (a frame of the source with an empty `[[ref:]]`) has no key. A client builds the other direction, verse to frames, from this table; the pack does not carry it. A reader that does not know the table skips it, so older readers read the core as before.
 - **Relation types of `xtopics`** (the `type` of a relation; the end that is `from` is named first):
   - `parent-of` (parent to child), `sibling-of` and `partner-of` (symmetric), `founder-of` (founder to the place or tribe) and `inhabitant-of` (inhabitant to the place), from TIPNR;
   - `tribe`: from the person to the tribe (or people) TIPNR names for them;
   - `part-of` (an event to the larger event) and `follows` (an event to its predecessor), from Theographic;
   - `participant`: from the event to a person, and `place`: from the event to a place, both from Theographic's participants and places, only when the name and at least one verse of the event match exactly one TIPNR record of that kind (confidence 80); a match that is not exactly one goes to the review list, and no relation is made;
   - `occurs-in`: from a story (`obs:`) or a section (`sec:`) to an event, when any verse of the event is also a verse of one of the story's or section's ranges (confidence 60). The test is overlap of any size, not containment: an event that begins in a story and ends outside it is listed, and a story can occur in several events (the Plagues of Egypt overlap OBS stories 10, 11, 12 and 48);
-  - `same-as`: from a `tw:names/` concept to the one person or place whose Strong keys it shares and whose verses overlap (confidence 70); a match that is not exactly one goes to the review list.
+  - `same-as`: from a `tw:names/` concept to the one person or place whose Strong keys it shares and whose verses overlap (confidence 70); a match that is not exactly one goes to the review list. A concept this rule joins to no one may get a `same-as` from ACAI instead (source ACAI, confidence 75; "People of ACAI" below), and then it may be joined to several people (the article "Abijah" is about several Abijahs).
   A TIPNR relation whose other end is a unique name shared by several records goes to the person's record when there is one, and is not reported as a review case.
 - **A TIPNR dStrong as a Strong key** (`topics.strongs`). TIPNR writes the Strong number of a name with STEPBible's capital disambiguation letter: `H2148P`, `G2197H`. The builder writes it as the key of the original (see "Strong keys"): Hebrew `H` and four digits, keeping a lowercase suffix when TIPNR has one (`H2148P` gives `H2148`, `H7462b` stays); Greek `G`, the number in four digits and a final `0`, which makes the five digits the UGNT writes (`G2197H` gives `G21970`; a disambiguation letter is dropped). Two comparisons use the keys. To take a name from the alignment, a word of the original matches when it has the same letter and number, and the same suffix when the key has one (`H2148` matches `H2148` and `H2148a`; `H2148a` only `H2148a`); for Greek only the first four digits of the number are compared, because the UGNT may end a number in a digit other than `0` (`G21970` and `G21971` both match a TIPNR `G2197`). To join a `tw:names/` concept to a person or place (`same-as`), only the letter and the four digits of the number are compared (`H2148a`, `H2148` and `G21970` against `G2197`). A text of another form is not a Strong key and goes to the build report.
 - **`ev:` concepts get no name from the alignment.** An event is named by its title (English, from Theographic) and by the language's outline; no name is taken for it from the aligned text.
@@ -125,6 +126,108 @@ name a person sees comes from each language's map.
   (`ta:translate/figs-orderheb`), and a link to it (`[[rc://*/ta/man/translate/figs-orderHeb]]`) is rewritten with the
   lowercase id (`[[ta:translate/figs-orderheb]]`).
 
+## People of ACAI
+
+ACAI (`BibleAquifer/ACAI`, `fuentes.md`) adds to the people of TIPNR what TIPNR lacks: the gender, the names in other
+languages, other names (aliases) and the uW Translation Words article of a person. It never makes, changes or merges an id,
+and none of its relations is used (the family relations come from TIPNR alone).
+
+- **What is read.** Of each file of `people/json/` (an object, or a list whose first item is the object) whose `id` starts
+  `person:`: `id`, `primary_id` (missing or empty: the `id`), `gender`, `alternate_sources.tipnr` (texts),
+  `alternate_sources.aquifer` (texts `number|title|resource`: only those of exactly three pieces whose resource is
+  `UWTranslationWords`, and of them the title), and `localizations.<code>.preferred_label` for the six codes below. Texts are
+  trimmed and made NFC. `src/source/acai.ts` `trimAcai` writes exactly this, sorted by `id`, as `acai/people.json`; that file
+  is what the builder reads, and its sha256 is pinned (`fuentes.md`). Not read: descriptions, word lists, references (ORG
+  versification), roles, tribes, places and relations.
+- **Join.** A record whose `primary_id` is its own id is joined to the `per:` topic whose `ref` is one of its TIPNR names, when
+  they give exactly one topic (were two `per:` topics to share a `ref`, the last by id is the one joined, and the build reports
+  it); none is not joined, several goes to the review list. Two records joined to one topic: the
+  first by ACAI id (code point) is used, the second and its alias records go to the review list. A record whose `primary_id`
+  is another record is an **alias record**: it belongs to the topic its primary record is joined to, and is not joined by its
+  own TIPNR names. An alias record whose primary is not joined, or is itself an alias record, is left out and reported.
+- **Gender** (`xtopics` `gender`): ACAI's `male` is 1, `female` 2; anything else, or a person ACAI does not join, is 0. A core
+  where every value would be 0 has no table.
+- **`same-as` of ACAI.** ACAI names a uW Translation Words article by its English title (`26734|Isaac|UWTranslationWords`;
+  the number is Aquifer's, not an id of tW). The titles compared are those of the tW of the map language of the common build
+  (`mapLang`, English: the rows `helps-text:tw-title:`), whose key and release are then inputs of the core; a build without a
+  map language makes no `same-as` of ACAI and says so in its report. The title is folded (combining marks dropped after NFD,
+  lowercase, only letters and digits kept) and compared with the folded slug of every `tw:names/` concept and with its
+  folded English title and each comma-separated piece of it (`Jacob, Israel`). When exactly one concept matches, and the TIPNR
+  rule above joined that concept to no one, the builder adds `same-as` from the concept to the person (source ACAI,
+  confidence 75). A concept the TIPNR rule joined keeps only that: ACAI fills what is missing. Two ACAI people may each get
+  the same concept this way. No match, several, and a concept joined by TIPNR to someone else go to the review list. A pair is
+  never added twice.
+
+### Names of people
+
+The name a client shows for a person `P` in language `L` is, in this order:
+
+1. `people.names[P]` of the `topics` core of `L`;
+2. else the first name in the `map` `names` of `L` of the `tw:names/` concept joined to `P` by a `same-as` of the `xtopics`
+   core (the first such concept by code point that has a name in `L`);
+3. else the English title of `P` (`xtopics` `topics.title`).
+
+The names of `L`'s `topics` `names` (taken from the alignment, often noisy: "he", "his son") are not part of this rule. A client
+may still find a person by its first one.
+
+The builder of `L` writes, for a person ACAI joins and names in `L` (the language's ACAI code: `en` eng, `es-419` spa, `fr`
+fra, `id` ind, `hi` hin, `ar` arb; any other language has no table):
+- **The label.** ACAI's preferred label is split into a name and a note: when it ends with `(`, a text with no parenthesis,
+  `)` (white space around them ignored, Unicode white space included), and something that is not white space comes before the `(`, the name is what comes before and
+  the note what is inside, each trimmed (`Jacob (padre de José)` is `Jacob` and `padre de José`); otherwise the whole label,
+  trimmed, is the name and there is no note (`A (b) c`, `(x)`). An empty name gives nothing; an empty note is no note.
+- **`names`**: the name, only when it is not, byte for byte, what steps 2 and 3 give. Both sides are NFC: ACAI's after
+  trimming (above), the `map` names as `map.cddl` stores them; the English title is compared as `xtopics` stores it.
+- **`aliases`**: the name of each alias record of `P` in `L` (its note dropped: `P` has its own), to `P`; only when it is not
+  `P`'s name in `L` (the rule above, with `names`), its English title, or the first `map` name in `L` of a `tw:names/` concept
+  joined to `P`. Two alias records with the same name are one key with all their people.
+  - **Not an alias that mostly means someone else.** Let `Q` be, of the other people the name finds in `L` without the
+    aliases (their name in `L`, their English title, the first `map` name of a `tw:names/` concept joined to them), the one in
+    the most verses (the `xtopics` counts; ties: the first by id). The alias is left out when TIPNR calls `P` by it in at most
+    a tenth of `Q`'s verses while `P` is in more than a tenth of them. "TIPNR calls `P` by it" counts the distinct verses of
+    `P`'s TIPNR name lines whose name (the part before `|` of the line's key; a line may list several spellings, separated by
+    commas) is the English name of the alias record, or whose dStrong has the Strong number of one of `Q`'s Strong keys (letter
+    and four digits, as for `same-as`). Example: ACAI makes «David» an alias of Judah from a textual variant TIPNR lists in one
+    verse (2 Chronicles 25:28), while David is in 964 verses and Judah in 1022: a client's ten-times rule on all their verses
+    could not choose, so «David» is not stored for Judah. «Simon» for Peter (45 verses) and «Jehoram» for Joram (filed under
+    Joram's line of H3088) stay. The build report lists what is left out.
+    The rule does not apply (the alias stays) when the alias record has no English name, when `P` has no TIPNR record, or
+    when `Q` is in no verse; a build without TIPNR records (none given, or an empty list) or without counts weighs no alias
+    and says so. The names compared are those of `L`, so the result can differ between languages: in English «Saul» for
+    Paul is left out (King Saul is in 327 verses, TIPNR calls Paul «Saul» in 22), while in Spanish «Saulo» finds no one else
+    and stays. `notes` are decided after this, so an alias left out no longer makes a note.
+- **`notes`**: the note of `P`'s label in `L`, only when `P`'s name in `L` is a name another person can also be found by in
+  `L`: that person's name in `L`, an alias in `L`, the first `map` name in `L` of a `tw:names/` concept joined to it, or its
+  English title; compared byte for byte. There the note tells the two apart.
+- A table with nothing in its three maps is not written. No table means: every name comes from steps 2 and 3, no person has a
+  note or an alias.
+
+**Built against one common.** What `people` leaves out is what steps 2 and 3 give with the `xtopics` core the language was
+built against, the common its catalog requires (`requires`, `catalog.md`); `notes` also depends on the people of that core. A
+client that reads the table with another common (one installed before or after) is not wrong in kind, only less exact: a person
+may show its tW title or English title instead of ACAI's name, two people may be told apart by no note, and an id the common
+lacks is ignored. It is never an error. A client that keeps the common its language requires, as `install` does, sees the names
+the builder meant.
+
+A client that compares names folds them its own way; the pack does not fold.
+
+### Verses of a family relation
+
+The relations `parent-of`, `sibling-of` and `partner-of` of `xtopics` carry no verse. A client finds the verses that show one
+from what the pack already has, the verses of each person in the `xtopics` parts (`occurrences` of the parts; the core has
+only counts), with this rule (normative: every client gives the same verses):
+
+1. Let `A` and `B` be the verse ids of the two people in the parts installed (all books). If they share verses, the first three
+   shared ones in canonical order (verse id order), each as the pair `[v, v]`.
+2. Else, of all pairs `a` of `A` and `b` of `B` in the same chapter with `|a - b| <= 3`, the one with the smallest `|a - b|`;
+   on a tie, the one with the smallest `min(a, b)`, then the smallest `max(a, b)`. It is given as `[min(a, b), max(a, b)]`.
+3. Else none.
+
+The rule is symmetric: which end is `from` does not matter. A relation never joins a person to itself (the builder drops one).
+A part that is not installed gives no verses of its book, and a client with the core alone gives none. The verses are not stored
+in the pack because they can be derived (`language-pack-client` `kinVerses`); `tests/parentescos/versiculos.json` holds the
+vectors every implementation must give.
+
 ## Strong keys
 
 The maps count Strong numbers by a key made from what the original publishes:
@@ -133,6 +236,11 @@ The maps count Strong numbers by a key made from what the original publishes:
 - Greek: as the UGNT writes it, five digits (`G54850`).
 
 A reader looking up `G5485` also tries `G54850`.
+
+The `macula` table of `orig` (v2, `cddl/orig.cddl`) uses both ideas: every word it names, a leaf of a tree or the word that
+refers, is a position of this book (the section above), not a verse and a place in the verse; and the Strong of the
+entities of its referents is a Strong key made as above. To fix an antecedent, `orig.cddl` compares the number of two
+Strongs (letter and digits, as that file says), not the whole key.
 
 ## Sections of articles
 

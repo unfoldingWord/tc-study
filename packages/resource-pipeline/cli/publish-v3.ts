@@ -38,6 +38,7 @@ class UsageError extends Error {}
 export const USAGE =
   'Usage: publish-v3 --lang <tag> --list <list.json> --originals <originals list.json> --parts <dir> --work <dir>\n' +
   '  [--bucket-dir <dir>] [--no-upload] [--map-lang en] [--map-list <list.json>] [--topics <dir>] [--aligned] [--books <list>] [--ta-config <dir>] [--book-names <file>]\n' +
+  '  [--obs-tf <dir> --obs-tf-release <tag>]  the OBS 5M manual (build-v3 --obs-tf), English only\n' +
   '  The bucket is --bucket-dir, else R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY (all or none); with neither only --no-upload is allowed.\n' +
   '  --books is for local tests: with --lang equal to --map-lang it needs --bucket-dir.'
 
@@ -45,7 +46,7 @@ type Io = { log: (line: string) => void; error: (line: string) => void; out?: (l
 type Env = Record<string, string | undefined>
 
 const BOOLEAN_FLAGS = ['no-upload', 'aligned']
-const VALUE_FLAGS = ['lang', 'list', 'originals', 'parts', 'work', 'bucket-dir', 'map-lang', 'map-list', 'topics', 'books', 'sign-key', 'ta-config', 'book-names']
+const VALUE_FLAGS = ['lang', 'list', 'originals', 'parts', 'work', 'bucket-dir', 'map-lang', 'map-list', 'topics', 'books', 'sign-key', 'ta-config', 'book-names', 'obs-tf', 'obs-tf-release']
 const TAG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 type Options = {
@@ -64,6 +65,8 @@ type Options = {
   signKey?: string
   taConfig?: string
   bookNames?: string
+  obsTf?: string
+  obsTfRelease?: string
 }
 
 function parse(argv: string[]): Options {
@@ -94,6 +97,7 @@ function parse(argv: string[]): Options {
   if (!TAG.test(mapLang) || mapLang === 'common') throw new UsageError(`--map-lang ${JSON.stringify(mapLang)} is not a language tag`)
   const signKey = flags.get('sign-key')
   if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
+  if (flags.has('obs-tf') !== flags.has('obs-tf-release')) throw new UsageError('--obs-tf and --obs-tf-release go together')
   return {
     lang,
     list: need('list'),
@@ -110,6 +114,8 @@ function parse(argv: string[]): Options {
     signKey,
     taConfig: flags.get('ta-config'),
     bookNames: flags.get('book-names'),
+    obsTf: flags.get('obs-tf'),
+    obsTfRelease: flags.get('obs-tf-release'),
   }
 }
 
@@ -257,6 +263,7 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
       ...(o.books === undefined ? [] : ['--books', o.books]),
       ...(hints ? ['--role-hints', hintsDir] : []),
       ...(o.aligned ? ['--aligned'] : []),
+      ...(o.obsTf === undefined ? [] : ['--obs-tf', o.obsTf, '--obs-tf-release', o.obsTfRelease ?? '']),
       ...(o.signKey === undefined ? [] : ['--sign-key', o.signKey]),
     ]
     const code = await buildV3(args, { log: io.error, error: io.error })

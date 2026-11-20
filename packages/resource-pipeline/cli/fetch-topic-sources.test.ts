@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { trimAcai } from '@bt-synergy/language-pack-v3'
 import { main, toCrlf, type TopicSource, urlOf } from './fetch-topic-sources'
+import { manifestOf } from './tarball'
+import { tarGz } from './tarball.fixture'
 
 const PINS = JSON.parse(readFileSync(join(import.meta.dir, 'topic-sources.json'), 'utf8')) as { sources: TopicSource[] }
 const made: string[] = []
@@ -20,10 +23,23 @@ afterAll(() => {
 const body = (s: TopicSource): string => `body of ${s.path}\nsecond line\n`
 const sha = (t: string | Uint8Array): string => createHash('sha256').update(t).digest('hex')
 
+/** What a `tree` pin "has": two ACAI person files and one file outside its folder, in a GitHub-style tarball. */
+const TREE_FILES: [string, string][] = [
+  ['people/json/Isaac.json', JSON.stringify({ id: 'person:Isaac', primary_id: 'person:Isaac', gender: 'male', localizations: { spa: { preferred_label: 'Isaac' } } })],
+  ['people/json/Sarah.json', JSON.stringify({ id: 'person:Sarah', primary_id: 'person:Sarah', gender: 'female', localizations: { spa: { preferred_label: 'Sara' } } })],
+  ['README.md', 'not in the folder'],
+]
+const treeFiles = (prefix: string) => new Map(TREE_FILES.filter(([p]) => p.startsWith(prefix)).map(([p, t]) => [p, new TextEncoder().encode(t)]))
+const trimmed = (s: TopicSource): string => trimAcai(new Map(TREE_FILES.filter(([p]) => p.startsWith(s.path))), s.commit, [])
+
 /** The pins with the hashes of the fake bodies, and a fetch that serves them by URL. */
 function fake(corrupt?: string) {
   const sources = PINS.sources.map((s) =>
-    s.rawSha256 === undefined ? { ...s, sha256: sha(body(s)) } : { ...s, rawSha256: sha(body(s)), sha256: sha(toCrlf(Buffer.from(body(s)))) },
+    s.tree !== undefined
+      ? { ...s, manifestSha256: sha(manifestOf(treeFiles(s.path))), sha256: sha(trimmed(s)) }
+      : s.rawSha256 === undefined
+        ? { ...s, sha256: sha(body(s)) }
+        : { ...s, rawSha256: sha(body(s)), sha256: sha(toCrlf(Buffer.from(body(s)))) },
   )
   const byUrl = new Map(sources.map((s) => [urlOf(s), s]))
   const urls: string[] = []
@@ -31,10 +47,16 @@ function fake(corrupt?: string) {
     urls.push(url)
     const s = byUrl.get(url)
     if (!s) return new Response('nope', { status: 404 })
+    if (s.tree !== undefined) {
+      const files = s.name === corrupt ? TREE_FILES.map(([p, t]): [string, string] => [p, `${t} `]) : TREE_FILES
+      return new Response(tarGz(`${s.repository.split('/')[1]}-${s.commit}`, files))
+    }
     return new Response(s.name === corrupt ? 'tampered' : body(s))
   }
   return { sources, fetchFn, urls }
 }
+/** What `main` writes for a pin. */
+const written = (s: TopicSource): string => (s.tree !== undefined ? trimmed(s) : s.eol === 'crlf' ? body(s).replace(/\n/g, '\r\n') : body(s))
 const quiet = { log: () => {}, error: () => {} }
 
 describe('fetch-topic-sources', () => {
@@ -42,9 +64,11 @@ describe('fetch-topic-sources', () => {
     const { sources, fetchFn } = fake()
     const out = join(temp(), 'topics')
     expect(await main(['--out', out], quiet, fetchFn, sources)).toBe(0)
-    for (const s of sources) expect(readFileSync(join(out, s.target), 'utf8')).toBe(s.eol === 'crlf' ? body(s).replace(/\n/g, '\r\n') : body(s))
+    for (const s of sources) expect(readFileSync(join(out, s.target), 'utf8')).toBe(written(s))
+    expect(JSON.parse(readFileSync(join(out, 'acai', 'people.json'), 'utf8')).people.map((p: { id: string }) => p.id)).toEqual(['person:Isaac', 'person:Sarah'])
     expect(readdirSync(join(out, 'theographic')).sort()).toEqual(['events.json', 'people.json', 'places.json', 'verses.json'])
     expect(readdirSync(join(out, 'en_obs', 'obs-repo', 'content')).length).toBe(50)
+    expect(readdirSync(join(out, 'bsb_obs')).sort()).toEqual(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'])
   })
 
   test('a wrong hash fails and leaves nothing', async () => {
@@ -57,6 +81,15 @@ describe('fetch-topic-sources', () => {
     const existing = temp()
     expect(await main(['--out', existing], quiet, fetchFn, sources)).toBe(1)
     expect(readdirSync(existing)).toEqual([])
+  })
+
+  test('a folder whose files are not the pinned ones (manifest) fails and leaves nothing', async () => {
+    const { sources, fetchFn } = fake('acai-people')
+    const out = join(temp(), 'topics')
+    const errors: string[] = []
+    expect(await main(['--out', out], { log: () => {}, error: (l) => errors.push(l) }, fetchFn, sources)).toBe(1)
+    expect(errors.join('\n')).toMatch(/acai\/people\.json: the 2 files under people\/json\/ have the manifest sha256 [0-9a-f]{64}, the pin says/)
+    expect(existsSync(out)).toBe(false)
   })
 
   test('a failed download fails and leaves nothing', async () => {
@@ -91,6 +124,8 @@ describe('fetch-topic-sources', () => {
       'STEPBible/STEPBible-Data': commitOf('STEPBible TIPNR'),
       'robertrouse/theographic-bible-metadata': commitOf('Theographic Bible Metadata'),
       'unfoldingWord/en_obs': commitOf('English OBS'),
+      'bcv-commons/bible-story-builder': commitOf('Bible Story Builder'),
+      'BibleAquifer/ACAI': commitOf('ACAI'),
     }
     for (const s of PINS.sources) expect(s.commit).toBe(want[s.repository])
     const theo = [...md.matchAll(/`(events|people|places|verses)\.json` `([0-9a-f]{64})`/g)]
@@ -100,7 +135,14 @@ describe('fetch-topic-sources', () => {
     expect(obs.length).toBe(50)
     for (const m of obs) expect(PINS.sources.find((s) => s.target === `en_obs/obs-repo/content/${m[2]}.md`)?.sha256).toBe(m[1])
     expect(PINS.sources.find((s) => s.name === 'tipnr')?.sha256).toBe(/sha256 of the file: `([0-9a-f]{64})`/.exec(md)![1])
-    expect(PINS.sources.length).toBe(1 + 4 + 50)
+    const bsb = [...md.matchAll(/^([0-9a-f]{64})  (\d\d\/\d\d)\.md$/gm)]
+    expect(bsb.length).toBe(50)
+    for (const m of bsb) expect(PINS.sources.find((s) => s.target === `bsb_obs/${m[2]}.md`)?.sha256).toBe(m[1])
+    const acai = PINS.sources.find((s) => s.name === 'acai-people')!
+    expect(acai.manifestSha256).toBe(/ACAI.*manifest sha256 `([0-9a-f]{64})`/.exec(md)![1])
+    expect(acai.sha256).toBe(/ACAI.*trimmed file sha256 `([0-9a-f]{64})`/.exec(md)![1])
+    expect(urlOf(acai)).toBe('https://codeload.github.com/BibleAquifer/ACAI/tar.gz/5375d0d334bb6d635ef1813e4d3df58eb30efcca')
+    expect(PINS.sources.length).toBe(1 + 4 + 50 + 50 + 1)
   })
 
   test('the URLs are raw GitHub for GitHub repositories and Door43 for the stories', () => {
@@ -108,5 +150,6 @@ describe('fetch-topic-sources', () => {
     expect(urls.find((u) => u.includes('TIPNR'))).toMatch(/^https:\/\/raw\.githubusercontent\.com\/STEPBible\/STEPBible-Data\/be4191f[0-9a-f]+\/Proper%20Nouns\/TIPNR%20-/)
     expect(urls.find((u) => u.endsWith('events.json'))).toMatch(/^https:\/\/raw\.githubusercontent\.com\/robertrouse\/theographic-bible-metadata\/744355c[0-9a-f]+\/json\/events\.json$/)
     expect(urls.find((u) => u.endsWith('01.md'))).toBe('https://git.door43.org/unfoldingWord/en_obs/raw/commit/d39a1dc7a7557ac54e4a8fecc3462147fe7eec3b/content/01.md')
+    expect(urls.find((u) => u.endsWith('OBS/01/01.md'))).toBe('https://raw.githubusercontent.com/bcv-commons/bible-story-builder/c07d45395d01b987c31f4e06871314f129c975e8/templates/OBS/01/01.md')
   })
 })

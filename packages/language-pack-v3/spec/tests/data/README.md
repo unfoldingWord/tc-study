@@ -44,6 +44,13 @@ The resources of the lists, with the release each row was made from (`resources[
   `prepare-language` (`kind: originals`, resource `role: original`, `rows` counts, and no `books`). Built from the UGNT part above by
   `spec/tests/build-originals-fixture.ts` (`bun spec/tests/build-originals-fixture.ts`; the zip is deterministic: fixed UTC dates, no folder entries, the same bytes in any time zone). It has the source and
   prepared rows of Titus (5 and 7), a receipt and a `catalog.json` with the UGNT's Door43 catalog row (`{ key, metadata }`, the metadata of `originals/list.json`, `bookBlobs` included); the real pack also has index rows, which the bridge does not read. Same license as the UGNT.
+- `originals-rut.langpack.zip`: a format 1.1 pack of the originals with Ruth 1:1-5 of the UHB (`unfoldingWord/hbo/uhb`, release
+  `v3.0.0#2026-08-14T18_44_01Z`, CC BY-SA 4.0) and the MACULA Hebrew rows of Ruth (`Biblica/hbo/macula`, release
+  `3b8aa380e8#2026-10-15T02_19_35.000Z`: the `trees/RUT` rows of the five sentences of 1:1-5 and the `referents/RUT` rows of the verses 1:1-5, as
+  published). MACULA is © Biblica, Inc., published under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); the credit
+  stays with the rows. Only the `sot` rows are in it (the pack of `prepare-language` has more), and the book row lists chapter 1 only.
+  Built by `bun spec/tests/build-originals-rut-fixture.ts <originals.langpack.zip>`; the source is not in the repository, so the
+  zip is kept. Used by the case `macula-v2`.
 
 ## What is here, and where each file comes from
 
@@ -82,12 +89,13 @@ prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.jso
 | File | Bytes | sha256 | Source and what was done |
 | --- | ---: | --- | --- |
 | `es-419/list.json` | 186 072 | `d3c3c4b6741832c8d7d1ceb0aab89102b994dba8e3d86d095e58a5ace0df47fa` | the phase 0 sample's list of es-419: trimmed (source sha256 c6077a9f70dc88a8e5a151c39babe04c0bb4b302a2cc9289786bd83c45e65702, 81 parts, 9 resources): 10 parts, 7 resources |
-| `en/list.json` | 244 546 | `62a0ed1dc7f1a52184a21f0a0bd8af161b1dba1de9a2343ecd57f92ac7130c32` | the phase 0 sample's list of English: trimmed (source sha256 37588b1990680594d169c86b480c7a745aadabe0e96d70e9dad171a0ace2c0f8, 595 parts, 11 resources): 4 parts, 4 resources |
+| `en/list.json` | 272 341 | `c8ded1109f416bb646d7e6be661eb5cd39d598fccd3e5ef6009e4866a9aa641c` | the phase 0 sample's list of English: trimmed (source sha256 37588b1990680594d169c86b480c7a745aadabe0e96d70e9dad171a0ace2c0f8, 595 parts, 11 resources): 4 parts, 4 resources |
 | `originals/list.json` | 10 317 | `1516a779e6862a1bd846aa4e4fbf6eddd13fe73ab93e914d838d8efa748d5273` | the phase 0 sample's list of the originals: trimmed (source sha256 f0d6ca889d58fba47a0ad22597791596f6b368b5933931a30d39b037cd4983b8, 132 parts, 4 resources): 1 parts, 1 resources |
 | `es-419-tit.langpack.zip` | 314 931 | `d3ecdff0ee9e329f58ec6652571bbebe6873784aa1c90e943a01e3c5299285c8` | the phase 0 sample's pack: format 1.1 pack, es-419 Titus |
 | `originals-tit.langpack.zip` | 29 827 | `ee3ca9d4706d7851df503541ab2047554af989d7c345b126019bdbf9f87302c6` | made here by `spec/tests/build-originals-fixture.ts` from the UGNT part: format 1.1 originals pack whose manifest lists no `books`, with a `catalog.json` holding the UGNT's catalog row from `originals/list.json` |
+| `originals-rut.langpack.zip` | 9 504 | `bfbbd091f22ca28e738e36fc89d2b45a6917152b8876b6c8042dabdaa8a61db8` | made by `spec/tests/build-originals-rut-fixture.ts` from the real `originals.langpack.zip` of `prepare-language` (es-419 run of 2026-10-27, `parts-real/originals.langpack.zip` on the maintainer's PC): Ruth 1:1-5 of the UHB and the MACULA Hebrew rows of Ruth |
 
-Total: 1 597 673 bytes in 20 files.
+Total: 1 865 182 bytes in 23 files (the parts, lists and packs above; `topics/` is listed below).
 
 ## Not copied
 
@@ -116,3 +124,7 @@ These are in the phase 0 sample, and a later task may need them:
 - `topics/obs-refs.txt`: the closing line `_A Bible story from: …_` of stories 1, 10 and 50 of "unfoldingWord® Open Bible Stories",
   English v9 (https://git.door43.org/unfoldingWord/en_obs), copyright © 2023 unfoldingWord, CC BY-SA 4.0
   (https://creativecommons.org/licenses/by-sa/4.0/). The `obsRefs` reader test uses it. The whole text is not in the repository.
+- `topics/acai-people.json`: a trimmed ACAI file (`src/source/acai.ts`, `trimAcai`) for 14 people of the family of Abraham and one
+  Zechariah, in the shape of ACAI's `people/json/` files but written by hand (`make-acai-people.ts` writes it; nothing is copied from
+  ACAI), with a made-up commit. Not every person is a record of `tipnr-subset.txt`: the others are the ACAI records a build finds no
+  TIPNR person for. The tests of the CLI and the old-client check use it.

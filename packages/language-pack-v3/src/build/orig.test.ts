@@ -15,7 +15,7 @@ const DATA = join(import.meta.dir, '..', '..', 'spec', 'tests', 'data')
 const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 const UHB = 'unfoldingWord/hbo/uhb'
 const MACULA = 'Biblica/el-x-koine/macula'
-const KNOWN = { words: [1], text: [1], macula: [1] }
+const KNOWN = { words: [1], text: [1], macula: [1, 2] }
 /** U+2060, which `find` takes out of a text. Built from its code point so that an editor cannot strip it. */
 const WORD_JOINER = String.fromCodePoint(0x2060)
 
@@ -674,13 +674,13 @@ describe('the segment, byte by byte', () => {
       ...tiny,
       words: [{ ...tiny.words[0], other: { c: '3', a: '1', b: '2' } }, tiny.words[1], tiny.words[2]],
       attrs: { 1: { z: '1', a: '2', m: '3' }, 3: { y: '1', b: '2' } },
-      macula: { release: 'r', trees, referents },
+      macula: { release: 'r', v: 1, trees, referents },
     }
     const b: OrigModel = {
       ...a,
       words: a.words.map((word) => (word.other === undefined ? word : { ...word, other: reverseKeys(word.other) as Record<string, string> })),
       attrs: Object.fromEntries(Object.entries(a.attrs!).map(([event, attrs]) => [event, reverseKeys(attrs) as Record<string, string>])),
-      macula: { release: 'r', trees: reverseKeys(trees), referents: reverseKeys(referents) },
+      macula: { release: 'r', v: 1, trees: reverseKeys(trees), referents: reverseKeys(referents) },
     }
     // The two really differ in the order of their keys.
     expect(Object.keys(a.words[0].other!)).not.toEqual(Object.keys(b.words[0].other!))
@@ -844,23 +844,70 @@ describe('origView rejects a segment that is not an original', () => {
 describe('MACULA', () => {
   // The real Titus MACULA part is not in the sample (its license is its own): these values have its shape.
   const trees = { sentences: [['*', ['s', 1001001, 1001002], ['adv', 1001003, ['&', 1001004]]]] }
-  const referents = { verses: { '1:1': [['ουσ', 0, [['r', '', 1, 10, 17]]]] }, words: [['x', 'y']] }
+  const referents = { verses: { '1:1': [['β', 0, [['r', '', 1, 10, 0]]], ['nowhere', 0, [['s', '', 0, 0, 0]]]] }, words: [['x', 'y']] }
   const release = '3b8aa380e8#2026-10-15T02_19_35.000Z'
   const macula = ref(MACULA, release, ['tit'])
   const treesRow: Row = { layer: 'sot', key: `${MACULA}/trees/TIT`, value: trees }
   const referentsRow: Row = { layer: 'sot', key: `${MACULA}/referents/TIT`, value: referents }
-  const tit = (...rest: Row[]) => [bookRow(UGNT, 'tit', [1]), chapterRow(UGNT, 'tit', 1, [chapterNode('1'), { type: 'para', marker: 'p', content: [w('α'), '.'] }]), ...rest]
+  const tit = (...rest: Row[]) => [bookRow(UGNT, 'tit', [1]), chapterRow(UGNT, 'tit', 1, [chapterNode('1'), verseNode('1'), { type: 'para', marker: 'p', content: [w('α'), w('β'), w('γ'), w('δ'), '.'] }]), ...rest]
   const refs = [ref(UGNT, 'v0.34#2023-09-27T02_19_31Z', ['tit']), macula]
 
-  test('the rows go to `macula` as they are, with the release of the resource', async () => {
-    const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
-    expect(m.macula).toEqual({ release, trees, referents })
+  // Labels most used first, ties by code point: & * adv s. Positions 0 to 3 are the four words.
+  const v2trees = {
+    labels: ['&', '*', 'adv', 's'],
+    pieces: [],
+    lo: [0],
+    span: [3],
+    nodes: [Uint8Array.from([3, 2, 9, 2, 1, 4, 6, 2, 7, 0, 1, 10])],
+  }
+
+  test('the trees and the referents go to `macula` v2 with the release of the resource, positions for ids and keys', async () => {
+    const issues: string[] = []
+    const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit', issues)
+    // `β` is the second word; its one reference is to the verse 1:10 (not in the book), so the antecedent is empty.
+    // `nowhere` is no word of the verse: its row is left out and counted.
+    expect(m.macula).toEqual({
+      release,
+      v: 2,
+      trees: v2trees,
+      referents: { ents: [['x', '']], kinds: ['r'], pieces: [''], word: [1], kind: [0], piece: [0], ent: [0], ch: [1], vs: [10], ante: [0] },
+    })
+    expect(issues).toEqual([
+      'MACULA referents: 1 referring word(s) not found in their verse, with 1 reference(s): left out',
+      'MACULA referents: 1 of 1 reference(s) with an antecedent the rule cannot fix: ante left empty',
+    ])
   })
 
-  test('trees or referents alone are kept alone', async () => {
-    expect((await extractOrig(fake(tit(treesRow), refs), 'tit')).macula).toEqual({ release, trees })
-    expect((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula).toEqual({ release, referents })
-    expect('referents' in (await extractOrig(fake(tit(treesRow), refs), 'tit')).macula!).toBe(false)
+  test('options.macula false skips the MACULA conversion: a malformed row does not abort, and there is no table and no line', async () => {
+    const issues: string[] = []
+    const broken = { ...treesRow, value: { sentences: 'nope' } }
+    await expect(extractOrig(fake(tit(broken), refs), 'tit')).rejects.toThrow()
+    const m = await extractOrig(fake(tit(broken, { ...referentsRow, value: 5 }), refs), 'tit', issues, { macula: false })
+    expect(m.macula).toBeUndefined()
+    expect(issues).toEqual([])
+    expect(m.words).toEqual((await extractOrig(fake(tit(), refs), 'tit')).words)
+  })
+
+  test('without a trees row the table has the release and the referents', async () => {
+    expect(Object.keys((await extractOrig(fake(tit(referentsRow), refs), 'tit')).macula!).sort()).toEqual(['referents', 'release', 'v'])
+    expect((await extractOrig(fake(tit(), refs), 'tit')).macula).toBeUndefined()
+  })
+
+  test('what the trees leave out is a line of the issues, and the words and text do not change', async () => {
+    const odd = { sentences: [['*', ['s', 1001001, 9009009], ['o', 7007001]], ['*', 1001009]] }
+    const issues: string[] = []
+    const m = await extractOrig(fake(tit({ ...treesRow, value: odd }), refs), 'tit', issues)
+    expect(issues).toEqual([
+      "MACULA trees: 3 word(s) whose place is not in this book's words: left out of the trees",
+      'MACULA trees: 1 part(s) left with no word: left out of the trees',
+      'MACULA trees: 1 sentence(s) left with no word: left out of the trees',
+    ])
+    expect(m.macula!.trees!.lo).toEqual([0])
+    const plain = await extractOrig(fake(tit(), refs), 'tit')
+    const a = origSegment(m).t
+    const b = origSegment(plain).t
+    expect(a.words).toEqual(b.words)
+    expect(a.text).toEqual(b.text)
   })
 
   test('without MACULA rows there is no `macula`; the rows of another book are not this book', async () => {
@@ -872,8 +919,8 @@ describe('MACULA', () => {
   test('the table is written as orig.cddl says and read back', async () => {
     const m = await extractOrig(fake(tit(treesRow, referentsRow), refs), 'tit')
     const seg = origSegment(m)
-    expect(seg.h.tables).toEqual({ words: [1, true], text: [1, true], macula: [1, false] })
-    expect(seg.t.macula).toEqual({ release, trees, referents })
+    expect(seg.h.tables).toEqual({ words: [1, true], text: [1, true], macula: [2, false] })
+    expect(Object.keys(seg.t.macula as object).sort()).toEqual(['referents', 'release', 'trees'])
     expect(origView(seg)).toEqual(m)
     const { model, skipped } = await throughFile(m)
     expect(model).toEqual(m)
@@ -889,7 +936,7 @@ describe('MACULA', () => {
   })
 
   test('only the release, with no trees and no referents', () => {
-    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r' } }
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', v: 1 } }
     const seg = origSegment(m)
     expect(seg.t.macula).toEqual({ release: 'r' })
     expect(origView(seg)).toEqual(m)
@@ -901,11 +948,11 @@ describe('MACULA', () => {
     // 14 deep ({sentences: ...} counts as one): they fit with room to spare.
     let deep: unknown = 1
     for (let i = 0; i < MAX_DEPTH - 2; i++) deep = [deep]
-    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', trees: deep } }
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', v: 1, trees: deep } }
     await expect(writeSegment(origSegment(m))).rejects.toThrow()
     let fits: unknown = 1
     for (let i = 0; i < MAX_DEPTH - 3; i++) fits = [fits]
-    const ok: OrigModel = { ...m, macula: { release: 'r', trees: fits } }
+    const ok: OrigModel = { ...m, macula: { release: 'r', v: 1, trees: fits } }
     expect((await throughFile(ok)).model).toEqual(ok)
   })
 
@@ -913,7 +960,7 @@ describe('MACULA', () => {
     // With the body, `t` and `macula` that is 17 levels: over the old limit of 16, inside the limit of 64.
     let trees: unknown = 1
     for (let i = 0; i < 14; i++) trees = [trees]
-    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', trees } }
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', v: 1, trees } }
     expect((await throughFile(m)).model).toEqual(m)
   })
 

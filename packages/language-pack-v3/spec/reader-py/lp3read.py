@@ -40,7 +40,7 @@ MAX_HEADER = 65536
 MAX_LEN = 67108864
 MAX_DEPTH = 64
 
-CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "aligned", "book", "orig", "art", "lex", "obs", "gen")
+CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "aligned", "book", "orig", "art", "lex", "obs", "gen", "obsimg")
 KINDS = ("chapter", "verse", "open", "close")
 BOOKS = (
     "gen exo lev num deu jos jdg rut 1sa 2sa 1ki 2ki 1ch 2ch ezr neh est job psa pro ecc sng isa jer lam ezk dan hos "
@@ -58,12 +58,14 @@ KNOWN_TABLES = {
     "orig": {"words", "text", "macula"},
     "art": {"articles"},
     "lex": {"entries"},
-    "obs": {"strings", "stories", "notes", "questions", "links", "study-notes", "study-questions"},
+    "obs": {"strings", "stories", "notes", "questions", "links", "study-notes", "study-questions", "tf-parts", "tf-questions",
+            "tf-terms", "tf-shared", "tf-frames", "tf-framework"},
+    "obsimg": {"frames", "meta"},
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
-    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks"},
-    "topics": {"names", "local", "coverage"},
+    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks", "obs-frames", "gender"},
+    "topics": {"names", "local", "coverage", "people"},
     "aligned": {"keys", "strongs", "data"},
 }
 REQUIRED_TABLES = {
@@ -72,6 +74,7 @@ REQUIRED_TABLES = {
     "art": {"articles"},
     "lex": {"entries"},
     "obs": {"strings", "stories"},
+    "obsimg": {"frames", "meta"},
     "catalog": {"about", "resources", "segments", "units"},
     "aligned": {"keys", "strongs", "data"},
 }
@@ -80,6 +83,8 @@ REQUIRED_MAP_CORE = {"map": {"books", "names", "coverage"}, "xmap": {"coverage",
                      "xtopics": {"coverage", "topics", "occurrences"}, "topics": {"names", "coverage"}}
 REQUIRED_MAP_PART = {"map": set(), "xmap": {"strong"}, "xtopics": {"occurrences"}, "topics": set()}
 KNOWN_VERSION = 1
+# Tables a reader knows at more than version 1 (a table not listed is known at KNOWN_VERSION only).
+KNOWN_VERSIONS = {("orig", "macula"): (1, 2)}
 
 _TABLE_NAME = re.compile(r"[a-z][a-z0-9-]*")
 _BOOK_CODE = re.compile(r"[0-9a-z]{3}")
@@ -524,7 +529,7 @@ def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str |
     schema_required = required_tables(cls, h)
     skip = set()
     for name, (version, required) in h["tables"].items():
-        known = name in KNOWN_TABLES[cls] and version == KNOWN_VERSION
+        known = name in KNOWN_TABLES[cls] and version in KNOWN_VERSIONS.get((cls, name), (KNOWN_VERSION,))
         if known:
             continue
         if required or name in schema_required:
@@ -946,14 +951,108 @@ def _decode_orig(p: Segment) -> dict:
         if attrs:
             out["attrs"] = attrs
     if p.has("macula"):
-        m = p.t["macula"]
-        if type(m) is not dict or not is_str(m.get("release")):
-            _bad()
-        mo = {"release": m["release"]}
+        out["macula"] = _decode_macula(p, nwords_total=nwords)
+    return out
+
+
+def _decode_macula(p: Segment, nwords_total: int) -> dict:
+    m = p.t["macula"]
+    version = p.h["tables"]["macula"][0]
+    if type(m) is not dict or not is_str(m.get("release")):
+        _bad()
+    mo = {"release": m["release"], "v": version}
+    if version == 1:
         for key in ("trees", "referents"):
             if key in m:
                 mo[key] = jsonable(m[key])
-        out["macula"] = mo
+        return mo
+    if "trees" in m:
+        mo["trees"] = _macula_trees(m["trees"], nwords_total)
+    if "referents" in m:
+        mo["referents"] = _macula_referents(m["referents"], nwords_total)
+    return mo
+
+
+def _macula_trees(tr, n: int) -> list:
+    if type(tr) is not dict:
+        _bad()
+    labels, pieces = _strtab(tr.get("labels")), _strtab(tr.get("pieces"))
+    lo = deltas(_need(tr, "lo", is_bytes))
+    span = uvarints(_need(tr, "span", is_bytes))
+    nodes = _need(tr, "nodes", lambda x: type(x) is list and all(is_bytes(b) for b in x))
+    if not len(lo) == len(span) == len(nodes):
+        _bad()
+    out = []
+    for lo_i, span_i, raw in zip(lo, span, nodes):
+        if span_i > n - 1 or lo_i > n - 1 - span_i:
+            _bad()
+        hi_i = lo_i + span_i
+        nums = uvarints(raw)
+        pos = 0
+
+        def take():
+            nonlocal pos
+            if pos >= len(nums):
+                _bad()                      # cut short
+            pos += 1
+            return nums[pos - 1]
+
+        def node(level: int):
+            if level > MAX_DEPTH:
+                _bad()
+            t = take()
+            kind, k = t % 3, t // 3
+            if kind == 0:
+                if k >= len(labels):
+                    _bad()
+                count = take()
+                if count == 0:
+                    _bad()
+                return [labels[k]] + [node(level + 1) for _ in range(count)]
+            if level == 1:
+                _bad()                      # the root must be a part
+            position = lo_i + k
+            if position > hi_i:
+                _bad()
+            if kind == 1:
+                return position
+            idx = take()
+            if idx >= len(pieces):
+                _bad()
+            return [position, pieces[idx]]
+
+        if not nums:
+            _bad()
+        tree = node(1)
+        if pos != len(nums):
+            _bad()                          # bytes left: a second root or leftovers
+        out.append({"lo": lo_i, "hi": hi_i, "tree": tree})
+    return out
+
+
+def _macula_referents(rf, n: int) -> list:
+    if type(rf) is not dict:
+        _bad()
+    ents = _need(rf, "ents", lambda x: type(x) is list and all(is_pair_strs(e) for e in x))
+    kinds, pieces = _strtab(rf.get("kinds")), _strtab(rf.get("pieces"))
+    cols_in = _need(rf, "cols", lambda x: type(x) is dict)
+    cols = {c: uvarints(cols_in.get(c)) for c in ("word", "kind", "piece", "ent", "ch", "vs", "ante")}
+    rows = len(cols["word"])
+    if any(len(c) != rows for c in cols.values()):
+        _bad()
+    out, word = [], 0
+    for i in range(rows):
+        word += cols["word"][i]
+        kind, piece, ent = cols["kind"][i], cols["piece"][i], cols["ent"][i]
+        ch, vs, ante = cols["ch"][i], cols["vs"][i], cols["ante"][i]
+        if (word >= n or kind >= len(kinds) or piece >= len(pieces) or ent >= len(ents)
+                or ch == 0 or vs == 0 or ante > n):
+            _bad()
+        row = {"word": word, "kind": kinds[kind], "piece": pieces[piece], "form": ents[ent][0],
+               "strong": ents[ent][1], "ch": ch, "vs": vs}
+        if ante:
+            row["ante"] = ante - 1
+        out.append(row)
     return out
 
 
@@ -1108,6 +1207,265 @@ def _decode_obs_helps(p: Segment, name: str, strings: list[str]) -> dict:
     return {"res": res, "rows": out}
 
 
+# ---- the Five Movements tables (obs.cddl, "OBS Five Movements") ----
+
+TF_PARTS = ("intro", "frames", "community", "m1", "m2", "drafting", "m3", "checking", "m4", "m5", "conclusion")
+TF_LISTS = ("observation", "terms", "discourse", "theology", "journal")
+TF_FIXED = TF_PARTS + TF_LISTS
+TF_FRAMEWORK = ("m1", "m2", "m3", "m4", "m5", "overview")
+
+
+def _tf_column(col, n: int, kind: str, may_have: bool) -> list:
+    """A text or number column of the tf tables: only ``kind`` and ``has``; None for a row without a value."""
+    if type(col) is not dict or any(k not in (kind, "has") for k in col) or kind not in col:
+        _bad()
+    if "has" in col:
+        if not may_have:
+            _bad()
+        present = bits(col["has"], n)
+        if all(present):
+            _bad()                          # a "has" that is all ones
+    else:
+        present = [True] * n
+    m = sum(present)
+    if kind == "texts":
+        vals = texts_column(col["texts"])
+        if any(v == "" for v in vals):
+            _bad()
+    else:
+        vals = uvarints(col["uints"])
+    if len(vals) != m:
+        _bad()
+    it = iter(vals)
+    return [next(it) if x else None for x in present]
+
+
+def _tf_codes(x, fixed) -> list:
+    if not is_strlist(x):
+        _bad()
+    last = -1
+    for c in x:
+        if c not in fixed or fixed.index(c) <= last:
+            _bad()
+        last = fixed.index(c)
+    return list(x)
+
+
+def _tf_head(p: Segment, name: str, nres: int):
+    tab = p.table(name)
+    if type(tab) is not dict:
+        _bad()
+    res = _need(tab, "res", is_uint)
+    if res >= nres:
+        _bad()
+    n = _need(tab, "n", is_uint)
+    if n > p.ulen:
+        _bad()
+    return tab, res, n
+
+
+def _tf_uints(tab, key, n) -> list:
+    v = uvarints(_need(tab, key, is_bytes))
+    if len(v) != n:
+        _bad()
+    return v
+
+
+def _tf_ref_text(tab, n) -> dict:
+    out = {}
+    if "refText" not in tab:
+        return out
+    items = tab["refText"]
+    if type(items) is not list:
+        _bad()
+    last = -1
+    for it in items:
+        if type(it) is not list or len(it) != 2 or not is_uint(it[0]) or not is_str(it[1]):
+            _bad()
+        if it[0] >= n or it[0] <= last:
+            _bad()
+        last = it[0]
+        out[it[0]] = it[1]
+    return out
+
+
+def _decode_obs_tf(p: Segment, stories: list):
+    if not p.has("tf-parts"):
+        return None
+    nres = len(p.h["res"])
+    P, res_i, n = _tf_head(p, "tf-parts", nres)
+    coverage = uvarints(_need(P, "stories", is_bytes))
+    last = 0
+    for s in coverage:
+        if s < 1 or s > 50 or s <= last:
+            _bad()
+        last = s
+    cov = set(coverage)
+    codes = _tf_codes(P.get("codes"), TF_FIXED)
+    story = _tf_uints(P, "story", n)
+    part = _tf_uints(P, "part", n)
+    lst = _tf_column(P.get("list"), n, "uints", True)
+    title = _tf_column(P.get("title"), n, "texts", True)
+    text = _tf_column(P.get("text"), n, "texts", True)
+    sh = _tf_column(P.get("shared"), n, "uints", True)
+    shared_tab = None
+    if p.has("tf-shared"):
+        shared_tab = _tf_head(p, "tf-shared", nres)
+
+    def rank(pp, ll):
+        return TF_PARTS.index(pp) * 10 + (0 if ll is None else 1 + TF_LISTS.index(ll))
+
+    parts, before, before_story = [], -1, 0
+    for i in range(n):
+        if story[i] not in cov or part[i] >= len(codes):
+            _bad()
+        pc = codes[part[i]]
+        if pc not in TF_PARTS:
+            _bad()
+        lc = None
+        if lst[i] is not None:
+            if lst[i] >= len(codes):
+                _bad()
+            lc = codes[lst[i]]
+            if lc not in TF_LISTS:
+                _bad()
+        r = rank(pc, lc)
+        if story[i] < before_story or (story[i] == before_story and r < before):
+            _bad()
+        before_story, before = story[i], r
+        row = {"story": story[i], "part": pc}
+        if lc is not None:
+            row["list"] = lc
+        if sh[i] is not None:
+            if title[i] is not None or text[i] is not None:
+                _bad()
+            if shared_tab is not None and sh[i] >= shared_tab[2]:
+                _bad()
+        if title[i] is not None:
+            row["title"] = title[i]
+        if text[i] is not None:
+            row["text"] = text[i]
+        parts.append(row)
+    shared = []
+    if shared_tab is not None:
+        S, sres, sn = shared_tab
+        if sres != res_i:
+            _bad()
+        key = _tf_column(S.get("key"), sn, "texts", False)
+        stitle = _tf_column(S.get("title"), sn, "texts", False)
+        stext = _tf_column(S.get("text"), sn, "texts", True)
+        seen = set()
+        for i in range(sn):
+            if key[i] in seen:
+                _bad()
+            seen.add(key[i])
+            row = {"key": key[i], "title": stitle[i]}
+            if stext[i] is not None:
+                row["text"] = stext[i]
+            shared.append(row)
+        for i, row in enumerate(parts):
+            if sh[i] is not None:
+                row["shared"] = shared[sh[i]]["key"]
+    known = {s["n"] * 100 + f["n"] for s in stories for f in s["frames"]}
+    frames = []
+    if p.has("tf-frames"):
+        F, fres, fn = _tf_head(p, "tf-frames", nres)
+        if fres != res_i:
+            _bad()
+        fr = _tf_uints(F, "frame", fn)
+        ftext = _tf_column(F.get("text"), fn, "texts", False)
+        for i, f in enumerate(fr):
+            if (i > 0 and f <= fr[i - 1]) or f // 100 not in cov:
+                _bad()
+            if f in known:
+                _bad()                      # the frame is in "stories" already
+            frames.append({"frame": f, "text": ftext[i]})
+            known.add(f)
+    questions = []
+    if p.has("tf-questions"):
+        Q, qres, qn = _tf_head(p, "tf-questions", nres)
+        if qres != res_i:
+            _bad()
+        qc = _tf_codes(Q.get("codes"), TF_FIXED)
+        qs, qp, ql, qk = (_tf_uints(Q, k, qn) for k in ("story", "part", "list", "k"))
+        fr = _need(Q, "frames", lambda x: type(x) is dict)
+        counts = _tf_uints(fr, "count", qn)
+        ids = uvarints(_need(fr, "ids", is_bytes))
+        if sum(counts) != len(ids):
+            _bad()
+        qq = _tf_column(Q.get("q"), qn, "texts", False)
+        qa = _tf_column(Q.get("a"), qn, "texts", True)
+        ref = _tf_ref_text(Q, qn)
+        at, last_place, k = 0, None, 0
+        for i in range(qn):
+            if qs[i] not in cov or qp[i] >= len(qc) or ql[i] >= len(qc):
+                _bad()
+            pc, lc = qc[qp[i]], qc[ql[i]]
+            if pc not in TF_PARTS or lc not in TF_LISTS:
+                _bad()
+            place = (qs[i], pc)
+            if place != last_place:
+                if last_place is not None and (qs[i] < last_place[0] or (
+                        qs[i] == last_place[0] and TF_PARTS.index(pc) <= TF_PARTS.index(last_place[1]))):
+                    _bad()
+                last_place, k = place, 0
+            k += 1
+            if qk[i] != k:
+                _bad()
+            named = ids[at:at + counts[i]]
+            at += counts[i]
+            if any(f not in known for f in named):
+                _bad()
+            row = {"story": qs[i], "part": pc, "list": lc, "k": qk[i], "frames": named, "q": qq[i]}
+            if qa[i] is not None:
+                row["a"] = qa[i]
+            if i in ref:
+                row["refText"] = ref[i]
+            questions.append(row)
+    terms = []
+    if p.has("tf-terms"):
+        T, tres, tn = _tf_head(p, "tf-terms", nres)
+        if tres != res_i:
+            _bad()
+        tfr, tk = _tf_uints(T, "frame", tn), _tf_uints(T, "k", tn)
+        tterm = _tf_column(T.get("term"), tn, "texts", True)
+        ttext = _tf_column(T.get("text"), tn, "texts", False)
+        ref = _tf_ref_text(T, tn)
+        k = 0
+        for i in range(tn):
+            if tfr[i] // 100 not in cov or (i > 0 and tfr[i] < tfr[i - 1]):
+                _bad()
+            k = k + 1 if i > 0 and tfr[i] == tfr[i - 1] else 1
+            if tk[i] != k or tfr[i] not in known:
+                _bad()
+            row = {"frame": tfr[i], "k": k, "text": ttext[i]}
+            if tterm[i] is not None:
+                row["term"] = tterm[i]
+            if i in ref:
+                row["refText"] = ref[i]
+            terms.append(row)
+    framework = []
+    if p.has("tf-framework"):
+        W, wres, wn = _tf_head(p, "tf-framework", nres)
+        if wres != res_i:
+            _bad()
+        wc = _tf_codes(W.get("codes"), TF_FRAMEWORK)
+        code = _tf_uints(W, "code", wn)
+        name = _tf_column(W.get("name"), wn, "texts", True)
+        body = _tf_column(W["text"], wn, "texts", True) if "text" in W else None
+        for i, c in enumerate(code):
+            if c >= len(wc) or (i > 0 and c <= code[i - 1]):
+                _bad()
+            row = {"code": wc[c]}
+            if name[i] is not None:
+                row["name"] = name[i]
+            if body is not None and body[i] is not None:
+                row["text"] = body[i]
+            framework.append(row)
+    return {"res": p.res_key(res_i), "stories": coverage, "parts": parts, "questions": questions, "terms": terms,
+            "shared": shared, "frames": frames, "framework": framework}
+
+
 def _decode_obs(p: Segment) -> dict:
     _header_needs(p, "lang", "res", nonempty_res=True)
     for key in REQUIRED_TABLES["obs"]:
@@ -1152,7 +1510,44 @@ def _decode_obs(p: Segment) -> dict:
     for name in ("notes", "questions", "links", "study-notes", "study-questions"):
         if p.has(name):
             out[name] = _decode_obs_helps(p, name, strings)
+    tf = _decode_obs_tf(p, stories)
+    if tf is not None:
+        out["tf"] = tf
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# obsimg
+# ---------------------------------------------------------------------------------------------------------------
+
+
+def _decode_obsimg(p: Segment) -> dict:
+    _header_needs(p, "lang", "group")
+    for key in REQUIRED_TABLES["obsimg"]:
+        if key not in p.h["tables"]:
+            _bad()
+    group = p.h["group"]
+    if not (len(group) == 2 and group.isascii() and group.isdigit()) or not 1 <= int(group) <= 50:
+        _bad()
+    frames_in, meta_in = p.t["frames"], p.t["meta"]
+    if type(frames_in) is not list or len(frames_in) == 0 or type(meta_in) is not list or len(meta_in) != 1:
+        _bad()
+    frames, last = [], -1
+    for f in frames_in:
+        if type(f) is not dict:
+            _bad()
+        n = _need(f, "n", lambda x: is_uint(x) and x > 0)
+        if n <= last:
+            _bad()
+        last = n
+        data = _need(f, "data", lambda x: type(x) is bytes and len(x) > 0)
+        frames.append({"n": n, "media": _need(f, "media", is_str), "w": _need(f, "w", lambda x: is_uint(x) and x > 0),
+                       "h": _need(f, "h", lambda x: is_uint(x) and x > 0), "data": data.hex()})
+    row = meta_in[0]
+    if type(row) is not dict:
+        _bad()
+    meta = {key: _need(row, key, is_str) for key in ("license", "credit", "changes", "source")}
+    return {"frames": frames, "meta": meta}
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1302,8 +1697,8 @@ BOOK_SOURCES = ("text", "list", "none")
 # Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
 CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
              "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"},
-             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks"},
-             "topics": {"coverage", "local"}}
+             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks", "obs-frames", "gender"},
+             "topics": {"coverage", "local", "people"}}
 
 
 def _map_header(p: Segment) -> tuple[bool, int | None]:
@@ -1625,7 +2020,32 @@ def _decode_xtopics_core(p: Segment) -> dict:
             if any(b[0] <= a[1] for a, b in zip(v, v[1:])):
                 _bad()
         out["chunks"] = {k: [list(x) for x in v] for k, v in c.items()}
+    if p.has("obs-frames"):
+        f = _str_map(p.t["obs-frames"], lambda v: type(v) is list and len(v) > 0 and all(
+            type(x) is list and len(x) == 2 and _verse_id_ok(x[0]) and _verse_id_ok(x[1]) and x[0] <= x[1]
+            for x in v))
+        if any(OBS_FRAME_KEY.fullmatch(k) is None for k in f):
+            _bad()
+        if any(x[0] // 1000 != x[1] // 1000 for v in f.values() for x in v):
+            _bad()
+        out["obs-frames"] = {k: [list(x) for x in v] for k, v in f.items()}
+    if p.has("gender"):
+        g = uvarints(_need(p.t, "gender", is_bytes))
+        if len(g) != len(ids):
+            _bad()                          # one number per row of topics.ids
+        gender = {}
+        for tid, v in zip(ids, g):
+            if v == 0:
+                continue
+            if v > 2 or topics[tid]["kind"] != "person" or not tid.startswith("per:"):
+                _bad()
+            gender[tid] = v
+        out["gender"] = gender
     return out
+
+
+# A frame key of the xtopics table obs-frames: story 1 to 50 and frame 1 to 99, no leading zeros ("1:3")
+OBS_FRAME_KEY = re.compile(r"(?:[1-9]|[1-4][0-9]|50):[1-9][0-9]?")
 
 
 def _decode_xtopics(p: Segment) -> dict:
@@ -1667,6 +2087,34 @@ def _decode_topics(p: Segment) -> dict:
         # Only the keys of local-topics: any other key of an entry is ignored, as the TypeScript reader does
         out["local"] = {k: {key: jsonable(v[key]) for key in ("names", "refs", "related") if key in v} for k, v in local.items()}
     out["coverage"] = _coverage(p.t["coverage"])
+    if p.has("people"):
+        out["people"] = _topics_people(p.t["people"])
+    return out
+
+
+def _topics_people(t) -> dict:
+    """The table people of a topics core (topics.cddl): names, notes, aliases; any other key is ignored."""
+    if type(t) is not dict or any(k not in t for k in ("names", "notes", "aliases")):
+        _bad()
+    out = {}
+    for key in ("names", "notes"):
+        m = t[key]
+        if type(m) is not dict or any(type(k) is not str or not k.startswith("per:") for k in m):
+            _bad()
+        if any(not is_str(v) or v == "" for v in m.values()):
+            _bad()
+        out[key] = dict(m)
+    a = t["aliases"]
+    if type(a) is not dict:
+        _bad()
+    aliases = {}
+    for k, v in a.items():
+        if type(k) is not str or k == "" or type(v) is not list or len(v) == 0:
+            _bad()
+        if any(not is_str(x) or not x.startswith("per:") for x in v) or any(x >= y for x, y in zip(v, v[1:])):
+            _bad()                          # per: ids, sorted by code point, no repeat
+        aliases[k] = list(v)
+    out["aliases"] = aliases
     return out
 
 
@@ -1768,7 +2216,7 @@ def _decode_aligned(p: Segment, ranges: list[tuple[str, str]] | None = None) -> 
 
 
 _DECODERS = {"aligned": _decode_aligned, "xtopics": _decode_xtopics, "topics": _decode_topics, "book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
-             "obs": _decode_obs, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
+             "obs": _decode_obs, "obsimg": _decode_obsimg, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
 
 
 def decode_segment(p: Segment, as_class: str | None = None, aligned_ranges: list | None = None) -> dict:

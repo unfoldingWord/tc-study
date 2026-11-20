@@ -119,11 +119,13 @@ required table it does not know is `E_TABLE`.
 | `book` / `questions` | `questions` |
 | `orig` / `macula` | `macula` |
 | `obs` / one of its five tables of helps | the key of that table |
+| `obs` / `tf-parts` (or its version) | `tf`, whole: the other five `tf-*` tables are not used without their root |
+| `obs` / any other `tf-*` table | that table's list inside `tf` (empty), and the rows that depend on it show no body (`obs.cddl`, "Missing tables and references") |
 | `catalog` / `requires`, `complements` | the key of that table |
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
 **What a phase 1 reader knows.** Every table of `cddl/<class>.cddl`, at version 1, for the classes `book`, `orig`, `art`,
-`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
+`lex`, `obs` and `catalog` (a current reader also knows those of `obsimg`; a phase 1 reader does not know that class, which is `E_BODY`). For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
 "`map`, `xmap`" below), so **a segment of
 these classes is `E_TABLE`** for a phase 1 reader, even if its tables are all optional, once the checks of `container.md` up to
 `E_HMISMATCH` have passed. The same holds for a segment inside a transfer file (below).
@@ -221,8 +223,21 @@ Piece 0 is the ellipsis, piece 1 is the original word 5, piece 2 is a word the o
 | `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; the argument of an event is the string `seps[arg]`, with **no** `- 1` (the number 0 is a string of `seps` too, and `"close"` has `""` as in a book) | never |
 | `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes (an empty map counts as a node with attributes, as in a book) |
 | `macula` | object | `macula` | the table is not in the file or not read |
+| `macula.v` | integer | the table's version in the header (`tables.macula[0]`): 1 or 2. The output of a v1 table gains `v: 1` too | the table is not in the file or not read |
 | `macula.release` | text | `macula.release` | never |
-| `macula.trees`, `.referents` | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
+| `macula.trees`, `.referents` (v1) | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
+| `macula.trees` (v2) | list of `{lo, hi, tree}` | one per sentence, in the file's order: `lo` its lowest word position, `hi` = `lo + span`, `tree` the decoded `nodes` entry | the file lacks `trees` |
+| `macula.referents` (v2) | list of `{word, kind, piece, form, strong, ch, vs, ante?}` | one per row of `referents.cols`, in the file's order | the file lacks `referents` |
+
+**`macula` v2.** All numbers (`lo`, `hi`, positions, `ch`, `vs`, `ante`) are output as integers, never as decimal strings. `tree` is `[label, ...children]`: `label` is the text of `trees.labels` (`"v"`, `"s*"`, `"*"`, `"&"`), a child
+is a tree again, a word is its position (an integer) and a piece of a word is `[position, text]` (`text` from `trees.pieces`).
+A leaf is never confused with a part: a part is a list whose first item is text, a piece is a list whose first item is an
+integer, a word is an integer. In a row, `word` is the referring word's position (the deltas of `cols.word` added up), `kind`
+is the text of `referents.kinds` (`"r"`, `"s"`, `"c"`, `"a"`, `"p"`, `"o"`), `piece` the text of `referents.pieces` (`""` when the
+whole word refers), `form` and `strong` the entity's two texts, `ch` and `vs` the numbers as the file has them, and
+`ante` the antecedent's position, that is `cols.ante - 1`, **absent** when `cols.ante` is 0 (an absent value is an absent
+key). Example, an illustration with the positions of Jonah 1:1 counted from 0 (ויהי 0, דבר 1, יהוה 2, אל 3, יונה 4, בן 5, אמתי 6, לאמר 7): `{"word": 7, "kind": "s", "piece": "", "form": "יוֹנָה", "strong": "H3124", "ch": 1, "vs": 1, "ante": 4}`.
+The root of a `tree` is always a part, and a part always has at least one child (a part with 0 children is `E_BODY`, so `[label]` alone is not output). The reader gives v1 and v2 the way each is stored; it does not turn one into the other.
 
 Example: `{"form": "Παῦλος", "lemma": "Παῦλος", "morph": "Gr,N,,,,,NMS,", "strong": "G39720"}`. The word at position `n` is
 `words[n]`. There is one word piece per word, in order, so `pieces` lists every word's form once.
@@ -244,6 +259,10 @@ A section has `sid`, `level` (integer), `role` and `lang` and `md` (text), and, 
 `aliases` (list of text). Example: `{"sid": "definition", "level": 2, "role": "definition", "title": "Definición", "lang": "es-419",
 "md": "…"}`. The group and the language are in `h` (`group`, `lang`), not repeated.
 
+### `obsimg`
+
+`frames`: the list of the table, in its order (by `n`). Each frame has `n`, `w`, `h` (integers), `media` (text) and `data` (the bytes of the image file as lowercase hex, like every byte string of the output). `meta`: the one row of the table as an object with `license`, `credit`, `changes` and `source` (text). The story is `h.group` and the language `h.lang`, not repeated.
+
 ### `lex`
 
 `entries`: the list of the table, in its order. An entry has `res` (the resource key), `strong`, `lemma` (text) and `senses`
@@ -258,6 +277,7 @@ A section has `sid`, `level` (integer), `role` and `lang` and `md` (text), and, 
 | --- | --- | --- |
 | `stories` | list | never |
 | `notes`, `questions`, `links`, `study-notes`, `study-questions` | `{"res", "rows"}` | the table is not in the file or not read |
+| `tf` | object | the file has no `tf-parts`, or the reader does not read it |
 
 - A **story** has `res` (the resource key), `n`, `title` (text) and `frames` (list) always, and `reference` (text) and
   `refs` (list of `[from, to]`) when the file has them. A **frame** has `n`, `text`, and `image` when the file has it.
@@ -272,6 +292,9 @@ A section has `sid`, `level` (integer), `role` and `lang` and `md` (text), and, 
   ```
 
   The second row has the text `10:03` in `refText`: it is kept as `frame`, and `frameId` still says where it is.
+
+- **`tf`** (the Five Movements manual; `obs.cddl`, "OBS Five Movements") has `res` (the resource key), `stories` (the coverage, a list of integers) and the lists `parts`, `questions`, `terms`, `shared`, `frames` and `framework`, each in the order of its table (a table the file lacks gives `[]`).
+  A `parts` row has `story`, `part`, and `list`, `title`, `text`, `shared` (the key of a `shared` row) when it has them; a `questions` row has `story`, `part`, `list`, `k`, `frames` (a list of frame ids, `[]` for none), `q`, and `a`, `refText` when it has them; a `terms` row has `frame`, `k`, `text`, and `term`, `refText` when it has them; a `shared` row has `key`, `title`, and `text` when it has it; a `frames` row has `frame` and `text`; a `framework` row has `code`, and `name`, `text` when it has them. A code is the fixed text (`m1`, `observation`), never its number.
 
 ### `catalog`
 
@@ -389,12 +412,14 @@ so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TA
 | `strongs` | `{topic id: [Strong keys]}` as the file has it | the table is not in the file |
 | `ranges` | `{topic id: [[first, last], ...]}`, full verse ids, as the file has it | the table is not in the file |
 | `chunks` | `{book: [[first, last], ...]}`, full verse ids, as the file has it (the sections of the English ULT) | the table is not in the file |
+| `obs-frames` | `{"N:F": [[first, last], ...]}`, full verse ids, as the file has it (the verses of each OBS frame) | the table is not in the file |
+| `gender` | `{per: id: 1 or 2}`: the topics whose number in the column is not 0, in the order of `topics.ids` | the table is not in the file |
 
 **`xtopics` part**: `occurrences` as `{id: [verse ids]}`, full ids.
 
-**`topics` core**: `names` as `{id: [[name, source, count, [books]], ...]}` in the order of the file, `books` as codes in canonical order; `local` as `{topic id: {"names": [...], "refs": [[first, last], ...], "related": [...]}}` (`local-topics` of `map.cddl`), with `refs` and `related` only when the entry has them and any other key of an entry left out, like every unknown key; `coverage` as above. **`topics` part**: `names` as `{topic id: [verse ids]}`, full ids; absent when the file lacks it.
+**`topics` core**: `names` as `{id: [[name, source, count, [books]], ...]}` in the order of the file, `books` as codes in canonical order; `local` as `{topic id: {"names": [...], "refs": [[first, last], ...], "related": [...]}}` (`local-topics` of `map.cddl`), with `refs` and `related` only when the entry has them and any other key of an entry left out, like every unknown key; `coverage` as above; `people` as `{"names": {per: id: text}, "notes": {per: id: text}, "aliases": {text: [per: ids]}}` as the file has it, any other key of the table left out, absent when the file lacks it. **`topics` part**: `names` as `{topic id: [verse ids]}`, full ids; absent when the file lacks it.
 
-A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges chunks` and `topics`: `names local coverage`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
+A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges chunks obs-frames gender` and `topics`: `names local coverage people`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
 
 ### `aligned`
 
@@ -429,12 +454,33 @@ types, these are `E_BODY` too:
   `missing` entry that names a piece that does not exist, has a position, or is listed twice (in either list); a `-1`
   position of a quote that is in neither list (every `-1` is in exactly one of `quoteKinds` and `quoteMissing`).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
-  are not as many as the words; `macula.release` that is not text.
+  are not as many as the words; `macula.release` that is not text. A `macula` table of a version other than 1 and 2 is
+  skipped (`container.md`), it is not `E_BODY`. For `macula` v2:
+  - `trees`: `lo`, `span` and `nodes` with different numbers of sentences; an index outside `trees.labels` or `trees.pieces`;
+    a tree that is cut short (the list ends before the children it announced), that has bytes left after its root, or that
+    has more than one root; a tree whose root is a word or a piece (the root must be a part), or a part with 0 children;
+    `span > n - 1`, or `lo > n - 1 - span` (`n` the number of rows of `words`; so `lo + span` is below `n`, tested without overflow); a word or a piece whose position is outside `lo .. lo + span` or outside the book's words (`0 .. n - 1`).
+    A reader does not require `lo` and `span` to be the exact lowest and highest leaf. A node deeper than 64 levels (a
+    part or a leaf counts as a node; the root is level 1) is `E_BODY`, not `E_LIMIT`: the nodes are uvarint bytes, not
+    CBOR nesting. An empty `nodes` entry and a negative `lo` are `E_BODY` too. A leaf outside `lo .. lo + span` is also
+    outside the book's words when the range check of `lo` and `span` fails, so that part follows from the range check
+    (keep both checks).
+    The tables are checked when the segment is opened: the shapes of `lo`, `span`, `nodes`, `labels` and `pieces`, and the
+    ranges of `lo` and `span`. The bytes of one tree (cut short, leftover bytes, a label or piece out of range, a leaf
+    outside `lo .. lo + span`, a part with 0 children, depth) may be checked when that sentence is read, not when the
+    segment is opened. The conformance output decodes every tree, so the output is the same.
+  - `referents`: the columns of `cols` with unequal numbers of rows; an index outside `kinds`, `pieces` or `ents`; a word
+    position outside the book's words; `ch` or `vs` equal to 0; `ante` above the number of the book's words (it is a
+    position + 1, so the largest allowed is `n`).
+  - A missing key of the v2 tables or a missing column is `E_BODY`. An `ents` entry that is not `[text, text]` is `E_BODY`.
+    An unknown key in `cols` is ignored.
+  - A uvarints or deltas column follows the rules of "Columns" above.
 - **`obs`.** A help row whose story is outside 1 to 50 or whose frame is outside 0 to 99; a story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
   table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is
   `flags`, or a `frame` column of another length than `n`.
 - **`art`.** An article with an empty `id`; an article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
   article; an `id` twice in the group.
+- **`obsimg`.** A `group` that is not two digits from `01` to `50`; no frame; a frame whose `n` is 0 or not above the one before (out of order or twice); a `w` or `h` of 0; empty `data` or `data` that is not a byte string; a `media` or a `meta` field that is not text; a `meta` that does not have exactly one row. The header needs `lang` and `group`; it has no `res`. A reader does not check that `lang` is `zxx-obsimg`, that `book`, `part`, `orig` and `res` are absent, or the value of `media` (it is passed through).
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
 - **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part without `book` is valid; a part whose `book` differs from its `part` is E_BODY; a core with a `book`; a
@@ -457,6 +503,8 @@ types, these are `E_BODY` too:
     - `xtopics` `topics`: ids not sorted or repeated; columns of different lengths; `kind` 0 or above 6; a `source` outside `h.res`; a `ref` outside `refs`; `refs` with a text twice, or one no id uses, or not in the order of first use; `title` or `ustrong` with a count other than the ids.
     - `xtopics` `relations`: as the `xmap` ones, with an end beyond the count of `topics.ids` plus `external`; `external` not sorted or repeated.
     - `xtopics` `chunks`: an empty list for a book; a pair with `first > last`; sections that are not ascending or that overlap (a `first` at or before the `last` of the previous one); a verse id whose book is not the key; a key that is not a book code. A reader that does not know `chunks` skips it (an optional table of an unknown name).
+    - `xtopics` `obs-frames`: a key that is not `N:F` with story 1 to 50 and frame 1 to 99 and no leading zeros; an empty list; a pair that is not two verse ids; a pair with `first > last`; a pair whose ends are in two chapters; the table in a part. A reader that does not know `obs-frames` skips it (an optional table of an unknown name).
+    - `xtopics` `gender`: not a byte string of uvarints; a length other than that of `topics.ids`; a number above 2; a 1 or 2 for a topic that is not of kind person or whose id does not start with `per:`; the table in a part. A reader that does not know `gender` skips it.
     - `xtopics` `strongs`, `ranges`: a key not in `topics.ids`; an empty list (also an empty `ranges` list); Strong keys not sorted or repeated; a range that runs backwards (`first > last`) or whose verse id is not `LLCCCVVV` of a book 1..66. That is all a reader checks of a range: it does not check that the two ends are in the same book.
     - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; a row whose `count` differs from its `verses` or is 0; in a part, verse lists as above.
     - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.
@@ -465,6 +513,7 @@ types, these are `E_BODY` too:
     - `group` that is not a prefix of 1 to 6 characters of `[a-z ]` (the first a letter), a range `P-Q` of two such prefixes with `P` not after `Q` by code point and `Q` of 1 to 6 characters that begins and ends with a letter (no trailing space; a prefix alone is `P-P`, so it follows the same rule), or `other` (the header is `E_BODY`, as for a `lex` group): `A`, `aaaaaaa`, `d-b`, `a-ab-c`, `the ` (an end with a space), `a-b ` are `E_BODY`; `a-ab`, `b-b`, `ar-b`, `the`, `the -thf` are not.
     - `keys` not sorted by code point, with a repeat, or with an empty key. For a range group `P-Q` (`P` alone is `P-P`): a key that is not in the range, that is `P <= key` and `key.slice(0, len(Q)) <= Q` by code point (`as` is in `ar-b`, `t` is in `t-td` and not in `ta-tz`). The builder's table of parts (`ALIGNED_PARTS`) is contiguous, without hole or overlap; the `aligned:` units of a catalog are a subset of it, in order and without overlap (a part whose range holds no key is not built, so a catalog may have holes between its units); that is a builder rule and a reader does not check it. For `other` the check is catalog-aware: no key may lie inside a range of the catalog's `aligned:` units. A reader that has the segment alone does not make it (no `E_BODY`); one that has the catalog does.
     - `strongs` that repeats a text; `data` with numbers left over or cut short (the entries must use it exactly); an entry with `s` = 0 (no Strong key) or a Strong key with `b` = 0 (no book); a Strong index outside `strongs` or repeated in one entry; book numbers (the running sum of the deltas) not increasing within a Strong key, a delta of 0, or a book outside 1..66; `verses` 0, or above `occurrences`.
+  - `topics` `people`: not a map, or a map without one of `names`, `notes`, `aliases`; a key of `names` or `notes` that does not start with `per:`, or a value that is not a non-empty text; an empty alias; an alias whose list is empty, has an id that does not start with `per:`, or is not sorted by code point or repeats an id; the table in a part. A reader does not check that an id is a topic of the common `xtopics` (it does not have it): a client ignores one its `xtopics` lacks. A reader that does not know `people` skips it.
   - `topics` `local`: an entry with no `names` or with an empty list, or a name that is not text; a `refs` item that is not a pair of two verse ids (`book * 1000000 + chapter * 1000 + verse`, book 1 to 66); a `related` that is not a list of texts.
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** A unit with `optional` that is not `true` (false or not a bool), a unit with `optional` whose id does not begin with `aligned:`, an `aligned:` unit without `optional`; an `aligned:` unit whose part is not a group (`aligned:A`, `aligned:ab-a`; `aligned:other` is one); `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
@@ -502,6 +551,10 @@ The order of the checks between a defect in the container and one in a table is 
 | 20 | `transferencia-catalogo-local` (`local.tcpack`, `local.keys.json`) | A local catalog inside a transfer file, read with keys (`transfer.md`, "Receiving", step 2) | A `full` transfer file whose only catalog is the local catalog of case 13 and which has no other entry; `made` "2026-11-01T10:00:00Z", `by` "build-cases 1"; the keys of case 16 | `E_SIGNATURE` (with no keys the file is accepted; the plain catalog file of case 13 is accepted with the keys) |
 | 21 | `articulos-relacionados` (`art.seg`) | The `related` of tA articles (`art.cddl`) | Four es-419 articles of `ta:translate`: the config of the manual says `figs-exmetaphor` and `bita-part1` depend on `figs-metaphor` (and `figs-exmetaphor` recommends `bita-part1`); the text of `figs-simetaphor` links to `figs-metaphor` | Every tie both ways, sorted: `figs-metaphor` has `bita-part1`, `figs-exmetaphor`, `figs-simetaphor`; `figs-simetaphor` has `figs-metaphor` |
 | 22 | `catalogo-parche` (`catalog.seg`) | A patch catalog (`catalog.md`, "Patch catalogs"): the optional `source` and `review` of a resource | The published catalog `hi-x-aquifer`: one resource `aquifer/hi/tn` with `source: "aquifer"` and `review: "none"`, one book unit `book:tit` (no text, one note) whose only need is `orig:tit`, and `requires` the common catalog | The catalog with the resource's `source` and `review` as written, and the unit `book:tit` with `needs` `["orig:tit"]` (no `map`, no `art:`) |
+| 23 | `macula-v2` (`orig-rut.seg`) | The MACULA trees and referents of `orig`, version 2 (`orig.cddl`, `macula`) | Ruth 1:1-5 of the UHB (`v3.0.0#2026-08-14T18_44_01Z`) with the real MACULA Hebrew rows of Ruth (`3b8aa380e8#2026-10-15T02_19_35.000Z`), trimmed: `data/originals-rut.langpack.zip` (format 1.1 originals pack read by `zipSource`), built by `extractOrig` and `origSegment` | `macula.v` 2, the release stamp, 5 trees (one sentence per verse; no real sentence of the slice crosses a verse), 31 referent rows over verses 1:1 to 1:5: kinds `a`, `r` and `p`, targets in the same verse (`x,y = 0,0` in the source) and in another (1:4 and 1:5 point to 1:3), rows with `ante` and rows without. Both readers give the same output |
+| 24 | `obsimg` (`obsimg.seg`) | The pictures of an OBS story (`obsimg.cddl`): frames with bytes, and the credit row | Story `01` with two frames (640 by 360, `image/webp`, 6 and 3 made-up bytes; the reader does not decode them) and the `meta` of the real catalog (CC BY-SA 3.0, Sweet Publishing), built by `obsimgSegments` | `h.lang` `zxx-obsimg`, `h.group` `01`, no `res`; `frames` with `data` as hex (`524946460001`, `ff007f`) and the `meta` object. Both readers give the same output |
+| 25 | `obs-5m` (`obs-5m.seg`) | The Five Movements tables of an OBS segment (`obs.cddl`): the six `tf-*` tables | An English OBS segment with story 1 (two frames) and its session (intro; m1 with an observation and a terms list; m2 with discourse and theology; two shared blocks; a question with a corrected frame label; a term without a bold span; a term of story 2 with a corrected label), plus story 2, which the OBS unit lacks, with its two frames in `tf-frames` (the approved fallback) and its title on the `frames` row, and a framework with an `overview` row; built by `obsSegment` from a model written by hand | `tf` with `res` `unfoldingWord/en/obs-tf`, coverage `[1, 2]`, 11 `parts` rows, 4 `questions`, 3 `terms`, 2 `shared`, 2 `frames` and 3 `framework` rows. Both readers give the same output |
+| 26 | `parentescos` (`xtopics-core.seg`, `topics-core-es-419.seg`, `personas-vacia-y-clave-extra.seg`, 15 files a reader rejects, and `versiculos.json`) | The people tables from ACAI (`ids.md`, "People of ACAI"): `gender` of the `xtopics` core and `people` of a `topics` core; and the vectors of the verse rule | An `xtopics` core with Abraham, Sarah, Hagar, Isaac, Rebekah, Ishmael, Esau, Israel, Jacob and the place Hebron, their TIPNR family relations, two `same-as` of TIPNR and one of ACAI (confidence 75), and `gender`; an es-419 `topics` core with `people` (four names, two notes, three aliases); the same core with three empty maps and a key the schema does not list (`descriptions`). Rejected: `gender` 1 for the place (`genero-de-un-lugar`), 3 (`genero-3`), one short (`genero-corto`), not a byte string (`genero-no-bytes`), in a part (`genero-en-parte`); in `people`: a `names` key `lug:hebron` (`personas-id-de-lugar`), a `notes` key `lug:hebron` (`personas-nota-de-lugar`), an empty name (`personas-nombre-vacio`), an empty note (`personas-nota-vacia`), an alias whose ids are not sorted (`personas-alias-desordenado`), repeat an id (`personas-alias-repetido`), are empty (`personas-alias-sin-ids`) or name `lug:hebron` (`personas-alias-id-de-lugar`), an empty alias (`personas-alias-vacio`), no `aliases` (`personas-sin-aliases`). `versiculos.json`: pairs of verse lists and the verses the rule of `ids.md` ("Verses of a family relation") gives; `language-pack-client` checks `kinVerses` against them | `xtopics-core.expected.json`, `topics-core-es-419.expected.json`, `personas-vacia-y-clave-extra.expected.json` (empty `people`, no `descriptions`); `E_BODY` for the 15 others |
 
 Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).
 

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BOOKS, catalogView, hex, keyId, KNOWN, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
+import { BOOKS, catalogView, hex, keyId, KNOWN, OBS_FRAMES_PER_STORY, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { createHash } from 'node:crypto'
 import { main, optionsFromArgs, readRoleHints, USAGE } from './build-v3'
 import type { TopicSource } from './fetch-topic-sources'
@@ -474,6 +474,8 @@ describe('build-v3: --topics', () => {
     mkdirSync(join(dir, 'tipnr'))
     cpSync(join(TOPICS, 'tipnr-subset.txt'), join(dir, 'tipnr', 'TIPNR.txt'))
     cpSync(join(TOPICS, 'theographic-subset'), join(dir, 'theographic'), { recursive: true })
+    mkdirSync(join(dir, 'acai'))
+    cpSync(join(TOPICS, 'acai-people.json'), join(dir, 'acai', 'people.json'))
     const content = join(dir, 'en_obs', 'obs-repo', 'content')
     mkdirSync(content, { recursive: true })
     let n = 0
@@ -484,6 +486,15 @@ describe('build-v3: --topics', () => {
       else if (n > 0) stories.set(n, `${stories.get(n)}${line}\n`)
     }
     for (const [story, text] of stories) writeFileSync(join(content, `${String(story).padStart(2, '0')}.md`), text)
+    // bible-story-builder's OBS files: every frame of every story, each telling Titus 1:1
+    OBS_FRAMES_PER_STORY.forEach((frames, i) => {
+      const ss = String(i + 1).padStart(2, '0')
+      const cat = join(dir, 'bsb_obs', String(Math.ceil((i + 1) / 5)).padStart(2, '0'))
+      mkdirSync(cat, { recursive: true })
+      let text = `[[story:${ss}]]\n`
+      for (let f = 1; f <= frames; f++) text += `![Image](obs-en-${ss}-${String(f).padStart(2, '0')}.jpg)\n[[ref:TIT 1:1]]\n`
+      writeFileSync(join(cat, `${ss}.md`), text)
+    })
     return dir
   }
   const files = (out: string): Record<string, string> => snapshot(out, 'segments')
@@ -509,6 +520,23 @@ describe('build-v3: --topics', () => {
     expect(result.code).toBe(0)
     expect(result.out.some((line) => /^xtopics\s+-\s/.test(line))).toBe(true)
     expect(result.out.some((line) => /^topics\s+es-419\s/.test(line))).toBe(true)
+    // the xtopics core has the frame map of the bible-story-builder files
+    let frameKeys = 0
+    let gender: Record<string, number> | undefined
+    let people: { names: Record<string, string> } | undefined
+    for (const name of Object.keys(files(withTopics))) {
+      const bytes = read(join(withTopics, name))
+      const h = readHeader(bytes).header.h as { class?: unknown; part?: unknown }
+      if (h.class === 'topics' && h.part === 'core') people = ((await readerOutput(bytes)) as { people?: typeof people }).people
+      if (h.class !== 'xtopics' || h.part !== 'core') continue
+      const out = (await readerOutput(bytes)) as { 'obs-frames'?: Record<string, unknown>; gender?: Record<string, number> }
+      frameKeys = Object.keys(out['obs-frames'] ?? {}).length
+      gender = out.gender
+    }
+    expect(frameKeys).toBe(598)
+    // ACAI: the gender of the TIPNR people it joins, and the es-419 names the pack cannot derive (Sara, not "Sarah")
+    expect(gender).toMatchObject({ 'per:abraham': 1, 'per:isaac': 1, 'per:sarah': 2 })
+    expect(people?.names['per:sarah']).toBe('Sara')
     const before = files(plain)
     const after = files(withTopics)
     for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
@@ -586,6 +614,12 @@ describe('build-v3: --topics', () => {
     const c = await run(sample(temp(), ['--topics', two]))
     expect(c.code).toBe(1)
     expect(c.err.join('\n')).toMatch(/--topics: .*exactly one \.txt file/)
+
+    const noFrames = sources()
+    rmSync(join(noFrames, 'bsb_obs'), { recursive: true })
+    const d = await run(sample(temp(), ['--topics', noFrames]))
+    expect(d.code).toBe(1)
+    expect(d.err.join('\n')).toMatch(/--topics: .*bsb_obs is not a directory/)
   })
 })
 
@@ -784,5 +818,34 @@ describe('build-v3: the book names list', () => {
     const names = await mapNames([])
     expect(names.gen?.[3]).toBe('none')
     expect(names.tit?.[3]).toBe('text')
+  })
+})
+
+describe('build-v3: --obs-tf', () => {
+  const folder = (): string => {
+    const dir = temp()
+    writeFileSync(join(dir, 'obs_story_1.md'), '## Introduction\n')
+    return dir
+  }
+  test('--obs-tf and --obs-tf-release go together, the folder has story files and the release is a tag', () => {
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', folder()]))).toThrow('go together')
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf-release', 'v4']))).toThrow('go together')
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', temp(), '--obs-tf-release', 'v4']))).toThrow('has no obs_story_N.md')
+    expect(() => optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', '4']))).toThrow('not a release tag')
+    expect(optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', 'v0.1.0'])).obsTf?.release).toBe('v0.1.0')
+    expect(optionsFromArgs(sample(temp(), ['--obs-tf', folder(), '--obs-tf-release', 'v4'])).obsTf?.release).toBe('v4')
+    expect(optionsFromArgs(sample(temp())).obsTf).toBeUndefined()
+  })
+
+  test('a language with no Open Bible Stories is refused: the manual goes with them', async () => {
+    const dir = folder()
+    const r = await run(sample(temp(), ['--obs-tf', dir, '--obs-tf-release', 'v4']))
+    expect(r.code).toBe(2)
+    expect(r.err.join('\n')).toContain('no Open Bible Stories')
+  })
+
+  test('the usage text describes --obs-tf', () => {
+    expect(USAGE).toContain('--obs-tf')
+    expect(USAGE).toContain('--obs-tf-release')
   })
 })

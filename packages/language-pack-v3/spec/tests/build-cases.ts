@@ -25,22 +25,25 @@ import { bookSegment } from '../../src/build/book'
 import { type BuiltSegment, buildCatalog, builtSegment, needsOfBook } from '../../src/build/catalog'
 import { BUILDER, buildCommon, buildLanguage, type LanguageBuild } from '../../src/build/language'
 import { extractObs, obsSegment } from '../../src/build/obs'
+import { obsimgSegments } from '../../src/build/obsimg'
 import { buildMap } from '../../src/build/map/build'
 import { mapSegment } from '../../src/build/map/segment'
 import { versesOf } from '../../src/build/maps/verses'
-import { extractOrig } from '../../src/build/orig'
+import { extractOrig, origSegment } from '../../src/build/orig'
 import { buildXmap } from '../../src/build/xmap/build'
 import { xmapSegment } from '../../src/build/xmap/segment'
-import { topicsSegment } from '../../src/build/topics/segment'
+import { topicsSegment, xtopicsSegment } from '../../src/build/topics/segment'
+import { encodeUvarints } from '../../src/codec/columns'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, readHeader, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { bookSet, verseId } from '../../src/ids'
-import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel, TopicName } from '../../src/model'
+import type { BookModel, HelpRow, MapCore, MapPart, ObsModel, OrigModel, TextModel, Topic, TopicName, XtopicsCore } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
 import { type Json, readerOutput, sortKeys } from '../../src/read/output'
+import { zipSource } from '../../src/source/zipSource'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../../src/source/rows'
 import { keyId, publicKeyOf, signCatalog } from '../../src/sign'
 import { writeTransfer } from '../../src/transfer'
@@ -570,6 +573,172 @@ async function integerOutOfRange(): Promise<{ header: Uint8Array; body: Uint8Arr
   }
 }
 
+// Case 23: the MACULA trees and referents of Ruth 1:1-5 (`orig` with `macula` of version 2)
+
+/** The segment of case 23: Ruth 1:1-5 of the UHB with its MACULA, built from `data/originals-rut.langpack.zip` (real rows, trimmed; see `data/README.md`). */
+async function maculaV2(): Promise<Uint8Array> {
+  const orig = await extractOrig(await zipSource(bytesOf(join(DATA, 'originals-rut.langpack.zip'))), 'rut')
+  return (await writeSegment(origSegment(orig))).bytes
+}
+
+// Case 24: the pictures of an Open Bible Stories story (`obsimg`)
+
+/** The segment of case 24: story 1 with two frames of a few bytes each (the reader does not decode them) and the credit of the real catalog. */
+async function obsPictures(): Promise<Uint8Array> {
+  const frame = (n: number, bytes: number[]) => ({ story: 1, frame: n, bytes: Uint8Array.from(bytes), media: 'image/webp', w: 640, h: 360 })
+  const meta = {
+    license: 'CC BY-SA 3.0',
+    credit: 'Illustrations © Sweet Publishing, https://sweetpublishing.com',
+    changes: 'converted to WebP quality 75',
+    source: 'https://cdn.door43.org/obs/jpg/obs-images-360px.zip',
+  }
+  const [seg] = obsimgSegments([frame(1, [0x52, 0x49, 0x46, 0x46, 0x00, 0x01]), frame(2, [0xff, 0x00, 0x7f])], meta, [2])
+  return (await writeSegment(seg)).bytes
+}
+
+// Case 25: the Five Movements tables of an Open Bible Stories segment (`obs` with `tf-*`)
+
+/** The segment of case 25: story 1 of an English OBS with its session (all six tables), and story 2, which the OBS unit lacks, with its frames from the manual. */
+async function obsFiveMovements(): Promise<Uint8Array> {
+  const OBS = 'unfoldingWord/en/obs'
+  const TF = 'unfoldingWord/en/obs-tf'
+  const model: ObsModel = {
+    lang: 'en',
+    res: [[OBS, 'v9'], [TF, 'v4']],
+    stories: [{ res: OBS, n: 1, title: 'The Creation', reference: 'A Bible story from: Genesis 1-2', frames: [{ n: 1, text: 'God made it all.', image: 'https://cdn.door43.org/obs/jpg/360px/obs-en-01-01.jpg' }, { n: 2, text: 'And it was good.' }] }],
+    tf: {
+      res: TF,
+      stories: [1, 2],
+      parts: [
+        { story: 1, part: 'intro', title: 'Introduction', text: '### Key Idea\nGod made everything.' },
+        { story: 1, part: 'frames' },
+        { story: 1, part: 'm1', title: 'Biblical Interpretation', text: 'Read the frames.' },
+        { story: 1, part: 'm1', list: 'observation', title: 'Observation Questions' },
+        { story: 1, part: 'm1', list: 'terms', title: 'Translation Questions' },
+        { story: 1, part: 'm2', title: 'Theological Dialogue' },
+        { story: 1, part: 'm2', list: 'discourse', title: 'Discourse Questions' },
+        { story: 1, part: 'm2', list: 'theology', title: 'Theological Questions' },
+        { story: 1, part: 'drafting', shared: 'movement_2_drafting' },
+        { story: 1, part: 'm4', shared: 'movement_4' },
+        { story: 2, part: 'frames', title: 'The Fall' },
+      ],
+      questions: [
+        { story: 1, part: 'm1', list: 'observation', k: 1, frames: [101], q: 'Who made it?', a: 'God.' },
+        { story: 1, part: 'm1', list: 'observation', k: 2, frames: [102], q: 'What did he say?' },
+        { story: 1, part: 'm2', list: 'discourse', k: 1, frames: [101, 102], q: 'Why is it good?', a: 'Because he made it.', refText: '01-1, 01-2' },
+        { story: 1, part: 'm2', list: 'theology', k: 2, frames: [], q: 'What does it show about God?' },
+      ],
+      terms: [
+        { frame: 101, k: 1, term: 'made', text: '**made** means created.' },
+        { frame: 101, k: 2, text: 'A paragraph without a term.' },
+        { frame: 202, k: 1, term: 'ate', text: '**ate** means ate.', refText: '2-2' },
+      ],
+      shared: [
+        { key: 'movement_2_drafting', title: 'Movement 2: Drafting', text: 'Draft the story.' },
+        { key: 'movement_4', title: 'Movement 4: Apply' },
+      ],
+      frames: [{ frame: 201, text: 'The serpent spoke.' }, { frame: 202, text: 'She ate.' }],
+      framework: [
+        { code: 'm1', name: 'Biblical Interpretation' },
+        { code: 'm2', name: 'Theological Dialogue' },
+        { code: 'overview', text: 'Welcome.' },
+      ],
+    },
+  }
+  return (await writeSegment(obsSegment(model))).bytes
+}
+
+// Case 26: the people tables: `gender` of the xtopics core and `people` of a language's topics core (from ACAI)
+
+/**
+ * The files of case 26: an xtopics core with the family of Isaac (TIPNR relations, a `same-as` of TIPNR and one of ACAI) and its
+ * `gender` column; an es-419 topics core with a `people` table; and the same two with one defect each, which a reader rejects.
+ */
+async function kinship(): Promise<Map<string, Uint8Array>> {
+  const TIPNR = 'STEPBible/STEPBible-Data/TIPNR'
+  const ACAI = 'BibleAquifer/ACAI'
+  const person = (title: string): Topic => ({ kind: 'person', source: TIPNR, ref: `${title}@Gen.1.1`, title, ustrong: '' })
+  const topics = new Map<string, Topic>([
+    ['lug:hebron', { kind: 'place', source: TIPNR, ref: 'Hebron@Gen.13.18', title: 'Hebron', ustrong: '' }],
+    ['per:abraham', person('Abraham')],
+    ['per:esau', person('Esau')],
+    ['per:hagar', person('Hagar')],
+    ['per:isaac', person('Isaac')],
+    ['per:ishmael', person('Ishmael')],
+    ['per:israel', person('Israel')],
+    ['per:jacob', person('Jacob')],
+    ['per:rebekah', person('Rebekah')],
+    ['per:sarah', person('Sarah')],
+  ])
+  const rel = (from: string, type: string, to: string, source = TIPNR, confidence = 100) => ({ from, to, type, source, confidence })
+  const core: XtopicsCore = {
+    part: 'core',
+    res: [[ACAI, '5375d0d3'], [TIPNR, 'be4191f0']],
+    coverage: new Map([[ACAI, { whole: [], partial: [] }], [TIPNR, { whole: ['gen'], partial: ['mat'] }]]),
+    topics,
+    occurrences: new Map([...topics.keys()].map((id) => [id, new Map([['gen', [2, 2] as [number, number]]])])),
+    relations: [
+      rel('per:abraham', 'parent-of', 'per:isaac'),
+      rel('per:abraham', 'parent-of', 'per:ishmael'),
+      rel('per:abraham', 'partner-of', 'per:sarah'),
+      rel('per:esau', 'sibling-of', 'per:israel'),
+      rel('per:hagar', 'parent-of', 'per:ishmael'),
+      rel('per:isaac', 'parent-of', 'per:esau'),
+      rel('per:isaac', 'parent-of', 'per:israel'),
+      rel('per:isaac', 'partner-of', 'per:rebekah'),
+      rel('per:rebekah', 'parent-of', 'per:esau'),
+      rel('per:rebekah', 'parent-of', 'per:israel'),
+      rel('per:sarah', 'parent-of', 'per:isaac'),
+      rel('tw:names/isaac', 'same-as', 'per:isaac', TIPNR, 70),
+      rel('tw:names/jacob', 'same-as', 'per:israel', TIPNR, 70),
+      rel('tw:names/rebekah', 'same-as', 'per:rebekah', ACAI, 75),
+    ],
+    gender: { 'per:abraham': 1, 'per:esau': 1, 'per:hagar': 2, 'per:isaac': 1, 'per:ishmael': 1, 'per:israel': 1, 'per:jacob': 1, 'per:rebekah': 2, 'per:sarah': 2 },
+  }
+  const x = xtopicsSegment(core)
+  const lang = topicsSegment({
+    lang: ES,
+    part: 'core',
+    res: [[ACAI, '5375d0d3'], [GLT, 'v42']],
+    coverage: new Map([[ACAI, { whole: [], partial: [] }], [GLT, { whole: ['gen'], partial: [] }]]),
+    names: { 'per:isaac': [['Isaac', 'alignment', 3, ['gen']]] },
+    people: {
+      names: { 'per:esau': 'Esaú', 'per:hagar': 'Agar', 'per:rebekah': 'Rebeca', 'per:sarah': 'Sara' },
+      notes: { 'per:israel': 'patriarca', 'per:jacob': 'padre de José' },
+      aliases: { Abram: ['per:abraham'], Jacob: ['per:israel'], 'Ismael hijo de Agar': ['per:ishmael'] },
+    },
+  })
+  const write = async (seg: Segment): Promise<Uint8Array> => (await writeSegment(seg)).bytes
+  const withX = (t: Record<string, unknown>): Segment => ({ h: x.h, t: { ...x.t, ...t } as Segment['t'] })
+  const withPeople = (people: unknown): Segment => ({ h: lang.h, t: { ...lang.t, people } as Segment['t'] })
+  const ids = [...topics.keys()]
+  const genderOf = (over: Record<string, number>, n = ids.length) => encodeUvarints(ids.slice(0, n).map((id) => over[id] ?? core.gender![id] ?? 0))
+  const people = lang.t.people as { names: Record<string, string>; notes: Record<string, string>; aliases: Record<string, string[]> }
+  const out = new Map<string, Uint8Array>()
+  out.set('parentescos/xtopics-core.seg', await write(x))
+  out.set('parentescos/topics-core-es-419.seg', await write(lang))
+  out.set('parentescos/genero-de-un-lugar.seg', await write(withX({ gender: genderOf({ 'lug:hebron': 1 }) })))
+  out.set('parentescos/genero-3.seg', await write(withX({ gender: genderOf({ 'per:isaac': 3 }) })))
+  out.set('parentescos/genero-corto.seg', await write(withX({ gender: genderOf({}, ids.length - 1) })))
+  out.set('parentescos/personas-id-de-lugar.seg', await write(withPeople({ ...people, names: { 'lug:hebron': 'Hebrón', ...people.names } })))
+  out.set('parentescos/personas-nota-vacia.seg', await write(withPeople({ ...people, notes: { ...people.notes, 'per:jacob': '' } })))
+  out.set('parentescos/personas-alias-desordenado.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Jacob: ['per:jacob', 'per:israel'] } })))
+  out.set('parentescos/personas-sin-aliases.seg', await write(withPeople({ names: people.names, notes: people.notes })))
+  out.set('parentescos/personas-nombre-vacio.seg', await write(withPeople({ ...people, names: { ...people.names, 'per:esau': '' } })))
+  out.set('parentescos/personas-nota-de-lugar.seg', await write(withPeople({ ...people, notes: { 'lug:hebron': 'en Canaán', ...people.notes } })))
+  out.set('parentescos/personas-alias-sin-ids.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Abram: [] } })))
+  out.set('parentescos/personas-alias-id-de-lugar.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Hebrón: ['lug:hebron'] } })))
+  out.set('parentescos/personas-alias-repetido.seg', await write(withPeople({ ...people, aliases: { ...people.aliases, Jacob: ['per:israel', 'per:israel'] } })))
+  out.set('parentescos/personas-alias-vacio.seg', await write(withPeople({ ...people, aliases: { '': ['per:abraham'], ...people.aliases } })))
+  out.set('parentescos/genero-no-bytes.seg', await write(withX({ gender: [1, 0, 2] })))
+  // A part with a core table: the gender of the core in the part of Genesis
+  const part = xtopicsSegment({ part: 'gen', occurrences: new Map([['per:isaac', [verseId('gen', 21, 3)]]]) })
+  out.set('parentescos/genero-en-parte.seg', await write({ h: { ...part.h, tables: { ...part.h.tables, gender: [1, false] } }, t: { ...part.t, gender: genderOf({}) } as Segment['t'] }))
+  // Accepted: three empty maps and a key the schema does not list (the reader leaves it out)
+  out.set('parentescos/personas-vacia-y-clave-extra.seg', await write(withPeople({ names: {}, notes: {}, aliases: {}, descriptions: { 'per:isaac': 'a key a later version adds' } })))
+  return out
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -606,6 +775,10 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('transferencia-catalogo-local/local.tcpack', writeTransfer({ mode: 'full', catalogs: [local], entries: [], made: MADE, by: BY }))
   out.set('transferencia-catalogo-local/local.keys.json', signedFiles.get('catalog-signed/catalog.keys.json')!)
   const outOfRange = await integerOutOfRange()
+  out.set('macula-v2/orig-rut.seg', await maculaV2())
+  out.set('obsimg/obsimg.seg', await obsPictures())
+  out.set('obs-5m/obs-5m.seg', await obsFiveMovements())
+  for (const [name, bytes] of await kinship()) out.set(name, bytes)
   out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
   out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out

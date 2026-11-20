@@ -18,6 +18,7 @@ import {
   type MapSet,
   type ObsModel,
   obsView,
+  obsimgView,
   type OrigModel,
   type Role,
   origView,
@@ -26,6 +27,7 @@ import {
   topicsView,
   xmapView,
   xtopicsView,
+  type XtopicsPart,
 } from '@bt-synergy/language-pack-v3'
 import { type ArticleData, articleQuery, type ContextData, contextQuery } from './query/article'
 import type { Answer } from './query/envelope'
@@ -35,7 +37,10 @@ import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/m
 import { type PassageData, passageQuery } from './query/passage'
 import { type StoryData, type StoryRef, storiesQuery, storyQuery } from './query/stories'
 import { type SectionsData, sectionsQuery } from './query/sections'
+import { type FramesAtData, framesAtQuery, type FrameVersesData, frameVersesQuery } from './query/obsFrames'
+import { obsPartOf, obsSessionOf, type TfPartData, type TfSessionData } from './query/obsTf'
 import { searchQuery } from './query/search'
+import { type FamilyData, familyQuery, type PersonEntry, peopleQuery } from './query/family'
 import { memoryIndex } from './search/memory'
 import type { Hit, SearchFilters, SearchIndex } from './search/types'
 import { type RenderingsData, renderingsQuery } from './query/renderings'
@@ -132,6 +137,41 @@ export interface PackReader {
   story(n: number): Promise<Answer<StoryData>>
   /** The sections of a book in the English ULT, from the `chunks` of the `xtopics` core, in order (`data: null` when `xtopics` is not installed; `sections: []` and coverage `none` when it has no entry for the book). */
   sections(book: string): Promise<Answer<SectionsData | null>>
+  /**
+   * The verses an Open Bible Stories frame tells, from the `obs-frames` table of the `xtopics` core (`data: null` when `xtopics` is not
+   * installed; `ranges: []` and coverage `none` when the core has no such table, an older common catalog; `ranges: []` and `count` for a frame
+   * that tells no verse).
+   */
+  frameVerses(story: number, frame: number): Promise<Answer<FrameVersesData | null>>
+  /**
+   * The family of a person (`per:` id): parents, children, partners and siblings with their names in the language, gender and the
+   * verses that show each relation (derived, `ids.md`). `data: null` when `xtopics` is not installed or the id is not a person of it.
+   */
+  family(id: string): Promise<Answer<FamilyData | null>>
+  /** Every person with the names a client may find it by (`ids.md`, "Names of people"); `data: null` without `xtopics`. */
+  people(): Promise<Answer<PersonEntry[] | null>>
+  /**
+   * Only the `xtopics` parts of the books named (a part missing or bad is left out), without decoding the others; `undefined` when the
+   * unit is not active. Added with `family`: a hand-made reader may lack it, and `family` then reads the whole unit.
+   */
+  xtopicsParts?(books: readonly string[]): Promise<Map<string, XtopicsPart> | undefined>
+  /** The frames that tell any verse of `first`..`last` (verse ids of one book), most specific first (fewest verses, then story order). */
+  framesAt(first: number, last?: number): Promise<Answer<FramesAtData | null>>
+  /**
+   * One picture of an Open Bible Stories frame, from the `obsimg` unit of the catalog `zxx-obsimg` (open that catalog). Reads only the one
+   * segment of the story. `null` when the unit is not installed, or the story or the frame is not there. `media` is passed through as written.
+   */
+  obsImage(story: number, frame: number): Promise<{ bytes: Uint8Array; media: string; w: number; h: number } | null>
+  /** The credit the pictures carry (license, credit, changes, source), from the first segment of the unit; `null` when `obsimg` is not installed. */
+  obsImageCredit(): Promise<{ license: string; credit: string; changes: string; source: string } | null>
+  /**
+   * The Five Movements session of story `n` (1 to 50) from the `tf-*` tables of the `obs` unit: the parts in order with their lists, the
+   * story's frames, and the release of the manual its ids belong to. `null` when the `obs` unit has no such tables or the story is outside
+   * the language's coverage (`coverage` of the session lists the stories that have one).
+   */
+  obsSession(n: number): Promise<TfSessionData | null>
+  /** One part of that session by its fixed code (`intro`, `frames`, `community`, `m1`, `m2`, `drafting`, `m3`, `checking`, `m4`, `m5`, `conclusion`); `null` when absent. */
+  obsPart(n: number, code: string): Promise<TfPartData | null>
 }
 
 export type ReaderInput = {
@@ -247,7 +287,46 @@ export function makeReader(o: ReaderInput): PackReader {
 
   async function single<T>(unit: string, view: (seg: Segment) => T): Promise<T | undefined> {
     const seg = (await segments(unit))?.[0]
-    return seg === undefined ? undefined : viewOf(unit, 0, seg, view)
+    const v = seg === undefined ? undefined : viewOf(unit, 0, seg, view)
+    // A book or an original is cached as its view only: the segment's bytes are not held twice. A later `segments(unit)` reads again.
+    if (v !== undefined && (unit.startsWith('book:') || unit.startsWith('orig:'))) {
+      unitSegments.delete(unit)
+      segCache.delete(`${unit.split(':')[0]}:${activeIds.get(unit)![0]}`)
+    }
+    return v
+  }
+
+  // The story of each `obsimg` segment (its `group`, "01" to "50"), from the catalog entries of the unit, so one story reads one segment.
+  let obsimgIndex: Map<number, number> | undefined
+  function obsimgAt(story: number): number | undefined {
+    if (obsimgIndex === undefined) {
+      obsimgIndex = new Map()
+      const ids = activeIds.get('obsimg')
+      const unit = o.catalogs.flatMap((c) => c.catalog.units.filter((u) => u.id === 'obsimg').map((u) => ({ c, u }))).find(({ c, u }) => u.segments.some((i) => ids?.includes(hex(c.catalog.segments[i]!.id))))
+      if (ids !== undefined && unit !== undefined) {
+        for (const i of unit.u.segments) {
+          const e = unit.c.catalog.segments[i]!
+          const at = ids.indexOf(hex(e.id))
+          if (at >= 0 && e.group !== undefined && /^\d+$/.test(e.group)) obsimgIndex.set(Number(e.group), at)
+        }
+      }
+    }
+    return obsimgIndex.get(story)
+  }
+  async function obsimgStory(story: number): Promise<ReturnType<typeof obsimgView> | undefined> {
+    const index = Number.isInteger(story) ? obsimgAt(story) : undefined
+    if (index === undefined) return undefined
+    const seg = await readOne(activeIds.get('obsimg')![index]!, 'obsimg')
+    return seg === undefined ? undefined : viewOf('obsimg', index, seg, obsimgView)
+  }
+  async function obsImage(story: number, frame: number): Promise<{ bytes: Uint8Array; media: string; w: number; h: number } | null> {
+    const f = (await obsimgStory(story))?.frames.find((x) => x.n === frame)
+    return f === undefined ? null : { bytes: f.data, media: f.media, w: f.w, h: f.h }
+  }
+  async function obsImageCredit(): Promise<{ license: string; credit: string; changes: string; source: string } | null> {
+    obsimgAt(0)
+    const first = obsimgIndex === undefined ? undefined : Math.min(...obsimgIndex.keys())
+    return first === undefined || !Number.isFinite(first) ? null : ((await obsimgStory(first))?.meta ?? null)
   }
 
   const VIEWS = { xmap: xmapView, map: mapView, xtopics: xtopicsView, topics: topicsView } as const
@@ -288,6 +367,37 @@ export function makeReader(o: ReaderInput): PackReader {
     const seg = await readOne(ids[at]!, unit)
     const v = seg === undefined ? undefined : viewOf(unit, at, seg, VIEWS[unit] as (s: Segment) => Part)
     return v === undefined || v.part !== 'core' ? undefined : { core: v, parts: new Map() }
+  }
+  /**
+   * Only the parts of the books named of one map unit (by `part`, from the catalogs), each read once and cached like any segment: a query
+   * that needs a few books does not decode the 66. A part that is missing or bad is left out. When the unit was read whole already, its
+   * parts are those; when a catalog does not say which segment is which part (an older catalog), the whole unit is read.
+   */
+  async function mapParts(unit: keyof typeof VIEWS, books: readonly string[]): Promise<Map<string, Part> | undefined> {
+    const ids = activeIds.get(unit)
+    if (ids === undefined) return undefined
+    const wanted = new Set(books)
+    const pick = (parts: Map<string, Part>): Map<string, Part> => new Map([...parts].filter(([book]) => wanted.has(book)))
+    if (ids.some((id) => partOf.get(id) === undefined)) {
+      const whole = (await mapUnit(unit)) as { parts: Map<string, Part> } | undefined
+      return whole === undefined ? undefined : pick(whole.parts)
+    }
+    // The unit read whole already: its parts, when it read (one bad part makes the whole unit undefined: then part by part below)
+    if (mapUnits.has(unit)) {
+      const whole = (await mapUnit(unit)) as { parts: Map<string, Part> } | undefined
+      if (whole !== undefined) return pick(whole.parts)
+    }
+    const out = new Map<string, Part>()
+    await Promise.all(
+      ids.map(async (id, i) => {
+        const part = partOf.get(id)!
+        if (!wanted.has(part)) return
+        const seg = await readOne(id, unit)
+        const v = seg === undefined ? undefined : viewOf(unit, i, seg, VIEWS[unit] as (s: Segment) => Part)
+        if (v !== undefined && v.part === part) out.set(part, v)
+      }),
+    )
+    return out
   }
   const cores = new Map<string, Promise<unknown>>()
   function mapCore(unit: MapUnit): Promise<unknown> {
@@ -366,6 +476,10 @@ export function makeReader(o: ReaderInput): PackReader {
     book: (book) => single(`book:${book}`, bookView),
     orig: (book) => single(`orig:${book}`, origView),
     obs: () => single('obs', obsView),
+    obsImage,
+    obsImageCredit,
+    obsSession: async (n) => obsSessionOf(await reader.obs(), n),
+    obsPart: async (n, code) => obsPartOf(await reader.obs(), n, code),
     async articles(group) {
       return (await single(`art:${group}`, artView))?.articles
     },
@@ -408,6 +522,11 @@ export function makeReader(o: ReaderInput): PackReader {
     stories: (ref) => storiesQuery(reader, ref),
     story: (n) => storyQuery(reader, n),
     sections: (book) => sectionsQuery(reader, book),
+    frameVerses: (story, frame) => frameVersesQuery(reader, story, frame),
+    framesAt: (first, last) => framesAtQuery(reader, first, last),
+    xtopicsParts: (books) => mapParts('xtopics', books) as Promise<Map<string, XtopicsPart> | undefined>,
+    family: (id) => familyQuery(reader, id),
+    people: () => peopleQuery(reader),
   }
   return reader
 }

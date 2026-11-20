@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import JSZip from 'jszip'
 import { hex, readHeader, readSegment } from '../codec/container'
 import type { About, CatalogModel, TopicsPart, XtopicsCore } from '../model'
+import { OBS_TABLES, obsView } from '../read/obs'
 import { topicsView, xtopicsView } from '../read/topics'
 import type { TipnrRecord } from '../source/tipnr'
 import { partsSource } from '../node/partsSource'
@@ -10,7 +11,8 @@ import { CATALOG_TABLES, catalogView } from '../read/catalog'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
 import { zipSource } from '../source/zipSource'
 import { type BuiltSegment, unitBytes } from './catalog'
-import { BUILDER, buildCommon, buildLanguage, inputsOf, licenseId } from './language'
+import { BUILDER, buildCommon, buildLanguage, inputsOf, licenseId, OBS_FRAMES_SOURCE } from './language'
+import { OBS_FRAMES_PER_STORY } from './obsimg'
 
 // The sample is real files (spec/tests/data/README.md): es-419 Titus of the format 2.0 parts, three common parts (tW, the Greek
 // lexicon), and the UGNT Titus.
@@ -99,6 +101,48 @@ describe('licenseId', () => {
     expect(licenseId(undefined)).toBe('unknown')
     expect(licenseId('')).toBe('unknown')
     expect(licenseId('  ')).toBe('unknown')
+  })
+})
+
+describe('buildLanguage: MACULA of the originals', () => {
+  const MACULA = 'Biblica/el-x-koine/macula'
+  /** The sample with a MACULA resource of Titus and these values for its trees and referents. */
+  async function withMacula(trees: unknown, referents: unknown): Promise<RowSource> {
+    const base = await sample()
+    return {
+      async resources(lang) {
+        const list = await base.resources(lang)
+        return lang === ORIGINALS ? [...list, { key: MACULA, stamp: '3b8aa380e8#2026-10-15T02_19_35.000Z', kind: 'Original', books: ['tit'] }] : list
+      },
+      async *rows(f) {
+        yield* base.rows(f)
+        if (f.lang === ORIGINALS && f.book === 'tit' && (f.layer === undefined || f.layer === 'sot')) {
+          yield { layer: 'sot', key: `${MACULA}/trees/TIT`, value: trees }
+          yield { layer: 'sot', key: `${MACULA}/referents/TIT`, value: referents }
+        }
+      },
+    }
+  }
+  const trees = { sentences: [['*', ['s', 1001001, 9009001]], ['*', ['s', 7007001]]] }
+  const referents = { words: [['x', 'y']], verses: { '1:1': [['nowhere', 0, [['s', '', 0, 0, 0]]]] } }
+
+  test('with withOrig the tree and referent lines are in the report of the book', async () => {
+    const built = await buildLanguage({ source: await withMacula(trees, referents), lang: ES, books: ['tit'], withOrig: true, registry: registry(), about })
+    for (const line of [
+      "book tit: MACULA trees: 2 word(s) whose place is not in this book's words: left out of the trees",
+      'book tit: MACULA trees: 1 sentence(s) left with no word: left out of the trees',
+      'book tit: MACULA referents: 1 referring word(s) not found in their verse, with 1 reference(s): left out',
+    ]) {
+      expect(built.report).toContain(line)
+    }
+  })
+
+  test('without withOrig a malformed MACULA row does not abort the build and leaves no line', async () => {
+    const source = await withMacula({ sentences: 'nope' }, 5)
+    const built = await buildLanguage({ source, lang: ES, books: ['tit'], registry: registry(), about })
+    expect(byClass(built.segments, 'book')).toHaveLength(1)
+    expect(built.report.some((line) => line.includes('MACULA'))).toBe(false)
+    await expect(buildLanguage({ source, lang: ES, books: ['tit'], withOrig: true, registry: registry(), about })).rejects.toThrow()
   })
 })
 
@@ -388,6 +432,41 @@ describe('buildLanguage: a language with Open Bible Stories and a lexicon, and n
       },
       changes,
     )
+
+  test('the OBS 5M manual (obsTf): off, every segment is the same bytes; on, the tf tables, the resource, the inputs; errors stop the build', async () => {
+    const TF = 'unfoldingWord/en/obs-tf'
+    const story =
+      '## Introduction\n\n### Key\nIdea.\n\n### Open Bible Story: The plagues\n\n######### 10-01\n\nGod sent plagues.\n\n*A Bible story from: Exodus 5-14*\n\n' +
+      '## Biblical Interpretation: M1\n\n### Observation Questions\n\n#### 10-01\n\nWho sent them?  \nGod.\n\n![[movement_4]]\n'
+    const files = new Map([
+      ['obs_story_10.md', story],
+      ['transclusions/movement_4.md', '# Movement 4\n\nApply it.\n'],
+    ])
+    const input = (f = files) => ({ key: TF, release: 'v4', title: 'OBS Theological Formation', license: 'CC-BY-SA-4.0', rights: 'unfoldingWord', attribution: 'unfoldingWord and Formation Stories', files: f })
+    const off = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about })
+    const on = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input() })
+    const again = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input() })
+    const obsOf = (b: typeof off) => b.segments.find((s) => s.seg.h.class === 'obs')!
+    // every other segment keeps its id; the obs segment changes, and the build is reproducible
+    expect(off.segments.filter((s) => s.seg.h.class !== 'obs').map((s) => s.id)).toEqual(on.segments.filter((s) => s.seg.h.class !== 'obs').map((s) => s.id))
+    expect(obsOf(on).id).not.toBe(obsOf(off).id)
+    expect(obsOf(on).id).toBe(obsOf(again).id)
+    const view = (await readSegment(obsOf(on).bytes, { known: { ...OBS_TABLES } })).seg
+    expect(obsView(view).tf!.stories).toEqual([10])
+    expect(obsView(view).res).toEqual([[OBS, 'v12'], [TF, 'v4']])
+    const cat = await catalogOf(on.catalog)
+    expect(cat.resources.find((r) => r.key === TF)).toEqual({ key: TF, title: 'OBS Theological Formation', subject: 'OBS Theological Formation', release: 'v4', license: 'CC-BY-SA-4.0', rights: 'unfoldingWord', attribution: 'unfoldingWord and Formation Stories', books: new Uint8Array(9) })
+    expect(cat.resources.filter((r) => r.key !== TF)).toEqual((await catalogOf(off.catalog)).resources)
+    // another text of the manual is another input
+    const other = new Map(files)
+    other.set('transclusions/movement_4.md', '# Movement 4\n\nApply it now.\n')
+    expect(obsOf(await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input(other) })).id).not.toBe(obsOf(on).id)
+    // an error of the manual stops the build; a warning does not
+    const broken = new Map(files)
+    broken.delete('transclusions/movement_4.md')
+    await expect(buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about, obsTf: input(broken) })).rejects.toThrow('transclusion movement_4: the file does not exist')
+    expect(on.report.some((line) => line.startsWith('obs-tf: story 10: no part'))).toBe(true)
+  })
 
   test('builds an obs segment and one lexicon segment per group, with the scopes of the report', async () => {
     const built = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about })
@@ -773,6 +852,48 @@ describe('buildCommon: the xtopics unit', () => {
     expect(without.report.filter((l) => l.includes('chunks'))).toEqual([`topics: chunks: the source has no ${ULT}: the xtopics have no section map`])
     // the core of a build without the ULT is the one the table-less model gives
     expect(hex(coreOf(without).bytes)).not.toBe(hex(coreOf(withUlt).bytes))
+  })
+
+  test('the frame map: obs-frames in the core only; every other segment the same bytes; the MIT credit; without the files no table', async () => {
+    // bible-story-builder's OBS files: every frame "GEN 1:1" (a chapter this sample has no length for), 1:3 in Titus, 27:11 empty
+    const frames = new Map<string, string>()
+    OBS_FRAMES_PER_STORY.forEach((n, i) => {
+      const ss = String(i + 1).padStart(2, '0')
+      let text = `[[story:${ss}]]\n`
+      for (let f = 1; f <= n; f++) {
+        const tag = `${i + 1}:${f}` === '1:3' ? 'TIT 2:11-12' : `${i + 1}:${f}` === '27:11' ? '' : 'GEN 1:1'
+        text += `![Image](obs-en-${ss}-${String(f).padStart(2, '0')}.jpg)\n[[ref:${tag}]]\n`
+      }
+      frames.set(`${String(Math.ceil((i + 1) / 5)).padStart(2, '0')}/${ss}.md`, text)
+    })
+    const withFrames = await buildCommon({ source: await english(), about, mapLang: 'en', topics: { ...topics(), frames } })
+    const without = await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })
+    const coreOf = (b: { segments: BuiltSegment[] }) => b.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!
+    const view = xtopicsView(coreOf(withFrames).seg) as XtopicsCore
+    expect(Object.keys(view.obsFrames!).length).toBe(597)
+    expect(view.obsFrames!['1:3']).toEqual([[56_002_011, 56_002_012]])
+    expect(view.obsFrames!['27:11']).toBeUndefined()
+    expect(view.res.some(([key, release]) => key === OBS_FRAMES_SOURCE.key && release === 'c07d4539')).toBe(true)
+    expect(view.coverage.get(OBS_FRAMES_SOURCE.key)).toEqual({ whole: [], partial: ['gen', 'tit'] })
+    expect((coreOf(withFrames).seg.h.tables as Record<string, unknown>)['obs-frames']).toEqual([1, false])
+    const resource = (await catalogOf(withFrames.catalog)).resources.find((r) => r.key === OBS_FRAMES_SOURCE.key) as { license?: string; attribution?: string } | undefined
+    expect(resource?.license).toBe('MIT')
+    expect(resource?.attribution).toContain('Copyright (c) 2024 unfoldingWord Box3')
+    expect(resource?.attribution).toContain('OTHER DEALINGS IN THE SOFTWARE.')
+    expect(withFrames.report).toContain('topics: obs-frames: 1 frames tell no verse and are left out: 27:11')
+    // every other segment (the xtopics parts too) is the same bytes and inputs as a build without the files
+    const rest = (b: { segments: BuiltSegment[] }) => b.segments.filter((s) => !(s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')).map((s) => [s.id, s.inputs, hex(s.bytes)])
+    expect(rest(withFrames)).toEqual(rest(without))
+    expect(withFrames.segments.some((s) => s.seg.h.class === 'xtopics' && s.seg.h.part !== 'core')).toBe(true)
+    // without the files: no table, no resource, one line
+    const bare = xtopicsView(coreOf(without).seg) as XtopicsCore
+    expect(bare.obsFrames).toBeUndefined()
+    expect(bare.res.some(([key]) => key === OBS_FRAMES_SOURCE.key)).toBe(false)
+    expect((await catalogOf(without.catalog)).resources.some((r) => r.key === OBS_FRAMES_SOURCE.key)).toBe(false)
+    expect(without.report.filter((l) => l.includes('obs-frames'))).toEqual(['topics: obs-frames: no bible-story-builder files: the xtopics have no frame map'])
+    // the same files give the same core
+    const again = await buildCommon({ source: await english(), about, mapLang: 'en', topics: { ...topics(), frames } })
+    expect(hex(coreOf(again).bytes)).toBe(hex(coreOf(withFrames).bytes))
   })
 
   test('a ULT book with no ts milestone has no key in the section map, and one report line', async () => {

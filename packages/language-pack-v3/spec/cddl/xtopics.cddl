@@ -31,6 +31,19 @@ xtopics-core-tables = {
                                ; both ends are in one book, or that the verses exist in any original
   ? "chunks": { * book-code => [+ [verse-id, verse-id]] },  ; optional, v1; the sections of the English ULT (its \ts\* chunks), per book, in order: first and last verse of each, first <= last, no overlap, ascending.
                                ; Every verse id is of the book of the key. A book whose ULT has no \ts\* has no key
+  ? "obs-frames": { * tstr => [+ [verse-id, verse-id]] },  ; optional, v1; core only; the verses each Open Bible Stories frame
+                               ; tells, from bible-story-builder (fuentes.md). Key: the frame "N:F", story 1 to 50 and frame 1 to
+                               ; 99, decimal, no leading zeros ("1:3"); the map in the deterministic order of container.md, like every
+                               ; map ("1:2" before "1:10": the shorter encoding first). Value: its
+                               ; verse ranges in the order of the source, first <= last, both in one chapter (the builder splits a
+                               ; range of the source that crosses chapters). A frame that tells no verse has no key. A reader
+                               ; checks the key form, each pair as in "ranges", and that both ends are in one chapter
+  ? "gender": uvarints,        ; optional, v1; core only; the gender of each person, from ACAI (ids.md, "People of ACAI"): one
+                               ; number per row of topics.ids, in its order: 0 no data, 1 man, 2 woman. Only a topic of kind
+                               ; person whose id starts "per:" may have 1 or 2. A reader checks the length, the values and that
+                               ; rule. A column, not a map by id: the ids are already in topics.ids, so nothing is repeated.
+                               ; Another value would be a new version of the table (v2), which a reader of v1 skips; a core
+                               ; where every value is 0 has no table
 }
 
 topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)
@@ -59,6 +72,8 @@ topics = {
 ; the map that only this module asserts). Concepts are never merged: "same-as" is a relation like any other.
 ; The types and their direction are in ids.md ("Relation types of xtopics"): participant and place go from the event,
 ; tribe from the person, occurs-in from the story or section to an event whose verses overlap its ranges at all.
+; The family relations (parent-of, sibling-of, partner-of) carry no verse: a client finds the verses of a relation from the
+; occurrences of the two people in the parts, by the rule of ids.md ("Verses of a family relation").
 topic-relations = {
   "types": strtab,
   "external": strtab,          ; ids of part A concepts, sorted by code point

@@ -22,7 +22,7 @@
  * exists and written after the build. Without it nothing is read or written, and the report says so.
  *
  * With `--topics <dir>` (the sources folder: `tipnr/*.txt`, `theographic/{events,verses,people,places}.json`,
- * `en_obs/obs-repo/content/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
+ * `en_obs/obs-repo/content/NN.md`, `bsb_obs/<category>/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
  * segments are the same bytes with or without it.
  *
  * With `--ta-config <dir>` (what `fetch-ta-config.ts` writes: `<dir>/<resource key>/<manual>/config.yaml`) the `related` of the tA
@@ -49,6 +49,7 @@ import {
   catalogView,
   hex,
   KNOWN,
+  OBSIMG_CATALOG,
   signCatalog,
   readHeader,
   readSegment,
@@ -62,9 +63,14 @@ import {
   type TipnrRecord,
   xtopicsView,
   type XtopicsCore,
+  type AcaiPerson,
+  parseAcai,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
+import { buildObsImages } from '../src/obsImages/build'
+import { convertAll, type Converter, encoderName, sharpConverter } from '../src/obsImages/convert'
+import { fetchObsImagesZip, OBS_IMAGES_ZIP, readObsJpegs } from '../src/obsImages/source'
 import { readTaConfigs, readTaTocs } from '../src/language/taConfig'
 import { pins, sourcesProblem, type TopicSource } from './fetch-topic-sources'
 
@@ -87,13 +93,19 @@ export const USAGE =
   '  --map-lang   the language whose helps make the common map (default en; with no list for it, no common map)\n' +
   '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
   '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map\n' +
-  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language\n' +
+  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/, bsb_obs/): builds the xtopics and the topics of the language\n' +
   '  --sign-key   a PKCS#8 PEM file of an Ed25519 key: both catalogs this build writes are signed with it (segments are the same bytes; the key is read\n' +
   '               into memory and never printed or written)\n' +
   '  --ta-config  the folder fetch-ta-config wrote (<resource key>/<manual>/config.yaml): the related of the tA articles also has the ties\n' +
   '               of the configs (without it, the ties of the links of the texts alone)\n' +
   '  --role-hints a folder with segments/*.seg of the map language (the published `art` segments): the sections whose heading the language\n' +
   '               does not know take the role of the same section of the English article with the same id (publish-v3 gives it)\n' +
+  '  --obs-images (no value) builds only the catalog zxx-obsimg (the OBS pictures: downloaded, checked against the pin, converted to WebP): needs --out and takes\n' +
+  '               only --sign-key, --revision (default 1), --previous, --built, --publisher and --cache (a folder that keeps the downloaded zip)\n' +
+  '  --obs-tf     the folder of an unpacked release of the OBS Theological Formation manual (en_obs-tf: obs_story_N.md and transclusions/): the Five Movements\n' +
+  '               tables go in the obs segment, and the resource in the catalog. English (en) and Indonesian (id) today. A manual with errors stops the build. Needs --obs-tf-release;\n' +
+  '               without it every segment is the same bytes\n' +
+  '  --obs-tf-release   the release tag of that folder (v4): the manual says a wrong one in its own manifest, so it is given\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -122,10 +134,16 @@ type Options = {
   signKey?: string
   taConfig?: string
   roleHints?: string
+  /** `--obs-tf` and `--obs-tf-release`: the OBS 5M manual. */
+  obsTf?: { dir: string; release: string }
+  /** `--obs-images`: build only the catalog `zxx-obsimg`; `list`, `originals` and `parts` are then empty. */
+  obsImages?: boolean
+  previous?: Uint8Array
+  cache?: string
 }
 
-const BOOLEAN_FLAGS = ['aligned']
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints']
+const BOOLEAN_FLAGS = ['aligned', 'obs-images']
+const VALUE_FLAGS = ['previous', 'cache', 'list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints', 'obs-tf', 'obs-tf-release']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -149,6 +167,29 @@ function flagsOf(argv: string[]): Map<string, string> {
   return flags
 }
 
+/** The options of `--obs-images`: only --out is required, and a flag of the language build is refused rather than ignored. */
+function obsImagesOptions(flags: Map<string, string>, need: (name: string) => string): Options {
+  const allowed = ['obs-images', 'out', 'sign-key', 'revision', 'previous', 'built', 'publisher', 'cache']
+  for (const name of flags.keys()) if (!allowed.includes(name)) throw new UsageError(`--${name} does not apply to --obs-images`)
+  const out = need('out')
+  const revisionText = flags.get('revision') ?? '1'
+  const revision = Number(revisionText)
+  if (!/^[0-9]+$/.test(revisionText) || !Number.isSafeInteger(revision)) throw new UsageError(`--revision ${JSON.stringify(revisionText)} is not a whole number`)
+  const previousText = flags.get('previous')
+  if (previousText !== undefined && !/^[0-9a-f]{64}$/.test(previousText)) throw new UsageError(`--previous ${JSON.stringify(previousText)} is not an id (64 lowercase hex digits)`)
+  const built = flags.get('built') ?? new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+  if (!RFC3339.test(built)) throw new UsageError(`--built ${JSON.stringify(built)} is not an RFC 3339 date and time (2026-11-01T10:00:00Z)`)
+  const publisher = flags.get('publisher') ?? 'unfoldingWord'
+  if (publisher === '') throw new UsageError('--publisher is empty')
+  const signKey = flags.get('sign-key')
+  if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
+  return {
+    list: '', originals: '', parts: '', out, revision, revisionCommon: revision, revisionLang: revision, built, publisher, mapLang: 'en', aligned: false, signKey,
+    obsImages: true, cache: flags.get('cache'),
+    previous: previousText === undefined ? undefined : Uint8Array.from(previousText.match(/../g)!, (pair) => parseInt(pair, 16)),
+  }
+}
+
 export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins()): Options {
   const flags = flagsOf(argv)
   const need = (name: string): string => {
@@ -156,6 +197,9 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     if (value === undefined) throw new UsageError(`--${name} is missing`)
     return value
   }
+  if (flags.has('obs-images')) return obsImagesOptions(flags, need)
+  // A language build has --previous-common and --previous-lang: a bare --previous (or --cache) would be ignored without a word.
+  for (const name of ['previous', 'cache']) if (flags.has(name)) throw new UsageError(`--${name} applies only to --obs-images`)
   const list = need('list')
   const originals = need('originals')
   const parts = need('parts')
@@ -222,8 +266,11 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
   if (!existsSync(parts) || !statSync(parts).isDirectory()) throw new UsageError(`--parts: ${parts} is not a directory`)
 
   if (topics !== undefined) {
-    for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content')]) {
-      if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new UsageError(`--topics: ${dir} is not a directory`)
+    for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content'), join(topics, 'bsb_obs')]) {
+      if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+        const hint = dir.endsWith('bsb_obs') ? ' (a sources folder fetched before the OBS frame map: run fetch-topic-sources again)' : ''
+        throw new UsageError(`--topics: ${dir} is not a directory${hint}`)
+      }
     }
     for (const name of ['events', 'verses', 'people', 'places']) {
       const file = join(topics, 'theographic', `${name}.json`)
@@ -237,7 +284,28 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     if (wrong !== undefined) throw new UsageError(`--topics: ${wrong}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig, roleHints }
+  const obsTfDir = flags.get('obs-tf')
+  const obsTfRelease = flags.get('obs-tf-release')
+  if ((obsTfDir === undefined) !== (obsTfRelease === undefined)) throw new UsageError('--obs-tf and --obs-tf-release go together')
+  if (obsTfDir !== undefined) {
+    if (!existsSync(obsTfDir) || !statSync(obsTfDir).isDirectory()) throw new UsageError(`--obs-tf: ${obsTfDir} is not a directory`)
+    if (!readdirSync(obsTfDir).some((f) => /^obs_story_\d+\.md$/.test(f))) throw new UsageError(`--obs-tf: ${obsTfDir} has no obs_story_N.md file`)
+    if (!/^v[0-9]+(\.[0-9]+)*$/.test(obsTfRelease!)) throw new UsageError(`--obs-tf-release ${JSON.stringify(obsTfRelease)} is not a release tag (v4, v0.1.0)`)
+  }
+
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig, roleHints, ...(obsTfDir === undefined ? {} : { obsTf: { dir: obsTfDir, release: obsTfRelease! } }) }
+}
+
+/** The credit of the Indonesian manual: the unfoldingWord conversion of the Indonesian PDFs into Door43 markdown (its manifest says CC BY-SA 4.0). */
+const ID_OBS_TF_ATTRIBUTION = 'unfoldingWord and Formation Stories. Indonesian text: unfoldingWord/id_obs-tf (Indonesian Five Movements PDFs converted to Door43 markdown), CC BY-SA 4.0'
+
+/** The files of the OBS Theological Formation manual in `dir` that the reader uses: `obs_story_N.md` and `transclusions/*.md`. */
+function obsTfFiles(dir: string): Map<string, string> {
+  const files = new Map<string, string>()
+  for (const f of readdirSync(dir).sort()) if (/^obs_story_\d+\.md$/.test(f)) files.set(f, readFileSync(join(dir, f), 'utf8'))
+  const transclusions = join(dir, 'transclusions')
+  if (existsSync(transclusions)) for (const f of readdirSync(transclusions).sort()) if (f.endsWith('.md')) files.set(`transclusions/${f}`, readFileSync(join(transclusions, f), 'utf8'))
+  return files
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -262,10 +330,20 @@ function topicTexts(dir: string) {
   const obsDir = join(dir, 'en_obs', 'obs-repo', 'content')
   for (const f of readdirSync(obsDir)) if (/^\d\d\.md$/.test(f)) obs.set(Number(f.slice(0, 2)), text(join(obsDir, f)))
   const theo = (name: string): string => text(join(dir, 'theographic', `${name}.json`))
+  // bible-story-builder's OBS files (`bsb_obs/<category>/<story>.md`): the verses of each frame (`obs-frames`)
+  const frames = new Map<string, string>()
+  const bsb = join(dir, 'bsb_obs')
+  for (const cat of readdirSync(bsb).sort()) {
+    if (!/^\d\d$/.test(cat) || !statSync(join(bsb, cat)).isDirectory()) continue
+    for (const f of readdirSync(join(bsb, cat)).sort()) if (/^\d\d\.md$/.test(f)) frames.set(`${cat}/${f}`, text(join(bsb, cat, f)))
+  }
   return {
     tipnr: text(join(tipnrDir, tipnrFile)),
     theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') },
     obs,
+    frames,
+    // ACAI's people, trimmed by fetch-topic-sources (`acai/people.json`): gender, same-as (common) and the people table (language)
+    acai: text(join(dir, 'acai', 'people.json')),
   }
 }
 
@@ -383,7 +461,56 @@ async function readPublished(dir: string, books: string[], needMap: boolean, nee
   return { segments: [], catalogId: read.id, revision: model.about.revision, report: [], published: true, core }
 }
 
-async function build(o: Options, io: Io): Promise<void> {
+/** What `--obs-images` needs from outside, so a test runs without the network and without sharp. */
+export type ObsImagesDeps = {
+  fetch: (url: string) => Promise<{ ok: boolean; status: number; arrayBuffer(): Promise<ArrayBuffer> }>
+  /** The converter and the name of its encoder; the default is sharp's. */
+  converter?: () => Promise<{ convert: Converter; encoder: string }>
+  /** The pin of the zip (the real one by default). */
+  pin?: typeof OBS_IMAGES_ZIP
+}
+
+async function buildObsImagesFolder(o: Options, io: Io, deps: ObsImagesDeps): Promise<void> {
+  const t0 = Date.now()
+  const zip = await fetchObsImagesZip(deps.fetch, o.cache, deps.pin)
+  const jpegs = await readObsJpegs(zip)
+  const { convert, encoder } = deps.converter === undefined ? { convert: await sharpConverter(), encoder: await encoderName() } : await deps.converter()
+  const images = await convertAll(jpegs, convert)
+  const about = { format: '3.0' as const, publisher: o.publisher, origin: 'published' as const, revision: o.revision, ...(o.previous === undefined ? {} : { previous: o.previous }), built: o.built }
+  const built = await buildObsImages({ images, encoder, about, source: (deps.pin ?? OBS_IMAGES_ZIP).url })
+
+  let key: SigningKey | undefined
+  if (o.signKey !== undefined) {
+    key = await readSigningKey(o.signKey)
+    built.catalog = { ...built.catalog, bytes: await signCatalog(built.catalog.bytes, key.pkcs8) }
+  }
+
+  await rm(join(o.out, 'segments'), { recursive: true, force: true })
+  await mkdir(join(o.out, 'segments'), { recursive: true })
+  for (const segment of built.segments) await writeFile(join(o.out, 'segments', `${segment.id}.seg`), segment.bytes)
+  await writeFile(join(o.out, `catalog-${OBSIMG_CATALOG}.seg`), built.catalog.bytes)
+  const largest = built.segments.reduce((a, b) => (b.bytes.length > a.bytes.length ? b : a))
+  const segmentBytes = built.segments.reduce((sum, s) => sum + s.bytes.length, 0)
+  const seconds = ((Date.now() - t0) / 1000).toFixed(1)
+  const summary = [
+    `images: ${images.length}`,
+    `segments: ${built.segments.length}, ${segmentBytes} bytes (${(segmentBytes / 1048576).toFixed(2)} MiB)`,
+    `catalog: ${built.catalog.bytes.length} bytes, id ${built.catalog.id}`,
+    `largest segment: story ${largest.seg.h.group}, ${largest.bytes.length} bytes`,
+    `encoder: ${encoder}`,
+    `signed: ${key === undefined ? 'no' : `key ${key.keyId}`}`,
+    `wall time: ${seconds} s`,
+  ]
+  await writeFile(join(o.out, 'report.txt'), `${['language-pack-v3 build report', `built: ${o.built}`, `catalog: ${OBSIMG_CATALOG}, revision ${o.revision}`, ...summary].join('\n')}\n`)
+  for (const line of summary) io.log(line)
+  io.log(`written in ${o.out}`)
+}
+
+async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
+  if (o.obsImages === true) {
+    await buildObsImagesFolder(o, io, deps ?? { fetch: (url) => fetch(url) })
+    return
+  }
   const lang = await languageOf(o.list)
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(lang)) throw new Error(`${o.list}: the language ${JSON.stringify(lang)} cannot name a file`)
   const originalsLanguage = await languageOf(o.originals)
@@ -422,7 +549,7 @@ async function build(o: Options, io: Io): Promise<void> {
       throw new Error(`Cannot read the book names ${o.bookNames}: ${(error as Error).message}`)
     }
   }
-  let topics: { xtopics: XtopicsCore; records: TipnrRecord[] } | undefined
+  let topics: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; release: string } } | undefined
   if (topicSources !== undefined) {
     const core = published !== undefined ? { seg: published.core! } : common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
     if (core === undefined) throw new Error('--topics: the common part has no xtopics core (no originals were built?)')
@@ -430,7 +557,8 @@ async function build(o: Options, io: Io): Promise<void> {
     const issues: string[] = []
     const records = parseTipnr(topicSources.tipnr, issues)
     for (const line of issues) if (!common.report.includes(`topics: ${line}`)) common.report.push(`topics: ${line}`)
-    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records }
+    const acai = parseAcai(topicSources.acai)
+    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records, acai: { people: acai.people, release: acai.commit.slice(0, 8) } }
   }
   // Without --ta-config the related of the tA articles comes from the links alone (a log line says so).
   const taKeys = (await source.resources(lang)).filter((ref) => ref.kind === 'Translation Academy').map((ref) => ref.key)
@@ -456,6 +584,18 @@ async function build(o: Options, io: Io): Promise<void> {
     taTocs,
     roleHints: roleHints?.hints,
     roleHintSegs: roleHints?.segs,
+    obsTf:
+      o.obsTf === undefined
+        ? undefined
+        : {
+            key: `unfoldingWord/${lang}/obs-tf`,
+            release: o.obsTf.release,
+            title: 'OBS Theological Formation',
+            license: 'CC-BY-SA-4.0',
+            rights: 'unfoldingWord',
+            attribution: lang === 'id' ? ID_OBS_TF_ATTRIBUTION : 'unfoldingWord and Formation Stories',
+            files: obsTfFiles(o.obsTf.dir),
+          },
   })
 
   // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.
@@ -517,7 +657,7 @@ async function build(o: Options, io: Io): Promise<void> {
 }
 
 /** The command: its exit code (0, 1 for a usage error, 2 for a build error). `io` takes what it prints. */
-export async function main(argv: string[], io: Io = { log: console.log, error: console.error }, sources: TopicSource[] = pins()): Promise<number> {
+export async function main(argv: string[], io: Io = { log: console.log, error: console.error }, sources: TopicSource[] = pins(), deps?: ObsImagesDeps): Promise<number> {
   let options: Options
   try {
     options = optionsFromArgs(argv, sources)
@@ -528,7 +668,7 @@ export async function main(argv: string[], io: Io = { log: console.log, error: c
     return 1
   }
   try {
-    await build(options, io)
+    await build(options, io, deps)
     return 0
   } catch (error) {
     io.error(`Error: ${error instanceof Error ? error.message : String(error)}`)

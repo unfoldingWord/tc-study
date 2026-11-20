@@ -40,8 +40,41 @@ export type OrigModel = {
   pieces: Piece[]
   events: Event[]
   attrs?: Record<number, Record<string, string>>
-  macula?: { release: string; trees?: unknown; referents?: unknown }
+  macula?: MaculaModel
 }
+
+/**
+ * The trees of `macula` v2 (`orig.cddl`): `lo` and `span` hold the sentence's own lowest word position and highest minus
+ * lowest, `nodes` the sentence's tree in preorder as uvarints, left undecoded (`read/macula.ts` decodes one on demand).
+ * `lo`, `span` and `nodes` have one entry per sentence.
+ */
+export type MaculaTrees = { labels: string[]; pieces: string[]; lo: number[]; span: number[]; nodes: Uint8Array[] }
+
+/**
+ * The referents of `macula` v2, one row per reference, rows by word position. `word` holds the referring words' own
+ * positions (the segment stores their deltas); `kind`, `piece` and `ent` number `kinds`, `pieces` and `ents`; `ante` is
+ * the antecedent's position + 1, or 0 when the rule cannot fix it.
+ */
+export type MaculaReferents = {
+  ents: [form: string, strong: string][]
+  kinds: string[]
+  pieces: string[]
+  word: number[]
+  kind: number[]
+  piece: number[]
+  ent: number[]
+  ch: number[]
+  vs: number[]
+  ante: number[]
+}
+
+/**
+ * The `macula` table of an original: v 2 (decoded columns) or v 1 (as published, kept as the file has it; the reader sets
+ * `v: 1`, a model that leaves `v` out is v 1 too). The writer writes the version the model carries.
+ */
+export type MaculaModel =
+  | { release: string; v?: 1; trees?: unknown; referents?: unknown }
+  | { release: string; v: 2; trees?: MaculaTrees; referents?: MaculaReferents }
 
 /**
  * A bridge text of a book (`spec/cddl/book.cddl`, "Texts"): its pieces and events as in {@link OrigModel}, and which
@@ -220,6 +253,28 @@ export type ObsModel = {
   links?: ObsHelpTable
   studyNotes?: ObsHelpTable
   studyQuestions?: ObsHelpTable
+  /** The Five Movements session manual (`obs.cddl`, "OBS Five Movements"); its `res` is a key of this model's `res`. */
+  tf?: ObsTfModel
+}
+
+/** A block of a story's session (`tf-parts`): the heading row of a part (no `list`) or of a list, or a shared block (`shared` is its key). */
+export type ObsTfBlock = { story: number; part: string; list?: string; title?: string; text?: string; shared?: string }
+/** A question (`tf-questions`); `k` counts from 1 within the part; `refText` is the frame label as the source wrote it, when corrected. */
+export type ObsTfQuestion = { story: number; part: string; list: string; k: number; frames: number[]; q: string; a?: string; refText?: string }
+/** A translation term (`tf-terms`); `k` counts from 1 within the frame. */
+export type ObsTfTerm = { frame: number; k: number; term?: string; text: string; refText?: string }
+/** A block the stories share (`tf-shared`), stored once. */
+export type ObsTfShared = { key: string; title: string; text?: string }
+/** The Five Movements tables of one language (`tf-parts`, `tf-questions`, `tf-terms`, `tf-shared`, `tf-frames`, `tf-framework`), as rows in table order. */
+export type ObsTfModel = {
+  res: string
+  stories: number[]
+  parts: ObsTfBlock[]
+  questions: ObsTfQuestion[]
+  terms: ObsTfTerm[]
+  shared: ObsTfShared[]
+  frames: { frame: number; text: string }[]
+  framework: { code: string; name?: string; text?: string }[]
 }
 
 /**
@@ -380,6 +435,16 @@ export type XtopicsCore = {
   ranges?: Record<string, [first: number, last: number][]>
   /** The sections of the English ULT per book (its ts chunks): first and last verse of each, ascending, no overlap. */
   chunks?: Record<string, [first: number, last: number][]>
+  /**
+   * The verses each frame of Open Bible Stories tells (`obs-frames`, from bible-story-builder): per frame key "N:F" (story,
+   * frame; no leading zeros), its verse ranges in the order of the source. A frame that tells no verse has no key.
+   */
+  obsFrames?: Record<string, [first: number, last: number][]>
+  /**
+   * The gender of a person (`gender`, from ACAI): 1 man, 2 woman, per `per:` topic of this core. A person with no data has no key. The
+   * segment holds it as a column aligned with `topics.ids` (0 for no data and for every topic that is not a person).
+   */
+  gender?: Record<string, 1 | 2>
 }
 
 /** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */
@@ -396,7 +461,17 @@ export type TopicsCore = {
   names: Record<string, TopicName[]>
   local?: Record<string, { names: string[]; refs?: [number, number][]; related?: string[] }>
   coverage: Coverage
+  /** What this language calls people where the pack cannot derive it (`people`, from ACAI; `topics.cddl` and `ids.md`, "Names of people"). */
+  people?: TopicsPeople
 }
+
+/**
+ * The table `people` of a language's topics core. `names`: per `per:` id, its name in this language, only where it is not the derived
+ * name (`ids.md`). `notes`: per `per:` id, what tells it apart from another person of the same name in this language (`padre de José`),
+ * only for such people. `aliases`: another name of a person (an ACAI alias record) to the `per:` ids it names, sorted by code point, only
+ * where the language cannot derive it. Each map may be empty.
+ */
+export type TopicsPeople = { names: Record<string, string>; notes: Record<string, string>; aliases: Record<string, string[]> }
 
 /** The part of one book: the verses each topic's alignment names were taken from. */
 export type TopicsPart = { lang: string; part: string; names?: VerseLists }
@@ -414,3 +489,12 @@ export type AlignedModel = {
   res: [string, string][]
   entries: Map<string, Map<string, Map<string, [verses: number, occurrences: number]>>>
 }
+
+/** A picture of the Open Bible Stories segment `obsimg` (`obsimg.cddl`, `frame`): the image file's bytes, as published. `media` is passed through, never decoded. */
+export type ObsImageFrame = { n: number; media: string; w: number; h: number; data: Uint8Array }
+
+/** The credit every `obsimg` segment carries (`obsimg.cddl`, `meta-row`). */
+export type ObsImagesMeta = { license: string; credit: string; changes: string; source: string }
+
+/** One story of the OBS pictures: the frames sorted by `n`, and the credit (`obsimg.cddl`). */
+export type ObsImagesModel = { story: number; frames: ObsImageFrame[]; meta: ObsImagesMeta }

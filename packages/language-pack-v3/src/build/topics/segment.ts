@@ -9,6 +9,7 @@ import type { Segment } from '../../codec/container'
 import { encodeBookSet, encodeCounts, encodeCoverage, encodeVerseLists } from '../../codec/counts'
 import { put } from '../../codec/values'
 import { chunksTable } from './chunks'
+import { OBS_FRAME_KEY } from '../../read/topics'
 import { TOPIC_KINDS, TOPIC_NAME_SOURCES, type TopicsCore, type TopicsPart, type XtopicsCore, type XtopicsPart } from '../../model'
 
 type Built = { tables: Record<string, [number, boolean]>; t: Record<string, CborValue> }
@@ -131,6 +132,32 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     tables.chunks = [1, false]
     t.chunks = chunksTable(byBook)
   }
+  if (m.obsFrames !== undefined) {
+    const out: Record<string, number[][]> = {}
+    for (const [k, v] of Object.entries(sortedRecord(m.obsFrames))) {
+      if (!OBS_FRAME_KEY.test(k)) throw new Error(`obs-frames: ${JSON.stringify(k)} is not a frame "N:F"`)
+      if (v.length === 0) throw new Error(`obs-frames: ${JSON.stringify(k)} has no range`)
+      for (const [a, b] of v) {
+        for (const n of [a, b]) {
+          if (!Number.isSafeInteger(n) || n < 1_000_000 || n >= 67_000_000) throw new Error(`obs-frames: ${JSON.stringify(k)} has ${n}, which is not a verse id`)
+        }
+        if (a > b) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range that runs backwards`)
+        if (Math.floor(a / 1000) !== Math.floor(b / 1000)) throw new Error(`obs-frames: ${JSON.stringify(k)} has a range across two chapters`)
+      }
+      put(out, k, v.map(([a, b]) => [a, b]))
+    }
+    tables['obs-frames'] = [1, false]
+    t['obs-frames'] = out
+  }
+  if (m.gender !== undefined) {
+    for (const [k, v] of Object.entries(m.gender)) {
+      if (!number.has(k)) throw new Error(`gender: ${JSON.stringify(k)} is not a topic`)
+      if (m.topics.get(k)!.kind !== 'person' || !k.startsWith('per:')) throw new Error(`gender: ${JSON.stringify(k)} is not a person (per:)`)
+      if (v !== 1 && v !== 2) throw new Error(`gender: ${JSON.stringify(k)} is ${String(v)}, not 1 or 2`)
+    }
+    tables.gender = [1, false]
+    t.gender = encodeUvarints(ids.map((id) => m.gender![id] ?? 0))
+  }
   return { tables, t }
 }
 
@@ -181,6 +208,38 @@ function topicsCoreTables(m: TopicsCore): Built {
       put(local, k, row)
     }
     t.local = local
+  }
+  if (m.people !== undefined) {
+    const per = (id: string, what: string): void => {
+      if (!id.startsWith('per:')) throw new Error(`people: ${what} ${JSON.stringify(id)} is not a per: id`)
+    }
+    const text = (v: string, what: string): string => {
+      if (typeof v !== 'string' || v === '') throw new Error(`people: ${what} is empty`)
+      return v
+    }
+    const names: Record<string, string> = {}
+    for (const [k, v] of Object.entries(sortedRecord(m.people.names))) {
+      per(k, 'the name of')
+      put(names, k, text(v, `the name of ${k}`))
+    }
+    const notes: Record<string, string> = {}
+    for (const [k, v] of Object.entries(sortedRecord(m.people.notes))) {
+      per(k, 'the note of')
+      put(notes, k, text(v, `the note of ${k}`))
+    }
+    const aliases: Record<string, string[]> = {}
+    for (const [k, v] of Object.entries(sortedRecord(m.people.aliases))) {
+      text(k, 'an alias')
+      if (v.length === 0) throw new Error(`people: the alias ${JSON.stringify(k)} names no one`)
+      const ids = [...v].sort(compareCodePoints)
+      ids.forEach((id, i) => {
+        per(id, `the alias ${JSON.stringify(k)} names`)
+        if (i > 0 && ids[i - 1] === id) throw new Error(`people: the alias ${JSON.stringify(k)} names ${id} twice`)
+      })
+      put(aliases, k, ids)
+    }
+    tables.people = [1, false]
+    t.people = { names, notes, aliases }
   }
   return { tables, t }
 }

@@ -11,12 +11,14 @@
  * The reader of the segment is `read/orig.ts`. No Node module is used.
  */
 import type { CborValue } from '../codec/cbor'
-import { encodeUvarints, stringTable } from '../codec/columns'
+import { encodeDeltas, encodeUvarints, stringTable } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { hasOwn, isMap } from '../codec/values'
 import { eventCode } from '../events'
 import { verseId } from '../ids'
-import { type Event, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
+import { buildMaculaReferents, maculaReferentIssues } from './macula/referents'
+import { buildMaculaTrees, maculaTreeIssues } from './macula/trees'
+import { type Event, type MaculaReferents, type MaculaTrees, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 import { ORIGINALS, type RowSource } from '../source/rows'
 
 // Extraction
@@ -119,13 +121,15 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
  * - `stamp` is the book file's blob as format 2.0 records it (`g987ab2025a`), which the resource's `bookStamps` gives
  *   for this book (`ids.md`, "Positions in the original"). A source that does not record blobs has none, and then the
  *   stamp is the release tag of the resource (`v0.34` of `v0.34#2023-09-27T02_19_31Z`: `ids.md` names the tag, with no date).
- * - MACULA rows `{resource}/trees/{BOOK}` and `{resource}/referents/{BOOK}` go to `macula` as they are, and `release`
- *   is the stamp of the MACULA resource.
+ * - MACULA rows `{resource}/trees/{BOOK}` become the `macula` v2 trees of the book ({@link buildMaculaTrees}), and `release`
+ *   is the stamp of the MACULA resource. What the trees leave out is a line in `issues`. The referents become columns too ({@link buildMaculaReferents}); what they leave out, or leave without an antecedent, is a line too.
+ * - `options.macula: false` skips the MACULA conversion (no `macula` in the model, no line in `issues`): for a caller that will not write
+ *   the orig, so that a malformed MACULA row cannot abort its build. Default: it converts.
  *
  * Throws `Error` when the source has no text of the book, has it from two resources, or has rows that are not what
  * format 2.0 writes.
  */
-export async function extractOrig(source: RowSource, book: string): Promise<OrigModel> {
+export async function extractOrig(source: RowSource, book: string, issues?: string[], options: { macula?: boolean } = {}): Promise<OrigModel> {
   const upper = book.toUpperCase()
   let resource: string | undefined
   let listed: number[] | undefined
@@ -189,10 +193,18 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
 
   const ordered = [...chunks.entries()].sort(([a], [b]) => a - b).map(([, chunk]) => chunk)
   const model: OrigModel = { book, key: resource, stamp, ...readDocument(ordered) }
-  if (macula.resource !== undefined) {
-    model.macula = { release: refOf(macula.resource).stamp }
-    if (macula.trees !== undefined) model.macula.trees = macula.trees
-    if (macula.referents !== undefined) model.macula.referents = macula.referents
+  if (options.macula !== false && macula.resource !== undefined) {
+    model.macula = { release: refOf(macula.resource).stamp, v: 2 }
+    if (macula.trees !== undefined) {
+      const { trees, counts } = buildMaculaTrees(macula.trees, model.pieces, model.events)
+      model.macula.trees = trees
+      issues?.push(...maculaTreeIssues(counts))
+    }
+    if (macula.referents !== undefined) {
+      const { referents, counts } = buildMaculaReferents(macula.referents, model.words, model.pieces, model.events)
+      model.macula.referents = referents
+      issues?.push(...maculaReferentIssues(counts))
+    }
   }
   return model
 }
@@ -228,6 +240,51 @@ function checkModel(m: OrigModel): void {
     if (!isInteger(event) || String(event) !== key || event < 0 || event >= m.events.length) {
       throw new Error(`attrs names the event ${JSON.stringify(key)}, and the model has events 0 to ${m.events.length - 1}`)
     }
+  }
+}
+
+function sameLength(what: string, lists: Record<string, { length: number }>): void {
+  const names = Object.keys(lists)
+  for (const name of names) {
+    if (lists[name].length !== lists[names[0]].length) {
+      throw new Error(`${what}: ${name} has ${lists[name].length} entries and ${names[0]} has ${lists[names[0]].length}`)
+    }
+  }
+}
+
+function maculaTreesOut(trees: MaculaTrees): CborValue {
+  sameLength('macula.trees', { lo: trees.lo, span: trees.span, nodes: trees.nodes })
+  return {
+    labels: trees.labels,
+    pieces: trees.pieces,
+    lo: encodeDeltas(trees.lo),
+    span: encodeUvarints(trees.span),
+    nodes: trees.nodes,
+  }
+}
+
+function maculaReferentsOut(r: MaculaReferents): CborValue {
+  sameLength('macula.referents', { word: r.word, kind: r.kind, piece: r.piece, ent: r.ent, ch: r.ch, vs: r.vs, ante: r.ante })
+  let last = 0
+  const word = r.word.map((position) => {
+    if (position < last) throw new Error('macula.referents: the rows are not in the order of their words')
+    const delta = position - last
+    last = position
+    return delta
+  })
+  return {
+    ents: r.ents.map(([form, strong]): CborValue => [form, strong]),
+    kinds: r.kinds,
+    pieces: r.pieces,
+    cols: {
+      word: encodeUvarints(word),
+      kind: encodeUvarints(r.kind),
+      piece: encodeUvarints(r.piece),
+      ent: encodeUvarints(r.ent),
+      ch: encodeUvarints(r.ch),
+      vs: encodeUvarints(r.vs),
+      ante: encodeUvarints(r.ante),
+    },
   }
 }
 
@@ -278,10 +335,16 @@ export function origSegment(m: OrigModel): Segment {
   const tables: Record<string, [number, boolean]> = { words: [1, true], text: [1, true] }
   const t: Record<string, CborValue> = { words, text }
   if (m.macula !== undefined) {
-    tables.macula = [1, false]
     const macula: Record<string, CborValue> = { release: m.macula.release }
-    if (m.macula.trees !== undefined) macula.trees = m.macula.trees as CborValue
-    if (m.macula.referents !== undefined) macula.referents = m.macula.referents as CborValue
+    if (m.macula.v === 2) {
+      tables.macula = [2, false]
+      if (m.macula.trees !== undefined) macula.trees = maculaTreesOut(m.macula.trees)
+      if (m.macula.referents !== undefined) macula.referents = maculaReferentsOut(m.macula.referents)
+    } else {
+      tables.macula = [1, false]
+      if (m.macula.trees !== undefined) macula.trees = m.macula.trees as CborValue
+      if (m.macula.referents !== undefined) macula.referents = m.macula.referents as CborValue
+    }
     t.macula = macula
   }
   return { h: { class: 'orig', v: 1, tables, book: m.book, orig: [m.key, m.stamp] }, t }
