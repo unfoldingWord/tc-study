@@ -32,6 +32,8 @@ export type YaapiVersionInfo = {
   field: string
   /** The SPDX license a person checked by hand, from `yaapi-versions.json`. */
   license: string
+  /** Extra credit the publisher's license asks for, appended to the attribution (`yaapi-versions.json`, `notice`). */
+  notice?: string
   /** The pin: `{ABBR}@sha256:{12 hex}` of the snapshot file. */
   release: string
   verses: ReadonlyMap<string, { chapter: number; verse: number; text: string }[]>
@@ -176,7 +178,7 @@ export async function buildYaapiPatch(o: YaapiPatchInput): Promise<YaapiPatchBui
       release: v.release,
       license: v.license,
       rights: v.copyright.trim(),
-      attribution: `${v.name}. ${v.copyright.trim()} Text unmodified, from yaapi.bible (${v.link}), license ${v.license}.${share} Not aligned to the original.`,
+      attribution: `${v.name}. ${v.copyright.trim()} Text unmodified, from yaapi.bible (${v.link}), license ${v.license}.${share} Not aligned to the original.${v.notice !== undefined ? ` ${v.notice}` : ''}`,
       source,
       books: bookSet(built[v.abbr]),
     })
