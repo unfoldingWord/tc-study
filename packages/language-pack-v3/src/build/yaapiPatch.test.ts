@@ -9,6 +9,8 @@ const ver = (abbr: string, over: Partial<YaapiVersionInfo> = {}): YaapiVersionIn
   link: 'https://example.org/x',
   field: 'CCBY',
   license: 'CC-BY-4.0',
+  audience: 'readers',
+  style: 'literal',
   release: `${abbr}@sha256:abc`,
   verses: new Map([['rut', verses(3, abbr)], ['jud', verses(2, abbr)]]),
   ...over,
@@ -42,10 +44,11 @@ describe('plainText', () => {
 
 describe('buildYaapiPatch', () => {
   test('one text per version in order, resources carry the provenance, no review', async () => {
-    const b = await buildYaapiPatch(input([ver('A'), ver('B', { field: 'CCBYSA', license: 'CC-BY-SA-4.0' })]))
+    const b = await buildYaapiPatch(input([ver('A'), ver('B', { field: 'CCBYSA', license: 'CC-BY-SA-4.0', style: 'dynamic' })]))
     expect(b.segments).toHaveLength(2)
     expect(b.built).toEqual({ A: ['rut', 'jud'], B: ['rut', 'jud'] })
     expect(b.resources.map((r) => [r.key, r.source, r.review, r.license])).toEqual([['yaapi/es-419/A', 'yaapi', undefined, 'CC-BY-4.0'], ['yaapi/es-419/B', 'yaapi', undefined, 'CC-BY-SA-4.0']])
+    expect(b.resources.map((r) => [r.audience, r.style])).toEqual([['readers', 'literal'], ['readers', 'dynamic']])
     expect(b.resources[1]!.attribution).toContain('Shared under the same license')
   })
   test('a book the base has text of is left out; an incomplete version book is left out of that version only', async () => {

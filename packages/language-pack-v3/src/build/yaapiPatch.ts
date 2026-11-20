@@ -11,7 +11,7 @@
  *   checked by hand (`YaapiVersionInfo`), `review` is left out.
  */
 import { bookNumber, bookSet } from '../ids'
-import type { About, BookModel, CatalogResource, Event, Piece, TextModel } from '../model'
+import type { About, Audience, BookModel, CatalogResource, Event, Piece, Style, TextModel } from '../model'
 import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, needsOfBook } from './catalog'
 import { BUILDER, inputsOf } from './language'
@@ -34,6 +34,9 @@ export type YaapiVersionInfo = {
   license: string
   /** Extra credit the publisher's license asks for, appended to the attribution (`yaapi-versions.json`, `notice`). */
   notice?: string
+  /** Who the text is for and how it renders its source, decided by a person (`yaapi-versions.json`); every yaapi text is labelled. */
+  audience: Audience
+  style: Style
   /** The pin: `{ABBR}@sha256:{12 hex}` of the snapshot file. */
   release: string
   verses: ReadonlyMap<string, { chapter: number; verse: number; text: string }[]>
@@ -111,6 +114,7 @@ export async function buildYaapiPatch(o: YaapiPatchInput): Promise<YaapiPatchBui
   for (const v of o.versions) {
     if (!OPEN_LICENSES.includes(v.license)) throw new Error(`${v.abbr}: the license ${JSON.stringify(v.license)} is not one of ${OPEN_LICENSES.join(', ')}`)
     if (v.field !== FIELD[v.license]) throw new Error(`${v.abbr}: yaapi's license field says ${JSON.stringify(v.field)} and the list says ${v.license}: a contradiction is not built`)
+    if (v.audience === undefined || v.style === undefined) throw new Error(`${v.abbr}: audience and style are required for a yaapi version`)
     if (v.copyright.trim() === '') throw new Error(`${v.abbr}: yaapi gives no copyright text`)
   }
   const wanted = o.books === undefined ? undefined : new Set(o.books)
@@ -180,6 +184,8 @@ export async function buildYaapiPatch(o: YaapiPatchInput): Promise<YaapiPatchBui
       rights: v.copyright.trim(),
       attribution: `${v.name}. ${v.copyright.trim()} Text unmodified, from yaapi.bible (${v.link}), license ${v.license}.${share} Not aligned to the original.${v.notice !== undefined ? ` ${v.notice}` : ''}`,
       source,
+      audience: v.audience,
+      style: v.style,
       books: bookSet(built[v.abbr]),
     })
   }

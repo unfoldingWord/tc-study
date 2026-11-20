@@ -53,7 +53,7 @@ async function baseTextBooks(base: string, lang: string, trusted: Record<string,
 }
 
 const lang = need('lang')
-const cfg = JSON.parse(readFileSync(arg('versions') ?? fileURLToPath(new URL('../data/yaapi-versions.json', import.meta.url)), 'utf8')).languages[lang] as { versions: { abbr: string; license: string; notice?: string }[] } | undefined
+const cfg = JSON.parse(readFileSync(arg('versions') ?? fileURLToPath(new URL('../data/yaapi-versions.json', import.meta.url)), 'utf8')).languages[lang] as { versions: { abbr: string; license: string; audience: 'translators' | 'readers'; style: 'literal' | 'simple' | 'dynamic'; notice?: string }[] } | undefined
 if (!cfg) {
   console.error(`yaapi-versions.json has no language ${lang}`)
   process.exit(1)
@@ -74,6 +74,8 @@ const versions: YaapiVersionInfo[] = cfg.versions.map((c) => {
     link: snap.version.link,
     field: snap.version.license,
     license: c.license,
+    audience: c.audience,
+    style: c.style,
     ...(c.notice !== undefined ? { notice: c.notice } : {}),
     release: `${c.abbr}@sha256:${createHash('sha256').update(raw).digest('hex').slice(0, 12)}`,
     verses: new Map(Object.entries(snap.books)),

@@ -11,7 +11,9 @@
           "evidence": [
             "https://ebible.org/spapddpt/copyright.htm"
           ],
-          "conflict": "https://www.bible.com/es/versions/3544 says CC BY-SA 4.0"
+          "conflict": "https://www.bible.com/es/versions/3544 says CC BY-SA 4.0",
+          "audience": "readers",
+          "style": "literal"
         },
         {
           "abbr": "ONBV-AST",
@@ -20,7 +22,9 @@
           "evidence": [
             "https://ebible.org/spaonbv/copyright.htm"
           ],
-          "notice": "Biblica® Open Nueva Biblia Viva™ Copyright © 2006, 2008 by Biblica, Inc. “Biblica” is a trademark registered in the United States Patent and Trademark Office by Biblica, Inc. Used with permission. The original Work by its copyright holders is available for free at www.biblica.com and open.bible."
+          "notice": "Biblica® Open Nueva Biblia Viva™ Copyright © 2006, 2008 by Biblica, Inc. “Biblica” is a trademark registered in the United States Patent and Trademark Office by Biblica, Inc. Used with permission. The original Work by its copyright holders is available for free at www.biblica.com and open.bible.",
+          "audience": "readers",
+          "style": "dynamic"
         }
       ]
     }
@@ -32,5 +36,6 @@
     "ASV": "field CCBYNC, text says public domain",
     "BSB": "field CCBYNCND, text says public domain",
     "HSB": "CCBYNCND"
-  }
+  },
+  "labels": "audience: translators = a tool for translating (like GLT/GST); readers = a version to read. style: literal / simple / dynamic. Set by a person (20 nov 2026): SPAPDDPT is a readers' text close to the Hebrew and Greek forms; ONBV-AST is a readers' dynamic text."
 }

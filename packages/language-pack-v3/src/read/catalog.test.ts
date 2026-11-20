@@ -59,6 +59,16 @@ describe('catalogView', () => {
     expect(view.complements).toEqual([{ kind: 'vectors', lang: 'es-419', id: idBytes(8), size: 100, media: 'application/octet-stream', version: '2', for: 'queries-1', license: 'MIT' }])
   })
 
+  test('audience and style take their values and are optional', () => {
+    for (const [audience, style] of [['translators', 'literal'], ['translators', 'simple'], ['readers', 'dynamic'], ['readers', 'literal']]) {
+      const seg = fresh()
+      tables(seg).resources[0].audience = audience
+      tables(seg).resources[0].style = style
+      expect([catalogView(seg).resources[0].audience, catalogView(seg).resources[0].style]).toEqual([audience, style])
+    }
+    expect('audience' in catalogView(fresh()).resources[0] || 'style' in catalogView(fresh()).resources[0]).toBe(false)
+  })
+
   test('review takes each of its four values, and a resource without source and review has neither', () => {
     for (const review of ['none', 'community', 'professional', 'mixed']) {
       const seg = fresh()
@@ -187,6 +197,10 @@ describe('catalogView', () => {
     ['a source that is not text', (s) => void (tables(s).resources[0].source = 1)],
     ['a review that is not one of the four', (s) => void (tables(s).resources[0].review = 'perfect')],
     ['a review that is not text', (s) => void (tables(s).resources[0].review = 1)],
+    ['an audience that is not one of the two', (s) => void (tables(s).resources[0].audience = 'everyone')],
+    ['an audience that is not text', (s) => void (tables(s).resources[0].audience = 1)],
+    ['a style that is not one of the three', (s) => void (tables(s).resources[0].style = 'free')],
+    ['a style that is not text', (s) => void (tables(s).resources[0].style = 1)],
     ['books of 8 bytes', (s) => void (tables(s).resources[0].books = new Uint8Array(8))],
     ['books of 10 bytes', (s) => void (tables(s).resources[0].books = new Uint8Array(10))],
     ['books that is a list', (s) => void (tables(s).resources[0].books = [0, 0, 0, 0, 0, 0, 0, 0, 0])],

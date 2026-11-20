@@ -22,6 +22,8 @@ function markOf(patch: string, r: CatalogResource): PatchMark {
     patch,
     ...(r.source !== undefined ? { source: r.source } : {}),
     ...(r.review !== undefined ? { review: r.review } : {}),
+    ...(r.audience !== undefined ? { audience: r.audience } : {}),
+    ...(r.style !== undefined ? { style: r.style } : {}),
     license: r.license,
     ...(r.rights !== undefined ? { rights: r.rights } : {}),
     ...(r.attribution !== undefined ? { attribution: r.attribution } : {}),

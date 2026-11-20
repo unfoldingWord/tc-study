@@ -25,7 +25,7 @@ import { CLASS_NAMES, hex, readHeader, type Segment, writeSegment } from '../cod
 import { sha256 } from '../codec/sha256'
 import { hexToBytes, isUint as isCount } from '../codec/values'
 import { bookNumber } from '../ids'
-import { REVIEW_LEVELS } from '../model'
+import { AUDIENCES, REVIEW_LEVELS, STYLES } from '../model'
 import type { About, BookModel, CatalogModel, CatalogResource, Complement, Unit } from '../model'
 
 /**
@@ -275,6 +275,14 @@ function encodeResources(resources: CatalogResource[]): CborValue[] {
     if (resource.review !== undefined) {
       if (!(REVIEW_LEVELS as readonly unknown[]).includes(resource.review)) throw new Error(`${where}: review is not one of ${REVIEW_LEVELS.join(', ')}`)
       out.review = resource.review
+    }
+    if (resource.audience !== undefined) {
+      if (!(AUDIENCES as readonly unknown[]).includes(resource.audience)) throw new Error(`${where}: audience is not one of ${AUDIENCES.join(', ')}`)
+      out.audience = resource.audience
+    }
+    if (resource.style !== undefined) {
+      if (!(STYLES as readonly unknown[]).includes(resource.style)) throw new Error(`${where}: style is not one of ${STYLES.join(', ')}`)
+      out.style = resource.style
     }
     return out
   })

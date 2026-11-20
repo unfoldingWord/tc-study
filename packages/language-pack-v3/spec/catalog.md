@@ -171,6 +171,10 @@ where Door43 has none). It is a language catalog like any other, marked by its n
   - `source`: the aggregator the data came from (`"aquifer"`);
   - `review`: the review level of the source's articles, one of `"none"`, `"community"`, `"professional"` or `"mixed"`
     (when the articles differ). A reader refuses any other value (`E_BODY`, like a bad `about.direction`).
+  - `audience` and `style` (Bible texts): who a text is for, `"translators"` (a tool for translating) or `"readers"` (a version to read),
+    and how it renders its source, `"literal"` (close to the form), `"simple"` (clear, simplified wording) or `"dynamic"` (meaning first). A
+    translators' literal text is like a GLT, a translators' simple text like a GST; a readers' text is a version people read. A reader refuses any other
+    value (`E_BODY`). Both are optional: an app shows no label when they are absent.
   An app takes its notice from `review` and its credit from `attribution`, `rights` and `license`.
 - **Merging.** A reader that merges a patch does it per book and per table (`notes`, `questions`, `links`, `texts`): the base's
   table wins whenever the base has that table for that book installed, and the patch fills only a missing table. For `texts` the

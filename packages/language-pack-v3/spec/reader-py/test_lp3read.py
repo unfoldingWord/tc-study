@@ -1489,6 +1489,7 @@ def catalog_fixture(lang="es-419", with_sig=True, rev=4, tables_extra=None):
                        "books": bytes(titus)},
                       {"key": "es-419_gl/es-419/tn", "title": "tN", "subject": "TSV Translation Notes",
                        "release": "v7", "license": "CC-BY-SA-4.0", "source": "aquifer", "review": "none",
+                       "audience": "readers", "style": "literal",
                        "books": bytes(9)}],
         "segments": [{"id": sha("s0"), "class": "book", "book": "tit", "size": 37713, "ulen": 70123,
                       "inputs": sha("i0")},
@@ -1515,6 +1516,7 @@ def catalog_fixture(lang="es-419", with_sig=True, rev=4, tables_extra=None):
                        "books": "000000000000800000"},
                       {"key": "es-419_gl/es-419/tn", "title": "tN", "subject": "TSV Translation Notes",
                        "release": "v7", "license": "CC-BY-SA-4.0", "source": "aquifer", "review": "none",
+                       "audience": "readers", "style": "literal",
                        "books": "000000000000000000"}],
         "segments": [{"id": sha("s0").hex(), "class": "book", "book": "tit", "size": 37713, "ulen": 70123,
                       "inputs": sha("i0").hex()},
@@ -1571,11 +1573,15 @@ def test_catalog_minimal_optional_keys_absent():
         r.pop("attribution", None)
         r.pop("source", None)
         r.pop("review", None)
+        r.pop("audience", None)
+        r.pop("style", None)
     for r in expected["resources"]:
         r.pop("rights", None)
         r.pop("attribution", None)
         r.pop("source", None)
         r.pop("review", None)
+        r.pop("audience", None)
+        r.pop("style", None)
     expected["h"] = header_h(h)
     ok(build(h, t), expected)
 
@@ -1589,6 +1595,10 @@ CATALOG_MUTATIONS = {
     "inputs of 8 bytes": lambda h, t: t["segments"][0].update(inputs=bytes(8)),
     "review outside none, community, professional and mixed": lambda h, t: t["resources"][1].update(review="perfect"),
     "review that is not text": lambda h, t: t["resources"][1].update(review=1),
+    "audience outside translators and readers": lambda h, t: t["resources"][1].update(audience="everyone"),
+    "audience that is not text": lambda h, t: t["resources"][1].update(audience=1),
+    "style outside literal, simple and dynamic": lambda h, t: t["resources"][1].update(style="free"),
+    "style that is not text": lambda h, t: t["resources"][1].update(style=1),
     "source that is not text": lambda h, t: t["resources"][1].update(source=1),
     "books of 8 bytes": lambda h, t: t["resources"][0].update(books=bytes(8)),
     "books of 18 bytes": lambda h, t: t["resources"][0].update(books=bytes(18)),
