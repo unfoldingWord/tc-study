@@ -15,12 +15,12 @@ import {
   originalLanguageResourceKey,
   type OriginalLanguageSpec,
 } from '../scripture/originalLanguageSpecs'
-import { literalTextOf } from '../language/literalText'
+import { isLiteralTextId, literalTextOf } from '../language/literalText'
 import { catalogHitRelease, door43ResourceForHit } from './catalogHits'
 import { ensureOriginalLanguageInCatalog } from './originalLanguageCatalog'
 import { obsKindOfSubject, pickObs, type ObsPick } from './obsPick'
 import { catalogIdentity } from './readCatalogIdentity'
-import { searchCatalogHitsForTarget, searchObsStories, type CatalogSearchClient } from './readCatalogSearch'
+import { searchAlignedBibles, searchCatalogHitsForTarget, searchObsStories, type CatalogSearchClient } from './readCatalogSearch'
 import { createResourceMetadata, type Door43Resource, type MetadataCreationOptions } from './ResourceMetadataFactory'
 
 export interface DiscoveredResource {
@@ -28,6 +28,8 @@ export interface DiscoveredResource {
   typeId: string
   subject: string
   version: string
+  /** True for the literal aligned text that came in without the `tc-ready` topic (see `withoutTcReady` of {@link LanguageDiscovery}). */
+  withoutTcReady?: true
 }
 
 export interface SkippedHit {
@@ -43,6 +45,11 @@ export interface LanguageDiscovery {
   /** Original-language keys now in the catalog (added now or already there). */
   originals: string[]
   skipped: SkippedHit[]
+  /**
+   * Resource keys that came in without the `tc-ready` topic. Only one case exists: a language whose Door43 has no `tc-ready` literal aligned
+   * text gets its literal aligned Bible (`*lt`, any owner) without the topic, so it can be opened (Abel, 19 Nov). Empty otherwise.
+   */
+  withoutTcReady: string[]
   /** The OBS owners picked for this language (`obsPick.ts`); every other OBS hit was dropped. */
   obs: ObsPick
 }
@@ -83,6 +90,29 @@ export async function discoverLanguage(options: {
     })),
     { hydrateTarget: 'text' as const, catalogResults: await searchObsStories(door43Client, language) },
   ]
+
+  // No tc-ready literal aligned text: take the literal aligned Bible without the topic, marked, never in place of one that has it.
+  const withoutTcReady = new Set<string>()
+  const hasLiteral = (list: typeof entries) =>
+    literalTextOf(
+      list.flatMap((entry) => {
+        const id = catalogIdentity(entry, language)
+        return id ? [{ language: id.langStr, subject: id.subject, resourceId: id.resourceId, owner: id.ownerStr }] : []
+      }),
+      language
+    ) !== undefined
+  if (!hasLiteral(pages.flatMap((page) => page.catalogResults))) {
+    const candidates = (await searchAlignedBibles(door43Client, language))
+      .filter((entry) => {
+        const id = catalogIdentity(entry, language)
+        return id !== null && id.langStr === language && isLiteralTextId(id.resourceId, language)
+      })
+      .sort((a, b) => (catalogIdentity(a, language)!.resourceKey < catalogIdentity(b, language)!.resourceKey ? -1 : 1))
+    if (candidates.length > 0) {
+      withoutTcReady.add(catalogIdentity(candidates[0], language)!.resourceKey)
+      pages.push({ hydrateTarget: 'text' as const, catalogResults: [candidates[0]] })
+    }
+  }
 
   // One owner per language for OBS: every OBS hit goes through the pick, and only the picked rows continue.
   const entries = pages.flatMap((page) => page.catalogResults)
@@ -138,6 +168,7 @@ export async function discoverLanguage(options: {
         typeId: type,
         subject: id.subject,
         version: release.tag_name,
+        ...(withoutTcReady.has(id.resourceKey) ? { withoutTcReady: true as const } : {}),
       })
     } catch (error) {
       skipped.push({
@@ -161,5 +192,5 @@ export async function discoverLanguage(options: {
     }
   }
 
-  return { language, resources, originals: presentOriginals, skipped, obs }
+  return { language, resources, originals: presentOriginals, skipped, withoutTcReady: [...withoutTcReady], obs }
 }
