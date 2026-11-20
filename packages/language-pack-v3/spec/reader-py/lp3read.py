@@ -1607,6 +1607,10 @@ def _decode_catalog(p: Segment) -> dict:
             res["source"] = r["source"]
         if _opt(r, "review", lambda x: type(x) is str and x in ("none", "community", "professional", "mixed")) is not None:
             res["review"] = r["review"]
+        if "tcReady" in r:
+            if r["tcReady"] is not False:
+                _bad()
+            res["tcReady"] = False
         resources.append(res)
 
     segments, ids = [], set()

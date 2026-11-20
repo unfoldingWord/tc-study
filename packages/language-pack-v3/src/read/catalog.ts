@@ -98,6 +98,10 @@ function readResource(value: unknown, i: number): CatalogResource {
     if (!(REVIEW_LEVELS as readonly unknown[]).includes(review)) bad(`${what}.review is ${JSON.stringify(review)}, not "none", "community", "professional" or "mixed"`)
     resource.review = review as ReviewLevel
   }
+  if (hasOwn(fields, 'tcReady')) {
+    if (fields.tcReady !== false) bad(`${what}.tcReady is ${JSON.stringify(fields.tcReady)}, not false (the field is absent for a tc-ready resource)`)
+    resource.tcReady = false
+  }
   return resource
 }
 

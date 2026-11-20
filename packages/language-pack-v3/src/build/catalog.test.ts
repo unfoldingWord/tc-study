@@ -518,6 +518,19 @@ describe('buildCatalog', () => {
   })
 })
 
+describe('resources without tc-ready', () => {
+  test('tcReady false is written and read back; a resource without it has no such field; any other value is refused', async () => {
+    const stub = () => builtSegment({ h: { class: 'book', v: 1, tables: {}, lang: 'es-419', book: 'tit' }, t: {} }, fingerprint(1))
+    const built = await buildCatalog({ about, resources: [resource('ru_gt/ru/glt', { tcReady: false }), resource('ru_gt/ru/tn')], segments: [await stub()] })
+    const view = catalogView((await readSegment(built.bytes, { known: CATALOG_TABLES })).seg)
+    expect(view.resources.find((r) => r.key === 'ru_gt/ru/glt')?.tcReady).toBe(false)
+    expect('tcReady' in view.resources.find((r) => r.key === 'ru_gt/ru/tn')!).toBe(false)
+    for (const bad of [true, 'false', 0]) {
+      await expect(buildCatalog({ about, resources: [resource('x/y/glt', { tcReady: bad as never })], segments: [] })).rejects.toThrow(/tcReady/)
+    }
+  })
+})
+
 describe('patch catalogs', () => {
   const patchAbout: About = { ...about, catalog: 'hi-x-aquifer' }
   const aquifer = (extra: Partial<CatalogResource> = {}) =>

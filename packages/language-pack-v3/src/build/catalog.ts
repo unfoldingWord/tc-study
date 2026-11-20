@@ -276,6 +276,10 @@ function encodeResources(resources: CatalogResource[]): CborValue[] {
       if (!(REVIEW_LEVELS as readonly unknown[]).includes(resource.review)) throw new Error(`${where}: review is not one of ${REVIEW_LEVELS.join(', ')}`)
       out.review = resource.review
     }
+    if (resource.tcReady !== undefined) {
+      if (resource.tcReady !== false) throw new Error(`${where}: tcReady is only ever false (leave it out for a tc-ready resource)`)
+      out.tcReady = false
+    }
     return out
   })
 }
