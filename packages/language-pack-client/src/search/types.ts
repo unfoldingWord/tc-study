@@ -1,7 +1,7 @@
 /** The search index contract and the rows of a book that both indexes keep. No Node module here. */
-import type { BookModel, Event, ObsModel, Piece } from '@bt-synergy/language-pack-v3'
+import type { ArticleModel, BookModel, Event, ObsModel, Piece } from '@bt-synergy/language-pack-v3'
 
-export type SearchKind = 'text' | 'note' | 'question' | 'link' | 'title'
+export type SearchKind = 'text' | 'note' | 'question' | 'link' | 'title' | 'section'
 
 export type SearchFilters = { books?: string[]; kinds?: SearchKind[]; limit?: number }
 
@@ -10,23 +10,30 @@ export const SEARCH_FILTER_KEYS: Record<keyof SearchFilters, true> = { books: tr
 
 export const DEFAULT_LIMIT = 20
 
+/** Version of the index layout. A stored index with another version is dropped and rebuilt by `init()`. 4: the C2 layout (stems, role)
+ * with the OBS rows (book `obs`), above both the OBS-era index (no version) and the C2 index without OBS (3). */
+export const INDEX_VERSION = 4
+
 /**
  * `ref` is the reference as the resource has it (`1:1`), `res` the resource key, `id` the row id of a note, question or link.
+ * `role` is the role of the section for a `section` hit (`definition`, `intro`...), so a caller can link to it; other hits have none. A section hit
+ * has `book: ''`, so a `books` filter leaves it out.
  * `snippet` is a piece of the body with the matched words between « and ». `score` is higher for a better match.
  */
-export type Hit = { kind: string; book: string; ref: string; res: string; id?: string; snippet: string; score: number }
+export type Hit = { kind: string; book: string; ref: string; res: string; id?: string; role?: string; snippet: string; score: number }
 
 export interface SearchIndex {
   init(): Promise<void>
   addBook(lang: string, book: BookModel, segmentId: string): Promise<void>
   /** The rows of the `obs` unit, with `book: 'obs'` (`rowsOfObs`). */
   addObs(lang: string, obs: ObsModel, segmentId: string): Promise<void>
+  addArticles(lang: string, articles: ArticleModel[], segmentId: string): Promise<void>
   removeSegment(segmentId: string): Promise<void>
   has(segmentId: string): Promise<boolean>
   search(lang: string, text: string, f?: SearchFilters): Promise<Hit[]>
 }
 
-export type PieceRow = { kind: SearchKind; ref: string; res: string; rid: string; body: string }
+export type PieceRow = { kind: SearchKind; ref: string; res: string; rid: string; body: string; role?: string }
 
 const NUMBER = /^(\d+)/
 
@@ -92,6 +99,17 @@ export function rowsOfObs(obs: ObsModel): PieceRow[] {
   for (const r of obs.questions?.rows ?? [])
     rows.push({ kind: 'question', ref: frameRef(r.frame), res: obs.questions!.res, rid: r.id, body: `${str(r.cols.question)}\n${str(r.cols.response)}`.trim() })
   return rows.filter((r) => r.body !== '')
+}
+
+/** One row per section with text: the article title, the section title and the text. A section hit has no book and no ref. */
+export function rowsOfArticles(articles: ArticleModel[]): PieceRow[] {
+  const rows: PieceRow[] = []
+  for (const a of articles)
+    for (const s of a.sections) {
+      if (s.md.trim() === '') continue
+      rows.push({ kind: 'section', ref: '', res: a.res, rid: `${a.id}#${s.sid}`, role: s.role, body: [a.title, s.title ?? '', s.md].filter((x) => x !== '').join('\n') })
+    }
+  return rows
 }
 
 /** The words of a user's text worth searching: those with at least one letter or digit. */

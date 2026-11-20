@@ -1,7 +1,7 @@
 /**
  * The client: refresh the catalogs, install by unit, status, prune and verify. Calls on one client run one after the other.
  */
-import { bookView, FormatError, KNOWN, obsView, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
+import { artView, bookView, FormatError, KNOWN, obsView, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { patchedReader } from './patch'
 import { ClientError } from './errors'
 import { catalogsOf, checkConcurrency, localCatalogIds, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
@@ -317,17 +317,18 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     return { bad }
   }
 
-  // The search index. It follows the active `book:` segments: after every call that can change them (install, importTransfer,
+  // The search index. It follows the active `book:` and `art:` segments: after every call that can change them (install, importTransfer,
   // importOldPack) and on `open`, segments not indexed yet are added, and those the call replaced or deactivated are removed.
   const indexProblems: { segment?: string; message: string }[] = []
   let indexReady: Promise<void> | undefined
-  const activeBooks = (state: InstalledState): Map<string, string> => {
-    const out = new Map<string, string>()
+  const activeBooks = (state: InstalledState): Map<string, { name: string; art: boolean }> => {
+    const out = new Map<string, { name: string; art: boolean }>()
     for (const [k, u] of Object.entries(state.units)) {
       const slash = k.indexOf('/')
       const unit = k.slice(slash + 1)
-      if (!unit.startsWith('book:') && unit !== 'obs') continue
-      for (const id of u.segments) out.set(id, k.slice(0, slash))
+      const art = unit.startsWith('art:')
+      if (!art && !unit.startsWith('book:') && unit !== 'obs') continue
+      for (const id of u.segments) out.set(id, { name: k.slice(0, slash), art })
     }
     return out
   }
@@ -341,7 +342,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   async function withIndex<T>(call: () => Promise<T>): Promise<T> {
     const index = o.index
     if (index === undefined) return call()
-    let before: Map<string, string> | undefined
+    let before: Map<string, { name: string; art: boolean }> | undefined
     try {
       before = activeBooks(await loadState(store))
     } catch {
@@ -353,14 +354,14 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       await syncIndex(index, before)
     }
   }
-  async function syncIndex(index: SearchIndex, before?: Map<string, string>): Promise<void> {
+  async function syncIndex(index: SearchIndex, before?: Map<string, { name: string; art: boolean }>): Promise<void> {
     try {
       const state = await loadState(store)
       const after = activeBooks(state)
       const obsIds = activeObs(state)
       await (indexReady ??= index.init())
       for (const id of before?.keys() ?? []) if (!after.has(id)) await index.removeSegment(id)
-      for (const [id, name] of after) {
+      for (const [id, { name, art }] of after) {
         if (await index.has(id)) continue
         try {
           const bytes = await st(() => store.get(id))
@@ -368,6 +369,9 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
           if (obsIds.has(id)) {
             const { seg } = await readSegment(bytes, { known: KNOWN.obs, expectedId: id })
             await index.addObs(name, obsView(seg), id)
+          } else if (art) {
+            const { seg } = await readSegment(bytes, { known: KNOWN.art, expectedId: id })
+            await index.addArticles(name, artView(seg).articles, id)
           } else {
             const { seg } = await readSegment(bytes, { known: KNOWN.book, expectedId: id })
             await index.addBook(name, bookView(seg), id)

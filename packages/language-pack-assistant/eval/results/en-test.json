@@ -1,0 +1,4066 @@
+{
+ "summary": {
+  "lang": "en",
+  "set": "test",
+  "n": 150,
+  "callsCorrect": 96,
+  "accepted": 114,
+  "correctAccepted": 81,
+  "acceptedWithSearch": 118,
+  "correctAcceptedWithSearch": 85,
+  "top3": {
+   "hit": 78,
+   "of": 135
+  },
+  "cardMs": {
+   "median": 5.7,
+   "p95": 2841.7,
+   "over300": 24
+  },
+  "steps": {
+   "rule": 94,
+   "classifier": 20,
+   "choose": 32,
+   "search": 4
+  }
+ },
+ "questions": [
+  {
+   "q": "John 3:16",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jhn 3:16"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: John 3:16"
+   },
+   "interpretation": "Passage: John 3:16",
+   "top3": [
+    "verse:ult jhn 3:16",
+    "note:jhn/vg6z",
+    "note:jhn/h4ht"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 40.3
+  },
+  {
+   "q": "what does Romans 8:28 say",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rom 8:28"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Romans 8:28"
+   },
+   "interpretation": "Passage: Romans 8:28",
+   "top3": [
+    "verse:ult rom 8:28",
+    "note:rom/u0ev",
+    "note:rom/q3ce"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 18
+  },
+  {
+   "q": "genesis 1:1-3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "gen 1:1-3"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Genesis 1:1-3"
+   },
+   "interpretation": "Passage: Genesis 1:1-3",
+   "top3": [
+    "verse:ult gen 1:1-3",
+    "note:gen/d9wn",
+    "note:gen/zb6f"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 21
+  },
+  {
+   "q": "Psalm 23:1 in the ULT",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "psa 23:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Psalm 23:1"
+   },
+   "interpretation": "Passage: Psalm 23:1",
+   "top3": [
+    "verse:ult psa 23:1",
+    "note:psa/r1f6",
+    "note:psa/glpb"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 28.1
+  },
+  {
+   "q": "translation notes for Matthew 5:3-12",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "mat 5:3-12"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Matthew 5:3-12"
+   },
+   "interpretation": "Passage: Matthew 5:3-12",
+   "top3": [
+    "verse:ult mat 5:3-12",
+    "note:mat/egbs",
+    "note:mat/jhdg"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 14.1
+  },
+  {
+   "q": "Isaiah 53:5",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "isa 53:5"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Isaiah 53:5"
+   },
+   "interpretation": "Passage: Isaiah 53:5",
+   "top3": [
+    "verse:bsb isa 53:5"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 6.7
+  },
+  {
+   "q": "Galatians 2:20 help please",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "gal 2:20"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Galatians 2:20"
+   },
+   "interpretation": "Passage: Galatians 2:20",
+   "top3": [
+    "verse:ult gal 2:20",
+    "note:gal/o3jk",
+    "note:gal/y2qf"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 16.1
+  },
+  {
+   "q": "hebrews 11:1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "heb 11:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Hebrews 11:1"
+   },
+   "interpretation": "Passage: Hebrews 11:1",
+   "top3": [
+    "verse:ult heb 11:1",
+    "note:heb/g4cc",
+    "note:heb/d95i"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.5
+  },
+  {
+   "q": "Ephesians 2:8-9",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "eph 2:8-9"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Ephesians 2:8-9"
+   },
+   "interpretation": "Passage: Ephesians 2:8-9",
+   "top3": [
+    "verse:ult eph 2:8-9",
+    "note:eph/abcq",
+    "note:eph/t9pc"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "Luke 2:1-7 notes",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "luk 2:1-7"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Luke 2:1-7"
+   },
+   "interpretation": "Passage: Luke 2:1-7",
+   "top3": [
+    "verse:ult luk 2:1-7",
+    "note:luk/dw6t",
+    "note:luk/c887"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 15.7
+  },
+  {
+   "q": "exodus 20:1-17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "exo 20:1-17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Exodus 20:1-17"
+   },
+   "interpretation": "Passage: Exodus 20:1-17",
+   "top3": [
+    "verse:ult exo 20:1-17",
+    "note:exo/x7vt",
+    "note:exo/qg71"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 24.2
+  },
+  {
+   "q": "Acts 2:38",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "act 2:38"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Acts 2:38"
+   },
+   "interpretation": "Passage: Acts 2:38",
+   "top3": [
+    "verse:ult act 2:38",
+    "note:act/a180",
+    "note:act/cmb7"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 10.3
+  },
+  {
+   "q": "how do the notes handle Philippians 4:13?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "php 4:13"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Philippians 4:13"
+   },
+   "interpretation": "Passage: Philippians 4:13",
+   "top3": [
+    "verse:ult php 4:13",
+    "note:php/z1pb",
+    "note:php/fpo4"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "jonah 1:17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 1:17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Jonah 1:17"
+   },
+   "interpretation": "Passage: Jonah 1:17",
+   "top3": [
+    "verse:ult jon 1:17",
+    "note:jon/q87y",
+    "note:jon/jdr4"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.4
+  },
+  {
+   "q": "Colossians 1:15-17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "col 1:15-17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Colossians 1:15-17"
+   },
+   "interpretation": "Passage: Colossians 1:15-17",
+   "top3": [
+    "verse:ult col 1:15-17",
+    "note:col/j5u9",
+    "note:col/rgb7"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.1
+  },
+  {
+   "q": "Revelation 21:4",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rev 21:4"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Revelation 21:4"
+   },
+   "interpretation": "Passage: Revelation 21:4",
+   "top3": [
+    "verse:ult rev 21:4",
+    "note:rev/w39g",
+    "note:rev/r310"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.3
+  },
+  {
+   "q": "stuck on James 2:17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jas 2:17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: James 2:17"
+   },
+   "interpretation": "Passage: James 2:17",
+   "top3": [
+    "verse:ult jas 2:17",
+    "note:jas/me1d",
+    "note:jas/j138"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "proverbs 3:5-6",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "pro 3:5-6"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Proverbs 3:5-6"
+   },
+   "interpretation": "Passage: Proverbs 3:5-6",
+   "top3": [
+    "verse:ult pro 3:5-6",
+    "note:pro/w345",
+    "note:pro/m1v4"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 10
+  },
+  {
+   "q": "Daniel 3:25",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "dan 3:25"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Daniel 3:25"
+   },
+   "interpretation": "Passage: Daniel 3:25",
+   "top3": [
+    "verse:ult dan 3:25",
+    "note:dan/ah4e",
+    "note:dan/poei"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "Mark 4:39",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "mrk 4:39"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Mark 4:39"
+   },
+   "interpretation": "Passage: Mark 4:39",
+   "top3": [
+    "verse:ult mrk 4:39",
+    "note:mrk/yym6",
+    "note:mrk/mnsa"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.2
+  },
+  {
+   "q": "1 Cor 13:4-7",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "1 Cor 13:4-7"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: 1 Cor 13:4-7"
+   },
+   "interpretation": "Search: 1 Cor 13:4-7",
+   "top3": [
+    "verse:bsb ezk 45:14",
+    "note:ezr/cja2",
+    "note:luk/pq2u"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 6218.5
+  },
+  {
+   "q": "First John 4:8",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "1jn 4:8"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: 1 John 4:8"
+   },
+   "interpretation": "Passage: 1 John 4:8",
+   "top3": [
+    "verse:ult 1jn 4:8",
+    "note:1jn/j265",
+    "note:1jn/j266"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 9.8
+  },
+  {
+   "q": "2 Tim 3:16",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "2 Tim 3:16"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: 2 Tim 3:16"
+   },
+   "interpretation": "Search: 2 Tim 3:16",
+   "top3": [
+    "section:tw:names/delilah#bible-references",
+    "note:jhn/ya90",
+    "note:luk/qz3g"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2155.1
+  },
+  {
+   "q": "second Peter 1:5-7",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "2pe 1:5-7"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: 2 Peter 1:5-7"
+   },
+   "interpretation": "Passage: 2 Peter 1:5-7",
+   "top3": [
+    "verse:ult 2pe 1:5-7",
+    "note:2pe/exd9",
+    "note:2pe/ceir"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.7
+  },
+  {
+   "q": "Jn 1:1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Jn 1:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: Jn 1:1"
+   },
+   "interpretation": "Search: Jn 1:1",
+   "top3": [
+    "section:tw:names/hannah#bible-references",
+    "section:tw:names/timothy#bible-references",
+    "section:tw:names/uzziah#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 582.5
+  },
+  {
+   "q": "Rom. 3:23",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rom 3:23"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Romans 3:23"
+   },
+   "interpretation": "Passage: Romans 3:23",
+   "top3": [
+    "verse:ult rom 3:23",
+    "note:rom/x1hu",
+    "note:rom/akn9"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.8
+  },
+  {
+   "q": "Phil 2:5-8 notes",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Phil 2:5-8 notes"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: Phil 2:5-8 notes"
+   },
+   "interpretation": "Search: Phil 2:5-8 notes",
+   "top3": [
+    "note:rom/px2r",
+    "note:pro/h74g",
+    "section:tw:names/herodthegreat#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 578.6
+  },
+  {
+   "q": "1 Thess 5:17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "1 Thess 5:17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: 1 Thess 5:17"
+   },
+   "interpretation": "Search: 1 Thess 5:17",
+   "top3": [
+    "note:gen/kgwz",
+    "section:tw:other/well#bible-references",
+    "section:tw:other/foreigner#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 1227.2
+  },
+  {
+   "q": "Jonah 2",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 2:1-10"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Jonah 2:1-10"
+   },
+   "interpretation": "Passage: Jonah 2:1-10",
+   "top3": [
+    "verse:ult jon 2:1-10",
+    "note:jon/ae4k",
+    "note:jon/alr2"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 9
+  },
+  {
+   "q": "psalm 117",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "psa 117:1-2"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Psalm 117:1-2"
+   },
+   "interpretation": "Passage: Psalm 117:1-2",
+   "top3": [
+    "verse:ult psa 117:1-2",
+    "note:psa/kfu1",
+    "note:psa/kxry"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 19.8
+  },
+  {
+   "q": "what does grace mean",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/grace"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: grace"
+   },
+   "interpretation": "Concept: grace",
+   "top3": [
+    "concept:tw:kt/grace",
+    "section:tw:kt/grace#definition",
+    "book:psa"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 53.8
+  },
+  {
+   "q": "define redemption",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/redeem"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: redeem"
+   },
+   "interpretation": "Concept: redeem",
+   "top3": [
+    "concept:tw:kt/redeem",
+    "section:tw:kt/redeem#definition",
+    "book:lev"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 12.8
+  },
+  {
+   "q": "righteousness in the Bible",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/righteous"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: righteous"
+   },
+   "interpretation": "Concept: righteous",
+   "top3": [
+    "concept:tw:kt/righteous",
+    "section:tw:kt/righteous#definition",
+    "book:psa"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 7.9
+  },
+  {
+   "q": "what is a covenant",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/covenant"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: covenant"
+   },
+   "interpretation": "Concept: covenant",
+   "top3": [
+    "concept:tw:kt/covenant",
+    "section:tw:kt/covenant#definition",
+    "book:gen"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.7
+  },
+  {
+   "q": "who is the Holy Spirit",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/holyspirit"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Holy Spirit"
+   },
+   "interpretation": "Concept: Holy Spirit",
+   "top3": [
+    "concept:tw:kt/holyspirit",
+    "section:tw:kt/holyspirit#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.8
+  },
+  {
+   "q": "meaning of repent",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/repent"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: repent"
+   },
+   "interpretation": "Concept: repent",
+   "top3": [
+    "concept:tw:kt/repent",
+    "section:tw:kt/repent#definition",
+    "book:luk"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.9
+  },
+  {
+   "q": "what is propitiation",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/propitiation"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: propitiation"
+   },
+   "interpretation": "Concept: propitiation",
+   "top3": [
+    "concept:tw:kt/propitiation",
+    "section:tw:kt/propitiation#definition",
+    "book:1jn"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.5
+  },
+  {
+   "q": "sabbath",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H7676"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G45210"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H7677"
+      }
+     }
+    ],
+    "interpretation": "Which of these words of the original: H7676, G4521, H7677…?"
+   },
+   "interpretation": "Which of these words of the original: H7676, G4521, H7677…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 8.1
+  },
+  {
+   "q": "what does gospel mean",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/goodnews"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "sec:2co/5.11-6.2"
+      }
+     }
+    ],
+    "interpretation": "Concept: good news, or Concept: The gospel?"
+   },
+   "interpretation": "Concept: good news, or Concept: The gospel?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "what is the tabernacle",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/tabernacle"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: tabernacle"
+   },
+   "interpretation": "Concept: tabernacle",
+   "top3": [
+    "concept:tw:kt/tabernacle",
+    "section:tw:kt/tabernacle#definition",
+    "book:exo"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.1
+  },
+  {
+   "q": "circumcision meaning",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/circumcise"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: circumcise"
+   },
+   "interpretation": "Concept: circumcise",
+   "top3": [
+    "concept:tw:kt/circumcise",
+    "section:tw:kt/circumcise#definition",
+    "book:rom"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "what is Pentecost",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/pentecost"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Pentecost"
+   },
+   "interpretation": "Concept: Pentecost",
+   "top3": [
+    "concept:tw:kt/pentecost",
+    "section:tw:kt/pentecost#definition",
+    "book:deu"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "who was Moses",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/moses"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Moses"
+   },
+   "interpretation": "Concept: Moses",
+   "top3": [
+    "concept:tw:names/moses",
+    "section:tw:names/moses#definition",
+    "book:exo"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 12.2
+  },
+  {
+   "q": "who is Melchizedek",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/melchizedek"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Melchizedek"
+   },
+   "interpretation": "Concept: Melchizedek",
+   "top3": [
+    "concept:tw:names/melchizedek",
+    "section:tw:names/melchizedek#definition",
+    "book:heb"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4
+  },
+  {
+   "q": "tell me about Barnabas",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/barnabas"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Barnabas"
+   },
+   "interpretation": "Concept: Barnabas",
+   "top3": [
+    "concept:tw:names/barnabas",
+    "section:tw:names/barnabas#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 9
+  },
+  {
+   "q": "who was Pontius Pilate",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/pilate"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Pilate"
+   },
+   "interpretation": "Concept: Pilate",
+   "top3": [
+    "concept:tw:names/pilate",
+    "section:tw:names/pilate#definition",
+    "book:jhn"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "Rahab",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/rahab"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Rahab"
+   },
+   "interpretation": "Concept: Rahab",
+   "top3": [
+    "concept:tw:names/rahab",
+    "section:tw:names/rahab#definition",
+    "book:jos"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.1
+  },
+  {
+   "q": "who was Deborah the judge",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/judge"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/judgeposition"
+      }
+     }
+    ],
+    "interpretation": "Concept: judge, or Concept: judge?"
+   },
+   "interpretation": "Concept: judge, or Concept: judge?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "where is Bethlehem",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/bethlehem"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:bethlehem-gen-35-16"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:bethlehem-jos-19-15"
+      }
+     }
+    ],
+    "interpretation": "Books: Bethlehem, Books: Bethlehem, or Books: and Bethlehem?"
+   },
+   "interpretation": "Books: Bethlehem, Books: Bethlehem, or Books: and Bethlehem?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "what do we know about Nazareth",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/nazareth"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:nazareth"
+      }
+     }
+    ],
+    "interpretation": "Concept: Nazareth, or Concept: Nazareth?"
+   },
+   "interpretation": "Concept: Nazareth, or Concept: Nazareth?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.6
+  },
+  {
+   "q": "Mount Sinai",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:sinai"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:sinai"
+      }
+     }
+    ],
+    "interpretation": "Concept: Sinai, or Books: Sinai?"
+   },
+   "interpretation": "Concept: Sinai, or Books: Sinai?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "capernaum",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/capernaum"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:capernaum"
+      }
+     }
+    ],
+    "interpretation": "Concept: Capernaum, or Concept: Capernaum?"
+   },
+   "interpretation": "Concept: Capernaum, or Concept: Capernaum?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "where was Damascus",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/damascus"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:damascus"
+      }
+     }
+    ],
+    "interpretation": "Concept: Damascus, or Concept: Damascus?"
+   },
+   "interpretation": "Concept: Damascus, or Concept: Damascus?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 1.5
+  },
+  {
+   "q": "Ephesus city info",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/ephesus"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:ephesus"
+      }
+     }
+    ],
+    "interpretation": "Concept: Ephesus, or Concept: Ephesus?"
+   },
+   "interpretation": "Concept: Ephesus, or Concept: Ephesus?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "what is Hades",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/hades"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Hades"
+   },
+   "interpretation": "Concept: Hades",
+   "top3": [
+    "concept:tw:kt/hades",
+    "section:tw:kt/hades#definition",
+    "book:psa"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3
+  },
+  {
+   "q": "how do I translate a metaphor",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Metaphor"
+   },
+   "interpretation": "Article: Metaphor",
+   "top3": [
+    "section:ta:translate/figs-metaphor#description",
+    "section:ta:translate/figs-metaphor#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 13.3
+  },
+  {
+   "q": "how to translate idioms",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-idiom"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Idiom"
+   },
+   "interpretation": "Article: Idiom",
+   "top3": [
+    "section:ta:translate/figs-idiom#description",
+    "section:ta:translate/figs-idiom#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "what is a rhetorical question and how do I translate it",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-rquestion"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Rhetorical Question"
+   },
+   "interpretation": "Article: Rhetorical Question",
+   "top3": [
+    "section:ta:translate/figs-rquestion#description",
+    "section:ta:translate/figs-rquestion#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "how do I handle exclusive and inclusive we",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-exclusive"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Exclusive and Inclusive ‘We’"
+   },
+   "interpretation": "Article: Exclusive and Inclusive ‘We’",
+   "top3": [
+    "section:ta:translate/figs-exclusive#description",
+    "section:ta:translate/figs-exclusive#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "How to translate names",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/translate-names"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: How to Translate Names"
+   },
+   "interpretation": "Article: How to Translate Names",
+   "top3": [
+    "section:ta:translate/translate-names#description",
+    "section:ta:translate/translate-names#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "what is a doublet",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-doublet"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Doublet"
+   },
+   "interpretation": "Article: Doublet",
+   "top3": [
+    "section:ta:translate/figs-doublet#description",
+    "section:ta:translate/figs-doublet#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.5
+  },
+  {
+   "q": "how do I translate euphemisms",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-euphemism"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Euphemism"
+   },
+   "interpretation": "Article: Euphemism",
+   "top3": [
+    "section:ta:translate/figs-euphemism#description",
+    "section:ta:translate/figs-euphemism#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.6
+  },
+  {
+   "q": "what is metonymy",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-metonymy"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Metonymy"
+   },
+   "interpretation": "Article: Metonymy",
+   "top3": [
+    "section:ta:translate/figs-metonymy#description",
+    "section:ta:translate/figs-metonymy#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.4
+  },
+  {
+   "q": "active or passive voice, what do I do",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-activepassive"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Active or Passive"
+   },
+   "interpretation": "Article: Active or Passive",
+   "top3": [
+    "section:ta:translate/figs-activepassive#description",
+    "section:ta:translate/figs-activepassive#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "translating hyperbole",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-hyperbole"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Hyperbole"
+   },
+   "interpretation": "Article: Hyperbole",
+   "top3": [
+    "section:ta:translate/figs-hyperbole#description",
+    "section:ta:translate/figs-hyperbole#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.4
+  },
+  {
+   "q": "how do I convert biblical weights",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/translate-bweight"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Biblical Weight"
+   },
+   "interpretation": "Article: Biblical Weight",
+   "top3": [
+    "section:ta:translate/translate-bweight#description"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "abstract nouns",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-abstractnouns"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Abstract Nouns"
+   },
+   "interpretation": "Article: Abstract Nouns",
+   "top3": [
+    "section:ta:translate/figs-abstractnouns#description",
+    "section:ta:translate/figs-abstractnouns#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.3
+  },
+  {
+   "q": "what is parallelism in poetry",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-parallelism"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Parallelism"
+   },
+   "interpretation": "Article: Parallelism",
+   "top3": [
+    "section:ta:translate/figs-parallelism#description",
+    "section:ta:translate/figs-parallelism#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "strategies for translating a hendiadys",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-hendiadys"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Hendiadys"
+   },
+   "interpretation": "Article: Hendiadys",
+   "top3": [
+    "section:ta:translate/figs-hendiadys#description",
+    "section:ta:translate/figs-hendiadys#reason"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2.1
+  },
+  {
+   "q": "forms of you singular or plural",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-you"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Forms of You"
+   },
+   "interpretation": "Article: Forms of You",
+   "top3": [
+    "section:ta:translate/figs-you#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.9
+  },
+  {
+   "q": "how is G5485 rendered in the ULT",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G5485"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G5485"
+   },
+   "interpretation": "Renderings: G5485",
+   "top3": [
+    "rendering:G5485/grace",
+    "rendering:G5485/grace",
+    "rendering:G5485/of"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 9232.9
+  },
+  {
+   "q": "G4102 renderings",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G4102"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Renderings: G4102"
+   },
+   "interpretation": "Renderings: G4102",
+   "top3": [
+    "rendering:G4102/faith",
+    "rendering:G4102/by faith",
+    "rendering:G4102/of faith"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2971.4
+  },
+  {
+   "q": "H2617 how is it translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "H2617"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: H2617"
+   },
+   "interpretation": "Renderings: H2617",
+   "top3": [
+    "rendering:H2617a/his covenant faithfulness",
+    "rendering:H2617a/covenant faithfulness",
+    "rendering:H2617a/he faithfully loves us"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5888.6
+  },
+  {
+   "q": "every way G3056 was translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G3056"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G3056"
+   },
+   "interpretation": "Renderings: G3056",
+   "top3": [
+    "rendering:G3056/word",
+    "rendering:G3056/words",
+    "rendering:G3056/message"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3758.8
+  },
+  {
+   "q": "what English words render G26?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G26"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Renderings: G26"
+   },
+   "interpretation": "Renderings: G26",
+   "top3": [
+    "rendering:G26/love",
+    "rendering:G26/of love",
+    "rendering:G26/love"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1400
+  },
+  {
+   "q": "h7965 translations",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "H7965"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Renderings: H7965"
+   },
+   "interpretation": "Renderings: H7965",
+   "top3": [
+    "rendering:H7965/peace",
+    "rendering:H7965/in peace",
+    "rendering:H7965/peace"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2919.6
+  },
+  {
+   "q": "G1515 how translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G1515"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G1515"
+   },
+   "interpretation": "Renderings: G1515",
+   "top3": [
+    "rendering:G1515/peace",
+    "rendering:G1515/of peace",
+    "rendering:G1515/peace"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1545.2
+  },
+  {
+   "q": "how did the ULT translate G4151",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G4151"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Renderings: G4151"
+   },
+   "interpretation": "Renderings: G4151",
+   "top3": [
+    "rendering:G4151/spirit",
+    "rendering:G4151/spirit",
+    "rendering:G4151/the"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1505.1
+  },
+  {
+   "q": "how was church translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G15770"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G1577"
+   },
+   "interpretation": "Renderings: G1577",
+   "top3": [
+    "rendering:G1577/church",
+    "rendering:G1577/churches",
+    "rendering:G1577/of"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 952.9
+  },
+  {
+   "q": "how was adoption translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G52060"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G5206"
+   },
+   "interpretation": "Renderings: G5206",
+   "top3": [
+    "rendering:G5206/adoption",
+    "rendering:G5206/adoption as sons",
+    "rendering:G5206/god spiritually adopted"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 290.1
+  },
+  {
+   "q": "how was Pharisee translated in the ULT",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G53300"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G5330"
+   },
+   "interpretation": "Renderings: G5330",
+   "top3": [
+    "rendering:G5330/pharisees",
+    "rendering:G5330/of the pharisees",
+    "rendering:G5330/of"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 836.7
+  },
+  {
+   "q": "how is synagogue translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G48640"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G4864"
+   },
+   "interpretation": "Renderings: G4864",
+   "top3": [
+    "rendering:G4864/synagogue",
+    "rendering:G4864/synagogues",
+    "rendering:G4864/jewish meeting place"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1053.5
+  },
+  {
+   "q": "how was conscience rendered",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G48930"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G4893"
+   },
+   "interpretation": "Renderings: G4893",
+   "top3": [
+    "rendering:G4893/conscience",
+    "rendering:G4893/a",
+    "rendering:G4893/consciences"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 698.4
+  },
+  {
+   "q": "how was hell translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G10670"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G1067"
+   },
+   "interpretation": "Renderings: G1067",
+   "top3": [
+    "rendering:G1067/hell",
+    "rendering:G1067/gehenna",
+    "rendering:G1067/of hell"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 588.7
+  },
+  {
+   "q": "how was deacon translated",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G12490"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Renderings: G1249"
+   },
+   "interpretation": "Renderings: G1249",
+   "top3": [
+    "rendering:G1249/servant",
+    "rendering:G1249/servants",
+    "rendering:G1249/a servant"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 926.9
+  },
+  {
+   "q": "which books talk about grace",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/grace"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: grace"
+   },
+   "interpretation": "Books: grace",
+   "top3": [
+    "book:psa",
+    "book:rom",
+    "book:2co"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 7.7
+  },
+  {
+   "q": "where is covenant mentioned most",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/covenant"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: covenant"
+   },
+   "interpretation": "Books: covenant",
+   "top3": [
+    "book:gen",
+    "book:deu",
+    "book:psa"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.1
+  },
+  {
+   "q": "books that mention repentance",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/repent"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Books: repent"
+   },
+   "interpretation": "Books: repent",
+   "top3": [
+    "book:luk",
+    "book:rev",
+    "book:2ki"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.5
+  },
+  {
+   "q": "which books have the sabbath",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/sabbath"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: Sabbath"
+   },
+   "interpretation": "Books: Sabbath",
+   "top3": [
+    "book:lev",
+    "book:luk",
+    "book:exo"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.6
+  },
+  {
+   "q": "in which books does Passover appear",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/passover"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: Passover"
+   },
+   "interpretation": "Books: Passover",
+   "top3": [
+    "book:jhn",
+    "book:luk",
+    "book:exo"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.1
+  },
+  {
+   "q": "books with angels",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/angel"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Books: angel"
+   },
+   "interpretation": "Books: angel",
+   "top3": [
+    "book:rev",
+    "book:luk",
+    "book:jdg"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4
+  },
+  {
+   "q": "where is Moses mentioned",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/moses"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: Moses"
+   },
+   "interpretation": "Books: Moses",
+   "top3": [
+    "book:exo",
+    "book:lev",
+    "book:jos"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.1
+  },
+  {
+   "q": "Jerusalem, which books",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/jerusalem"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:jerusalem"
+      }
+     }
+    ],
+    "interpretation": "Books: Jerusalem, or Books: Jerusalem?"
+   },
+   "interpretation": "Books: Jerusalem, or Books: Jerusalem?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.4
+  },
+  {
+   "q": "which books speak of baptism",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:kt/baptize"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "sec:luk/3.21-4.13"
+      }
+     }
+    ],
+    "interpretation": "Books: baptize, or Books: The baptism, genealogy, and temptation of Jesus?"
+   },
+   "interpretation": "Books: baptize, or Books: The baptism, genealogy, and temptation of Jesus?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.6
+  },
+  {
+   "q": "books with priests",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/priest"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Books: priest"
+   },
+   "interpretation": "Books: priest",
+   "top3": [
+    "book:lev",
+    "book:2ki",
+    "book:neh"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "in which books will I meet metaphors",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: Metaphor"
+   },
+   "interpretation": "Books: Metaphor",
+   "top3": [
+    "book:psa",
+    "book:pro",
+    "book:job"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 8
+  },
+  {
+   "q": "which books use idioms the most",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-idiom"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: Idiom"
+   },
+   "interpretation": "Books: Idiom",
+   "top3": [
+    "book:psa",
+    "book:luk",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "where do rhetorical questions show up",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-rquestion"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Rhetorical Question"
+   },
+   "interpretation": "Article: Rhetorical Question",
+   "top3": [
+    "section:ta:translate/figs-rquestion#description",
+    "section:ta:translate/figs-rquestion#reason"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 25.5
+  },
+  {
+   "q": "books with lots of hyperbole",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-hyperbole"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: Hyperbole"
+   },
+   "interpretation": "Article: Hyperbole",
+   "top3": [
+    "section:ta:translate/figs-hyperbole#description",
+    "section:ta:translate/figs-hyperbole#reason"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "where do I need to translate names the most",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/translate-names"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Article: How to Translate Names"
+   },
+   "interpretation": "Article: How to Translate Names",
+   "top3": [
+    "section:ta:translate/translate-names#description",
+    "section:ta:translate/translate-names#reason"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 8
+  },
+  {
+   "q": "list of people in the Bible",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "person"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Topics: person"
+   },
+   "interpretation": "Topics: person",
+   "top3": [
+    "topic:per:aaron",
+    "topic:per:abagtha",
+    "topic:per:abda"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 330.9
+  },
+  {
+   "q": "all the places mentioned",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:edom"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:egypt"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:sodom"
+      }
+     }
+    ],
+    "interpretation": "Books: Edom, Books: Egypt, or Books: Sodom?"
+   },
+   "interpretation": "Books: Edom, Books: Egypt, or Books: Sodom?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "what events does the Bible record",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "event"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Topics: event"
+   },
+   "interpretation": "Topics: event",
+   "top3": [
+    "topic:ev:2nd-rejection-at-nazareth",
+    "topic:ev:3rd-tour-of-galilee",
+    "topic:ev:7-years-of-famine"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 11
+  },
+  {
+   "q": "Bible stories list",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "story"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Topics: story"
+   },
+   "interpretation": "Topics: story",
+   "top3": [
+    "topic:obs:1",
+    "topic:obs:10",
+    "topic:obs:11"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "who and what appears in Ruth",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/ruth"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Books: Ruth"
+   },
+   "interpretation": "Books: Ruth",
+   "top3": [
+    "book:rut",
+    "book:mat"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "topics in Jonah",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "jon"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Topics: Jonah"
+   },
+   "interpretation": "Topics: Jonah",
+   "top3": [
+    "topic:ev:prophecies-of-jonah",
+    "topic:lug:joppa",
+    "topic:lug:nineveh"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 7.5
+  },
+  {
+   "q": "what people and places are in Philemon",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "phm"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Topics: Philemon"
+   },
+   "interpretation": "Topics: Philemon",
+   "top3": [
+    "topic:lug:rome",
+    "topic:per:apphia",
+    "topic:per:archippus"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "how is Romans divided into sections",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/rome"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Books: Rome"
+   },
+   "interpretation": "Books: Rome",
+   "top3": [
+    "book:act",
+    "book:rom",
+    "book:jhn"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.4
+  },
+  {
+   "q": "topics in 1 John",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "1jn"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Topics: 1 John"
+   },
+   "interpretation": "Topics: 1 John",
+   "top3": [
+    "topic:obs:49",
+    "topic:per:cain",
+    "topic:per:jesus"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "what does Esther cover",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "est front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/esther"
+      }
+     }
+    ],
+    "interpretation": "Esther, the book, or Concept: Esther?"
+   },
+   "interpretation": "Esther, the book, or Concept: Esther?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3
+  },
+  {
+   "q": "background for Acts 15:1-11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "act 15:1-11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Acts 15:1-11"
+   },
+   "interpretation": "Passage: Acts 15:1-11",
+   "top3": [
+    "verse:ult act 15:1-11",
+    "note:act/h917",
+    "note:act/su66"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 73.4
+  },
+  {
+   "q": "what is going on around Gal 3:28",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "gal 3:28"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Galatians 3:28"
+   },
+   "interpretation": "Passage: Galatians 3:28",
+   "top3": [
+    "verse:ult gal 3:28",
+    "note:gal/srk1",
+    "note:gal/tu05"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 6.9
+  },
+  {
+   "q": "context of Jeremiah 29:11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "context",
+     "args": {
+      "ref": "jer 29:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Context: Jeremiah 29:11"
+   },
+   "interpretation": "Context: Jeremiah 29:11",
+   "top3": [
+    "verse:bsb jer 29:11"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 12.9
+  },
+  {
+   "q": "need context for 1 Cor 11:3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "need context for 1 Cor 11:3"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: need context for 1 Cor 11:3"
+   },
+   "interpretation": "Search: need context for 1 Cor 11:3",
+   "top3": [
+    "verse:bsb ezk 45:14",
+    "note:ezr/cja2",
+    "note:luk/pq2u"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4193.5
+  },
+  {
+   "q": "what comes before and after Mark 10:45",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "mrk 10:45"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Passage: Mark 10:45"
+   },
+   "interpretation": "Passage: Mark 10:45",
+   "top3": [
+    "verse:ult mrk 10:45",
+    "note:mrk/pnmd",
+    "note:mrk/ctta"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 19.5
+  },
+  {
+   "q": "prodigal son",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/sonofgod"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:israel"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:simon-jhn-6-71"
+      }
+     }
+    ],
+    "interpretation": "Concept: Son of God, Concept: Israel, or Concept: Simon?"
+   },
+   "interpretation": "Concept: Son of God, Concept: Israel, or Concept: Simon?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 4
+  },
+  {
+   "q": "good Samaritan",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/samaria"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:samaria"
+      }
+     }
+    ],
+    "interpretation": "Concept: Samaria, or Concept: Samaria?"
+   },
+   "interpretation": "Concept: Samaria, or Concept: Samaria?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 10.2
+  },
+  {
+   "q": "feeding of the five thousand",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "ev:feeding-of-five-thousand"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "ev:feeding-of-five-thousand"
+      }
+     }
+    ],
+    "interpretation": "Concept: Feeding of Five Thousand, or Books: Feeding of Five Thousand?"
+   },
+   "interpretation": "Concept: Feeding of Five Thousand, or Books: Feeding of Five Thousand?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.3
+  },
+  {
+   "q": "Jonah and the big fish",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/jonah"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Jonah"
+   },
+   "interpretation": "Concept: Jonah",
+   "top3": [
+    "concept:tw:names/jonah",
+    "section:tw:names/jonah#definition",
+    "book:jon"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.7
+  },
+  {
+   "q": "David and Goliath",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/david"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: David"
+   },
+   "interpretation": "Concept: David",
+   "top3": [
+    "concept:tw:names/david",
+    "section:tw:names/david#definition",
+    "book:1sa"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.9
+  },
+  {
+   "q": "burning bush",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "burning bush"
+     }
+    },
+    "via": "search",
+    "interpretation": "Search: burning bush"
+   },
+   "interpretation": "Search: burning bush",
+   "top3": [
+    "verse:ust exo 3:2",
+    "note:luk/m406",
+    "verse:ult exo 3:2"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": true
+   },
+   "ms": 94.5
+  },
+  {
+   "q": "crossing the Red Sea",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/redsea"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Sea of Reeds"
+   },
+   "interpretation": "Concept: Sea of Reeds",
+   "top3": [
+    "concept:tw:names/redsea",
+    "section:tw:names/redsea#definition",
+    "book:exo"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 14.8
+  },
+  {
+   "q": "Lazarus raised from the dead",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/lazarus"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Lazarus"
+   },
+   "interpretation": "Concept: Lazarus",
+   "top3": [
+    "concept:tw:names/lazarus",
+    "section:tw:names/lazarus#definition",
+    "book:jhn"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 10.2
+  },
+  {
+   "q": "wedding at Cana",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/cana"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Cana"
+   },
+   "interpretation": "Concept: Cana",
+   "top3": [
+    "concept:tw:names/cana",
+    "section:tw:names/cana#definition",
+    "book:jhn"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.7
+  },
+  {
+   "q": "Jesus walks on water",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "ev:jesus-walks-on-water"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "ev:jesus-walks-on-water"
+      }
+     }
+    ],
+    "interpretation": "Concept: Jesus Walks on Water, or Books: Jesus Walks on Water?"
+   },
+   "interpretation": "Concept: Jesus Walks on Water, or Books: Jesus Walks on Water?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.8
+  },
+  {
+   "q": "Daniel in the lions den",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/daniel"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Daniel"
+   },
+   "interpretation": "Concept: Daniel",
+   "top3": [
+    "concept:tw:names/daniel",
+    "section:tw:names/daniel#definition",
+    "book:dan"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 11.7
+  },
+  {
+   "q": "Samson and Delilah",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/samson"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Samson"
+   },
+   "interpretation": "Concept: Samson",
+   "top3": [
+    "concept:tw:names/samson",
+    "section:tw:names/samson#definition",
+    "book:jdg"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.1
+  },
+  {
+   "q": "Zacchaeus",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/zacchaeus"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: Zacchaeus"
+   },
+   "interpretation": "Concept: Zacchaeus",
+   "top3": [
+    "concept:tw:names/zacchaeus",
+    "section:tw:names/zacchaeus#definition",
+    "book:luk"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.8
+  },
+  {
+   "q": "parable of the sower",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H1819"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G38500"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H4912"
+      }
+     }
+    ],
+    "interpretation": "Which of these words of the original: H1819, G3850, H4912…?"
+   },
+   "interpretation": "Which of these words of the original: H1819, G3850, H4912…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 8.2
+  },
+  {
+   "q": "eye of a needle",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "eye of a needle"
+     }
+    },
+    "via": "search",
+    "interpretation": "Search: eye of a needle"
+   },
+   "interpretation": "Search: eye of a needle",
+   "top3": [
+    "note:luk/j7x3",
+    "verse:bsb mrk 10:25",
+    "verse:bsb luk 18:25"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 90
+  },
+  {
+   "q": "turn the other cheek",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "turn the other cheek"
+     }
+    },
+    "via": "search",
+    "interpretation": "Search: turn the other cheek"
+   },
+   "interpretation": "Search: turn the other cheek",
+   "top3": [
+    "note:mat/i13f",
+    "verse:bsb mat 5:39",
+    "verse:ult mat 5:39"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": true
+   },
+   "ms": 146.2
+  },
+  {
+   "q": "salt of the earth",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:other/earth"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concept: earth"
+   },
+   "interpretation": "Concept: earth",
+   "top3": [
+    "concept:tw:other/earth",
+    "section:tw:other/earth#definition",
+    "book:gen"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 38.1
+  },
+  {
+   "q": "lost sheep",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H0352a"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G42630"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H5116a"
+      }
+     }
+    ],
+    "interpretation": "Which of these words of the original: H0352a, G4263, H5116a…?"
+   },
+   "interpretation": "Which of these words of the original: H0352a, G4263, H5116a…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 21.8
+  },
+  {
+   "q": "mustard seed",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/seed"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2233"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H4592"
+      }
+     }
+    ],
+    "interpretation": "Concept: seed, Renderings: H2233, or Renderings: H4592?"
+   },
+   "interpretation": "Concept: seed, Renderings: H2233, or Renderings: H4592?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 7
+  },
+  {
+   "q": "Sodom and Gomorrah",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/sodom"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:sodom"
+      }
+     }
+    ],
+    "interpretation": "Concept: Sodom, or Concept: Sodom?"
+   },
+   "interpretation": "Concept: Sodom, or Concept: Sodom?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "John",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jhn front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/johntheapostle"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/johnthebaptist"
+      }
+     }
+    ],
+    "interpretation": "John, the book, Concept: John (the apostle), or Concept: John (the Baptist)?"
+   },
+   "interpretation": "John, the book, Concept: John (the apostle), or Concept: John (the Baptist)?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.8
+  },
+  {
+   "q": "james",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jas front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jamesbrotherofjesus"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jamessonofalphaeus"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jamessonofzebedee"
+      }
+     }
+    ],
+    "interpretation": "James, the book, Concept: James (brother of Jesus), Concept: James (son of Alphaeus), or Concept: James (son of Zebedee)?"
+   },
+   "interpretation": "James, the book, Concept: James (brother of Jesus), Concept: James (son of Alphaeus), or Concept: James (son of Zebedee)?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "Mark",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "mrk front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:mark"
+      }
+     }
+    ],
+    "interpretation": "Mark, the book, or Mark, the person?"
+   },
+   "interpretation": "Mark, the book, or Mark, the person?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.1
+  },
+  {
+   "q": "Jude",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jud front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:jude"
+      }
+     }
+    ],
+    "interpretation": "Jude, the book, or Judas, the person?"
+   },
+   "interpretation": "Jude, the book, or Judas, the person?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.5
+  },
+  {
+   "q": "Daniel",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "dan front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/daniel"
+      }
+     }
+    ],
+    "interpretation": "Daniel, the book, or Concept: Daniel?"
+   },
+   "interpretation": "Daniel, the book, or Concept: Daniel?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 43.9
+  },
+  {
+   "q": "Ruth",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "rut front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/ruth"
+      }
+     }
+    ],
+    "interpretation": "Ruth, the book, or Concept: Ruth?"
+   },
+   "interpretation": "Ruth, the book, or Concept: Ruth?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "jonah",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jon front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jonah"
+      }
+     }
+    ],
+    "interpretation": "Jonah, the book, or Concept: Jonah?"
+   },
+   "interpretation": "Jonah, the book, or Concept: Jonah?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.5
+  },
+  {
+   "q": "Luke",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "luk front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/luke"
+      }
+     }
+    ],
+    "interpretation": "Luke, the book, or Concept: Luke?"
+   },
+   "interpretation": "Luke, the book, or Concept: Luke?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.9
+  },
+  {
+   "q": "how was apostle translated",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G06510"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G06520"
+      }
+     }
+    ],
+    "interpretation": "Which of these words of the original: G0651, G0652?"
+   },
+   "interpretation": "Which of these words of the original: G0651, G0652?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "how was Christ translated",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G33230"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G55470"
+      }
+     }
+    ],
+    "interpretation": "Which of these words of the original: G3323, G5547?"
+   },
+   "interpretation": "Which of these words of the original: G3323, G5547?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 18
+  },
+  {
+   "q": "Tobit 3:1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Tobit 3:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: Tobit 3:1"
+   },
+   "interpretation": "Search: Tobit 3:1",
+   "top3": [
+    "note:jhn/m37g",
+    "note:jhn/t2sl",
+    "section:tw:other/serpent#bible-references"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 2841.7
+  },
+  {
+   "q": "what does the Book of Enoch say about the Watchers",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/enoch"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concept: Enoch"
+   },
+   "interpretation": "Concept: Enoch",
+   "top3": [
+    "concept:tw:names/enoch",
+    "section:tw:names/enoch#definition",
+    "book:gen"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "Quran verses about Moses",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Quran verses about Moses"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Search: Quran verses about Moses"
+   },
+   "interpretation": "Search: Quran verses about Moses",
+   "top3": [
+    "verse:ust exo 3:4",
+    "note:exo/qmvk",
+    "link:2co/f5dy"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 675.1
+  },
+  {
+   "q": "best Bible app for Android",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:kt/good"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00180"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G25700"
+      }
+     }
+    ],
+    "interpretation": "Books: good, Renderings: G0018, or Renderings: G2570?"
+   },
+   "interpretation": "Books: good, Renderings: G0018, or Renderings: G2570?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 16.5
+  },
+  {
+   "q": "translate this sentence into Swahili for me",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "translate this sentence into Swahili for me"
+     }
+    },
+    "via": "search",
+    "interpretation": "Search: translate this sentence into Swahili for me"
+   },
+   "interpretation": "Search: translate this sentence into Swahili for me",
+   "top3": [
+    "section:ta:translate/figs-sentencetypes#reason",
+    "section:ta:translate/figs-sentences#s3",
+    "note:neh/zami"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2491.9
+  }
+ ]
+}
