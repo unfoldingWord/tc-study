@@ -12,8 +12,8 @@ import { CLASS_NAMES, hex, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
 import { isGroup } from './aligned'
-import { REVIEW_LEVELS } from '../model'
-import type { About, CatalogModel, CatalogResource, Complement, ReviewLevel, SegmentEntry, Unit } from '../model'
+import { AUDIENCES, REVIEW_LEVELS, STYLES } from '../model'
+import type { About, Audience, CatalogModel, CatalogResource, Complement, ReviewLevel, SegmentEntry, Style, Unit } from '../model'
 
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the catalog is malformed: ${what}`)
@@ -97,6 +97,14 @@ function readResource(value: unknown, i: number): CatalogResource {
     const review = fields.review
     if (!(REVIEW_LEVELS as readonly unknown[]).includes(review)) bad(`${what}.review is ${JSON.stringify(review)}, not "none", "community", "professional" or "mixed"`)
     resource.review = review as ReviewLevel
+  }
+  if (hasOwn(fields, 'audience')) {
+    if (!(AUDIENCES as readonly unknown[]).includes(fields.audience)) bad(`${what}.audience is ${JSON.stringify(fields.audience)}, not "translators" or "readers"`)
+    resource.audience = fields.audience as Audience
+  }
+  if (hasOwn(fields, 'style')) {
+    if (!(STYLES as readonly unknown[]).includes(fields.style)) bad(`${what}.style is ${JSON.stringify(fields.style)}, not "literal", "simple" or "dynamic"`)
+    resource.style = fields.style as Style
   }
   return resource
 }

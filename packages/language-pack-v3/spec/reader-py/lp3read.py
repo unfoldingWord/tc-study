@@ -1607,6 +1607,10 @@ def _decode_catalog(p: Segment) -> dict:
             res["source"] = r["source"]
         if _opt(r, "review", lambda x: type(x) is str and x in ("none", "community", "professional", "mixed")) is not None:
             res["review"] = r["review"]
+        if _opt(r, "audience", lambda x: type(x) is str and x in ("translators", "readers")) is not None:
+            res["audience"] = r["audience"]
+        if _opt(r, "style", lambda x: type(x) is str and x in ("literal", "simple", "dynamic")) is not None:
+            res["style"] = r["style"]
         resources.append(res)
 
     segments, ids = [], set()

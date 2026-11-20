@@ -1,0 +1,43 @@
+{
+  "note": "Versions of yaapi.bible a patch may use, checked by hand (20 nov 2026). Order = preference. `license` is what a person confirmed; the build fails if yaapi's own `license` field disagrees. SPAPDDPT: yaapi CCBY, eBible.org (publisher's distribution) CC BY 4.0 with 'Copyright 2020 Asociacion Biblica Latinoamericana'; Bible.com's page says CC BY-SA 4.0; Abel decided CC BY-SA 4.0 (stricter) on 20 Nov 2026. ONBV-AST: Biblica's own notice (via eBible.org) says CC BY-SA 4.0 and asks for the notice below.",
+  "languages": {
+    "es-419": {
+      "language": "Spanish",
+      "versions": [
+        {
+          "abbr": "SPAPDDPT",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "evidence": [
+            "https://ebible.org/spapddpt/copyright.htm"
+          ],
+          "conflict": "decided by Abel (20 nov 2026): CC BY-SA 4.0. Sources: yaapi CCBY; eBible.org CC BY 4.0; https://www.bible.com/es/versions/3544 CC BY-SA 4.0",
+          "audience": "readers",
+          "style": "literal",
+          "stricter": true,
+          "notice": "Redistributed here under CC BY-SA 4.0, the stricter of the terms published for this text (yaapi.bible and eBible.org state CC BY 4.0; Bible.com states CC BY-SA 4.0). Copyright © 2020 Asociación Bíblica Latinoamericana."
+        },
+        {
+          "abbr": "ONBV-AST",
+          "license": "CC-BY-SA-4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+          "evidence": [
+            "https://ebible.org/spaonbv/copyright.htm"
+          ],
+          "notice": "Biblica® Open Nueva Biblia Viva™ Copyright © 2006, 2008 by Biblica, Inc. “Biblica” is a trademark registered in the United States Patent and Trademark Office by Biblica, Inc. Used with permission. The original Work by its copyright holders is available for free at www.biblica.com and open.bible.",
+          "audience": "readers",
+          "style": "dynamic"
+        }
+      ]
+    }
+  },
+  "excluded": {
+    "VBL": "licence field CCBYND, text says CC BY-SA 4.0 (contradiction)",
+    "BLT": "licence field CCBYND, text says CC BY-SA 4.0 (contradiction)",
+    "TOJB": "field CCBY but the copyright text has no license wording",
+    "ASV": "field CCBYNC, text says public domain",
+    "BSB": "field CCBYNCND, text says public domain",
+    "HSB": "CCBYNCND"
+  },
+  "labels": "audience: translators = a tool for translating (like GLT/GST); readers = a version to read. style: literal / simple / dynamic. Set by a person (20 nov 2026): SPAPDDPT is a readers' text close to the Hebrew and Greek forms; ONBV-AST is a readers' dynamic text."
+}
