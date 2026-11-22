@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { deflateRaw } from 'pako'
+import { createHash } from 'node:crypto'
+import { deflateRaw, inflateRaw } from 'pako'
 import { zip } from '../../spec/tests/data/topics/natural-earth-fixture'
-import { basemapId, decodeBasemap, encodeBasemap } from '../read/basemap'
+import { basemapOf, decodeBasemap, encodeBasemap } from '../read/basemap'
 import { parseOpenBible } from './openbible'
 import { readDbf, readShp } from './shapefile'
 import { readZip } from './zip'
@@ -108,16 +109,23 @@ describe('readZip: the errors', () => {
   })
 })
 
-describe('the basemap id is the sha256 of the inflated bytes', () => {
+describe('the basemap complement', () => {
   const model = { bbox: [800, 2200, 5200, 4300] as [number, number, number, number], paths: [{ layer: 1 as const, points: [[1000, 2300], [1500, 2300], [1500, 2800]] as [number, number][] }] }
-  test('another compression level gives other bytes and the same id, and a reader given the id checks it (E_ID)', () => {
+  test('its id is the sha256 of the file as downloaded, so another compressor setting (stored blocks) gives another id; the same build gives the same bytes', () => {
     const a = encodeBasemap(model)
-    const b = deflateRaw(new Uint8Array(0)) // not the same bytes at all
-    expect(basemapId(a)).toEqual(basemapId(a))
-    const id = basemapId(a)
-    expect(decodeBasemap(a, id).paths.length).toBe(1)
-    expect(() => decodeBasemap(a, new Uint8Array(32))).toThrow('catalog lists')
-    expect(b.length).not.toBe(a.length)
+    expect(Buffer.from(encodeBasemap(model)).equals(Buffer.from(a))).toBe(true)
+    const other = deflateRaw(inflateRaw(a), { level: 0 })
+    expect(decodeBasemap(other)).toEqual(decodeBasemap(a))
+    expect(createHash('sha256').update(other).digest('hex')).not.toBe(createHash('sha256').update(a).digest('hex'))
+  })
+  test('a client uses a basemap only when exactly one of version 1 is listed', () => {
+    const c = (kind: string, version = '1') => ({ kind, version, id: kind })
+    expect(basemapOf([c('basemap')])?.kind).toBe('basemap')
+    expect(basemapOf([c('images'), c('basemap')])?.kind).toBe('basemap')
+    expect(basemapOf([c('basemap'), c('basemap')])).toBeUndefined()
+    expect(basemapOf([c('basemap', '2')])).toBeUndefined()
+    expect(basemapOf([c('images')])).toBeUndefined()
+    expect(basemapOf(undefined)).toBeUndefined()
   })
 })
 

@@ -308,6 +308,7 @@ function encodeComplements(complements: Complement[]): CborValue[] {
       throw new Error(`The complement ${JSON.stringify(checked[i].order[0])} ${checked[i].order[2]} is listed twice`)
     }
   }
+  if (checked.filter((c) => c.order[0] === 'basemap').length > 1) throw new Error('A catalog lists at most one complement of kind "basemap" (catalog.md): a relief or a second level of detail is a new kind')
   return checked.map(({ out }) => out)
 }
 

@@ -3,8 +3,8 @@
  * cosine of the latitude of the middle of the frame; the frame fits the points with a margin (one point: a radius of about 40 km). Each path is cut to the
  * frame, segment by segment (a ring by Sutherland-Hodgman, a line by Liang-Barsky), so a large land ring emits no point far outside the screen even at
  * the deepest zoom; the pieces are simplified to the scale and smoothed once (Chaikin, done here and not stored). More than 200 points are grouped in a grid
- * of 44 px (adjacent circles are pushed apart so none overlaps another); markers that fall on nearly the same pixel (route stops that return to a place,
- * Perga and Attalia at a wide zoom) are spread on a small ring with a leader line; labels go by number of verses, and a label that collides with a dot, a
+ * of 44 px (adjacent circles are pushed apart, in as many passes as needed, so none overlaps another; only points in the frame are counted); markers that fall on nearly the same pixel (route stops that return to a place,
+ * Perga and Attalia at a wide zoom) are spread on a small ring (at most 30 px) with a leader line, grouped by distance to the group's first marker, and a bunch of more than 12 becomes one circle; labels go by number of verses, and a label that collides with a dot, a
  * circle or a label already placed is left out (the list has them all).
  *
  * **Colors** are literal attributes taken from `theme` ({@link LIGHT_THEME} by default), so an image that is shared keeps them; there is no `var()` and no style
@@ -112,7 +112,15 @@ export type DrawMapOptions = {
 
 type Pt = [number, number]
 
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+// Text and attribute values: the characters XML 1.0 does not allow are dropped, and & < > " are escaped (every attribute is written between double quotes)
+const esc = (s: string): string =>
+  s
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 const n1 = (x: number): string => String(Math.round(x * 10) / 10)
 
 function chaikin(points: Pt[], closed: boolean): Pt[] {
@@ -247,11 +255,14 @@ export function drawMap(o: DrawMapOptions): string {
   const H = o.height ?? o.frame?.height ?? 240
   const font = o.fontSize ?? 11
   const rtl = o.dir === 'rtl'
-  const th = o.theme ?? LIGHT_THEME
+  if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) throw new RangeError('drawMap: the width and the height must be finite numbers above 0')
+  // The theme is written into attributes: every value goes through esc once, here, so a hostile value cannot leave its attribute
+  const th = Object.fromEntries(Object.entries(o.theme ?? LIGHT_THEME).map(([k, v]) => [k, esc(String(v))])) as Theme
   const measure = o.measure ?? ((t: string): number => [...t].length * font * 0.6)
   const smooth = o.smooth ?? 1
   const pts = o.points
   const frame = o.frame ?? fit(pts, W, H)
+  if (![frame.lat, frame.lon, frame.scale].every(Number.isFinite) || frame.scale <= 0) throw new RangeError('drawMap: the frame must have a finite center and a scale above 0')
   const margin = 20
   const box: Box = { w: -margin, e: W + margin, n: -margin, s: H + margin }
   const tolerance = 0.7
@@ -283,43 +294,55 @@ export function drawMap(o: DrawMapOptions): string {
     if (rivers.length > 0) parts.push(`<path class="map-river" fill="none" stroke="${th.river}" stroke-width="1.2" d="${rivers.join('')}"/>`)
   }
 
-  // Where each marker is drawn: its point, or a place on a small ring when several fall on nearly the same pixel
-  const drawn = pts.filter((p) => p.form !== 2)
+  // Where each marker is drawn: its point, or a place on a small ring when several fall on nearly the same pixel; a bunch of more than 12 becomes a circle
+  const home = new Map<string, Pt>(pts.map((p) => [p.id, proj(p.lat, p.lon)]))
+  const inFrame = (at: Pt): boolean => at[0] >= box.w && at[0] <= box.e && at[1] >= box.n && at[1] <= box.s
+  // a marker off the frame (and its margin) is not drawn and not counted: it may still be a stop of the route, which is drawn through `where`
+  const drawn = pts.filter((p) => p.form !== 2 && inFrame(home.get(p.id)!))
   const areas = pts.filter((p) => p.form === 2)
-  const where = new Map<string, Pt>()
-  const trueAt = new Map<string, Pt>()
-  for (const p of pts) {
-    const at = proj(p.lat, p.lon)
-    where.set(p.id, [at[0], at[1]])
-    trueAt.set(p.id, at)
-  }
+  const where = new Map<string, Pt>(home)
+  const leaderBoxes: [number, number, number, number][] = []
   const leaders: string[] = []
+  const circles: { at: Pt; n: number }[] = []
+  const hidden = new Set<string>() // markers drawn as part of a circle
   const clusterMode = drawn.length > 200
+  const RING_MAX = 30
+  const BUNCH = 12
   if (!clusterMode) {
     const sorted = [...drawn].sort((a, b) => (a.id < b.id ? -1 : 1))
-    // groups of markers closer than a dot and a bit: a point joins the group of the first earlier one it touches
-    const group = new Array<number>(sorted.length).fill(-1)
-    let groups = 0
-    for (let i = 0; i < sorted.length; i++) {
-      if (group[i] < 0) group[i] = groups++
-      const [xi, yi] = trueAt.get(sorted[i].id)!
-      for (let j = i + 1; j < sorted.length; j++) {
-        const [xj, yj] = trueAt.get(sorted[j].id)!
-        if (group[j] < 0 && Math.hypot(xi - xj, yi - yj) < 2 * DOT + 2) group[j] = group[i]
+    // groups by distance to the group's first member (no chaining): the first one not yet in a group opens a group
+    const taken = new Set<string>()
+    for (const first of sorted) {
+      if (taken.has(first.id)) continue
+      taken.add(first.id)
+      const [x0, y0] = home.get(first.id)!
+      const list = [first]
+      for (const q of sorted) {
+        if (taken.has(q.id)) continue
+        const [xq, yq] = home.get(q.id)!
+        if (Math.hypot(x0 - xq, y0 - yq) < 2 * DOT + 2) {
+          taken.add(q.id)
+          list.push(q)
+        }
       }
-    }
-    const members = new Map<number, MapPoint[]>()
-    sorted.forEach((p, i) => members.set(group[i], [...(members.get(group[i]) ?? []), p]))
-    for (const list of members.values()) {
       if (list.length < 2) continue
-      const cx = list.reduce((s, p) => s + trueAt.get(p.id)![0], 0) / list.length
-      const cy = list.reduce((s, p) => s + trueAt.get(p.id)![1], 0) / list.length
-      const radius = list.length === 2 ? 7 : 7 + 2 * (list.length - 2)
+      const cx = list.reduce((t, p) => t + home.get(p.id)![0], 0) / list.length
+      const cy = list.reduce((t, p) => t + home.get(p.id)![1], 0) / list.length
+      if (list.length > BUNCH) {
+        circles.push({ at: [cx, cy], n: list.length })
+        for (const p of list) {
+          hidden.add(p.id)
+          where.set(p.id, [cx, cy])
+        }
+        continue
+      }
+      const radius = Math.min(RING_MAX, list.length === 2 ? 7 : 7 + 2 * (list.length - 2))
       list.forEach((p, k) => {
         const angle = -Math.PI / 2 + (2 * Math.PI * k) / list.length
         const at: Pt = [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]
         where.set(p.id, at)
         leaders.push(`<path class="map-leader" fill="none" stroke="${th.label}" stroke-width="0.6" d="M${n1(cx)} ${n1(cy)}L${n1(at[0])} ${n1(at[1])}"/>`)
+        leaderBoxes.push([Math.min(cx, at[0]) - 1, Math.min(cy, at[1]) - 1, Math.max(cx, at[0]) + 1, Math.max(cy, at[1]) + 1])
       })
     }
   }
@@ -336,11 +359,10 @@ export function drawMap(o: DrawMapOptions): string {
       : `<circle class="map-dot-open" data-id="${esc(p.id)}" cx="${n1(x)}" cy="${n1(y)}" r="${DOT}" fill="none" stroke="${th.pointHollow}" stroke-width="1.4"/>`
   const dots: string[] = []
   const labelled: { p: MapPoint; at: Pt }[] = []
-  const clusters: Pt[] = []
   if (clusterMode) {
     const cells = new Map<string, { n: number; x: number; y: number; one: MapPoint }>()
     for (const p of drawn) {
-      const [x, y] = where.get(p.id)!
+      const [x, y] = home.get(p.id)!
       const key = `${Math.floor(x / 44)},${Math.floor(y / 44)}`
       const c = cells.get(key)
       if (c === undefined) cells.set(key, { n: 1, x, y, one: p })
@@ -350,62 +372,69 @@ export function drawMap(o: DrawMapOptions): string {
         c.y += y
       }
     }
-    const circles: { at: Pt; n: number }[] = []
     for (const c of [...cells.values()].sort((a, b) => a.y - b.y || a.x - b.x)) {
       if (c.n === 1) {
         dots.push(dot(c.one, c.x, c.y))
         labelled.push({ p: c.one, at: [c.x, c.y] })
       } else circles.push({ at: [c.x / c.n, c.y / c.n], n: c.n })
     }
-    // Adjacent circles are pushed apart until none overlaps another (a few passes are enough for a grid of 44 px)
-    for (let pass = 0; pass < 8; pass++) {
-      for (let i = 0; i < circles.length; i++) {
-        for (let j = i + 1; j < circles.length; j++) {
-          const a = circles[i].at
-          const b = circles[j].at
-          const dist = Math.hypot(a[0] - b[0], a[1] - b[1])
-          const need = 2 * CLUSTER + 2
-          if (dist >= need) continue
-          const ux = dist === 0 ? 1 : (b[0] - a[0]) / dist
-          const uy = dist === 0 ? 0 : (b[1] - a[1]) / dist
-          const push = (need - dist) / 2
-          a[0] -= ux * push
-          a[1] -= uy * push
-          b[0] += ux * push
-          b[1] += uy * push
-        }
-      }
-    }
-    for (const c of circles) {
-      clusters.push(c.at)
-      dots.push(`<g class="map-cluster"><circle fill="${th.cluster}" cx="${n1(c.at[0])}" cy="${n1(c.at[1])}" r="${CLUSTER}"/><text fill="${th.clusterText}" x="${n1(c.at[0])}" y="${n1(c.at[1] + 4)}" font-size="${font}" text-anchor="middle">${c.n}</text></g>`)
-    }
   } else {
     for (const p of drawn) {
+      if (hidden.has(p.id)) continue
       const [x, y] = where.get(p.id)!
       dots.push(dot(p, x, y))
       labelled.push({ p, at: [x, y] })
     }
   }
+  // Circles are pushed apart until none overlaps another: passes until nothing moves, with a cap (a dense layout needs more than a few)
+  const need = 2 * CLUSTER + 2
+  for (let pass = 0; pass < 200; pass++) {
+    let moved = false
+    for (let i = 0; i < circles.length; i++) {
+      for (let j = i + 1; j < circles.length; j++) {
+        const a = circles[i].at
+        const b = circles[j].at
+        const dist = Math.hypot(a[0] - b[0], a[1] - b[1])
+        if (dist >= need - 1e-6) continue
+        const ux = dist === 0 ? 1 : (b[0] - a[0]) / dist
+        const uy = dist === 0 ? 0 : (b[1] - a[1]) / dist
+        const push = (need - dist) / 2 + 1e-3
+        a[0] -= ux * push
+        a[1] -= uy * push
+        b[0] += ux * push
+        b[1] += uy * push
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
+  const clusters: Pt[] = circles.map((c) => c.at)
+  for (const c of circles) {
+    dots.push(`<g class="map-cluster"><circle fill="${th.cluster}" cx="${n1(c.at[0])}" cy="${n1(c.at[1])}" r="${CLUSTER}"/><text fill="${th.clusterText}" x="${n1(c.at[0])}" y="${n1(c.at[1] + 4)}" font-size="${font}" text-anchor="middle">${c.n}</text></g>`)
+  }
   parts.push(...dots)
 
-  // Labels: most verses first; a collision with a dot, a circle, a badge or a label already placed leaves the label out. Areas are only their name.
+  // Labels: most verses first; a collision with a dot, a circle, a leader, a badge or a label already placed leaves the label out. Areas are only their name.
   const placed: [number, number, number, number][] = []
   for (const { at: [x, y] } of labelled) placed.push([x - DOT, y - DOT, x + DOT, y + DOT])
   for (const c of clusters) placed.push([c[0] - CLUSTER, c[1] - CLUSTER, c[0] + CLUSTER, c[1] + CLUSTER])
-  const free = (r: [number, number, number, number]): boolean => !placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
+  placed.push(...leaderBoxes)
+  const inside = (r: [number, number, number, number]): boolean => r[0] >= 0 && r[2] <= W && r[1] >= 0 && r[3] <= H
+  const free = (r: [number, number, number, number]): boolean => inside(r) && !placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
   const text = (cls: string, x: number, y: number, anchor: string, size: number, body: string): string =>
     `<text class="${cls}" fill="${th.label}" stroke="${th.halo}" stroke-width="3" paint-order="stroke" x="${n1(x)}" y="${n1(y)}" font-size="${size}" text-anchor="${anchor}">${body}</text>`
   const badges: string[] = []
   for (const { p, at: [x, y] } of labelled) {
     if (p.badge === undefined || p.badge === '') continue
     const w = measure(p.badge) * 0.9
-    placed.push([x - w / 2, y - DOT - font, x + w / 2, y - DOT])
+    const rect: [number, number, number, number] = [x - w / 2, y - DOT - font, x + w / 2, y - DOT]
+    if (!free(rect)) continue
+    placed.push(rect)
     badges.push(text('map-badge', x, y - DOT - 2, 'middle', font - 1, esc(p.badge)))
   }
   const labels: string[] = []
   const gap = 6
-  const items = [...labelled.map((l) => ({ ...l, area: false })), ...areas.map((p) => ({ p, at: where.get(p.id)!, area: true }))].sort(
+  const items = [...labelled.map((l) => ({ ...l, area: false })), ...areas.filter((p) => inFrame(where.get(p.id)!)).map((p) => ({ p, at: where.get(p.id)!, area: true }))].sort(
     (a, b) => (b.p.verses ?? 0) - (a.p.verses ?? 0) || (a.p.id < b.p.id ? -1 : 1),
   )
   for (const { p, at: [x, y], area } of items) {
@@ -427,7 +456,7 @@ export function drawMap(o: DrawMapOptions): string {
       anchor = 'start'
       rect = [tx, y - font / 2 - 2, tx + w, y + font / 2 + 2]
     }
-    if (rect[0] < 0 || rect[2] > W || rect[1] < 0 || rect[3] > H || !free(rect)) continue
+    if (!free(rect)) continue
     placed.push(rect)
     labels.push(text(area ? 'map-label map-area' : 'map-label', tx, y + font / 2 - 2, anchor, font, esc(p.label)))
   }

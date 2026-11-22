@@ -907,6 +907,19 @@ async function maps(): Promise<Map<string, Uint8Array>> {
   out.set('mapas/mapa-base-capa-0.basemap', withB({ layer: encodeUvarints([0, 2, 3]) }))
   out.set('mapas/mapa-base-sin-capa.basemap', base({ bbox: good.bbox, count: good.count, x: good.x, y: good.y }))
   out.set('mapas/mapa-base-vacio.basemap', withB({ layer: encodeUvarints([]), count: encodeUvarints([]), x: encodeDeltas([]), y: encodeDeltas([]) }))
+  // a path of a layer above 3 is skipped whatever its size, but its points still add up and must be inside bbox
+  const land4 = [[1000, 2300], [1500, 2300], [1500, 2800], [1000, 2800]]
+  const river2 = [[3500, 3200], [3600, 3300]]
+  const withLayer4 = (path4: number[][]): Uint8Array =>
+    withB({
+      layer: encodeUvarints([1, 4, 3]),
+      count: encodeUvarints([4, path4.length, 2]),
+      x: encodeDeltas([...land4, ...path4, ...river2].map((q) => q[0])),
+      y: encodeDeltas([...land4, ...path4, ...river2].map((q) => q[1])),
+    })
+  out.set('mapas/mapa-base-capa-4-un-punto.basemap', withLayer4([[2000, 2500]]))
+  out.set('mapas/mapa-base-capa-4-cuenta-0.basemap', withLayer4([]))
+  out.set('mapas/mapa-base-capa-4-punto-fuera.basemap', withLayer4([[2000, 2500], [9900, 2500], [2100, 2600]]))
   out.set('mapas/mapa-base-capa-5-se-salta.basemap', withB({ layer: encodeUvarints([1, 5, 3]) }))
   // geo: more defects, and the limits of the globe, which are valid
   const only = (key: 'lat' | 'lon' | 'sure' | 'form', id: string, value: number) => ({ [key]: (i: string) => (i === id ? value : (geo[i]?.[key] ?? 0)) })

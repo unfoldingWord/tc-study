@@ -2490,10 +2490,11 @@ def read_file(data: bytes, expect: str | None = None, trusted: dict | None = Non
 BASEMAP_MAX = 4194304                       # the most a basemap inflates to (catalog.md)
 
 
-def read_basemap(data: bytes, expected_id: bytes | None = None) -> dict:
+def read_basemap(data: bytes) -> dict:
     """The reader output of a ``basemap`` complement file (catalog.md, "The basemap complement"): ``{"bbox", "paths"}`` or ``{"error": code}``.
 
-    ``expected_id``: the id the catalog lists, the sha256 of the inflated bytes; another one is ``E_ID``. A layer above 3 is skipped, not drawn, not an error."""
+    The id the catalog lists is the sha256 of the file bytes, checked by whoever downloads the file, as for any complement. A layer above 3 is skipped,
+    not drawn, not an error."""
     try:
         inflater = zlib.decompressobj(-15)
         try:
@@ -2502,8 +2503,6 @@ def read_basemap(data: bytes, expected_id: bytes | None = None) -> dict:
             _fail("E_INFLATE")
         if len(body) > BASEMAP_MAX or not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
             _fail("E_INFLATE")
-        if expected_id is not None and hashlib.sha256(body).digest() != expected_id:
-            _fail("E_ID")
         try:
             doc = _cbor_one(body)
         except _TooDeep:

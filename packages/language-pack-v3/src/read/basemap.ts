@@ -12,7 +12,6 @@ import { deflateRaw, Inflate } from 'pako'
 import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic } from '../codec/cbor'
 import { ColumnError, decodeDeltas, decodeUvarints, encodeDeltas, encodeUvarints } from '../codec/columns'
 import { FormatError } from '../codec/errors'
-import { sha256 } from '../codec/sha256'
 import { hasOwn, isMap } from '../codec/values'
 import type { Basemap, BasemapPath } from '../model'
 
@@ -46,11 +45,8 @@ function checkShape(bbox: number[], layer: number[], count: number[], x: number[
   }
 }
 
-/**
- * The inflated bytes of a basemap (the CBOR map); throws `E_BODY` for a model the reader would reject. Its sha256 is the `id` of the complement
- * (`catalog.md`), like a segment's: it does not depend on the compressor.
- */
-export function basemapBody(model: Basemap): Uint8Array {
+/** The inflated bytes of a basemap (the CBOR map); throws `E_BODY` for a model the reader would reject. */
+function basemapBody(model: Basemap): Uint8Array {
   const layer = model.paths.map((p) => p.layer as number)
   const count = model.paths.map((p) => p.points.length)
   const x = model.paths.flatMap((p) => p.points.map((pt) => pt[0]))
@@ -65,14 +61,21 @@ export function basemapBody(model: Basemap): Uint8Array {
   } as unknown as CborValue)
 }
 
-/** The bytes of a basemap complement: {@link basemapBody} compressed with deflate-raw. */
+/**
+ * The bytes of a basemap complement: the CBOR map compressed with deflate-raw (pako 2.1.0, level 9). The `id` the catalog lists is the sha256 of **these bytes**, as for
+ * every complement (`catalog.md`), so the version of pako and the level are part of the reproducible build.
+ */
 export function encodeBasemap(model: Basemap): Uint8Array {
   return deflateRaw(basemapBody(model), { level: 9 })
 }
 
-/** The `id` the catalog lists for a basemap complement: the sha256 of its inflated bytes. Throws {@link FormatError} `E_INFLATE` when the bytes do not inflate. */
-export function basemapId(bytes: Uint8Array): Uint8Array {
-  return sha256(inflate(bytes))
+/**
+ * The basemap a client uses, from the complements of a catalog: the one of kind `basemap` and version `"1"` **when exactly one is listed**; with none, with
+ * two or more, or with another version, `undefined` (the app then draws without a background). A reader does not reject such a catalog (`catalog.md`).
+ */
+export function basemapOf<T extends { kind: string; version: string }>(complements: readonly T[] | undefined): T | undefined {
+  const all = (complements ?? []).filter((c) => c.kind === 'basemap')
+  return all.length === 1 && all[0].version === '1' ? all[0] : undefined
 }
 
 interface InflateState {
@@ -110,12 +113,8 @@ function inflate(bytes: Uint8Array): Uint8Array {
 }
 
 /** The basemap the bytes hold. Throws {@link FormatError} (`E_INFLATE`, `E_LIMIT` or `E_BODY`) at the first defect; a key the schema does not list is ignored. */
-export function decodeBasemap(bytes: Uint8Array, expectedId?: Uint8Array): Basemap {
+export function decodeBasemap(bytes: Uint8Array): Basemap {
   const body = inflate(bytes)
-  if (expectedId !== undefined) {
-    const id = sha256(body)
-    if (id.length !== expectedId.length || id.some((b, i) => b !== expectedId[i])) throw new FormatError('E_ID', 'the sha256 of the inflated basemap is not the id the catalog lists')
-  }
   let value: CborValue
   try {
     value = decodeCbor(body)

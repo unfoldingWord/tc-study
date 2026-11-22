@@ -77,8 +77,9 @@ complement = {
 }
 
 ; The bytes of a complement whose kind is "basemap" and whose version is "1" (catalog.md, "The basemap complement"): a CBOR map, deflate-raw
-; compressed (the codec of the segments, with no container), at most 4 MiB inflated. The sha256 of the inflated bytes is the complement's "id" (as a segment's id is of its uncompressed form), and the media type
-; is that of the inflated bytes. A catalog lists at most one complement of kind "basemap".
+; compressed (the codec of the segments, with no container), at most 4 MiB inflated. The sha256 of the file's bytes as downloaded (compressed) is the complement's "id", as for every complement, so it depends on the
+; compressor; the media type is that of the inflated bytes. A catalog lists at most one complement of kind "basemap"; a client uses it only when
+; exactly one is listed.
 ; A reader rejects it (E_INFLATE for a stream that is not complete deflate or inflates to more, E_LIMIT for CBOR nested more than 64 levels, E_BODY for the rest) when:
 ; - a key listed here is missing or of another type; bbox is not four integers, has west after east or south after north, or leaves the
 ;   globe (west and east -18000 to 18000, south and north -9000 to 9000); a key not listed here is ignored;

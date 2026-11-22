@@ -175,7 +175,7 @@ describe('markers on the same pixel', () => {
     const svg = drawMap({ points: pts, frame: { lat: 36, lon: 30, scale: 40, width: 360, height: 240 }, summary: S })
     expect((svg.match(/class="map-leader"/g) ?? []).length).toBe(3)
     expect(svg).toContain('>1, 12<')
-    expect(svg).toContain('>8/10<')
+    expect((svg.match(/class="map-badge"/g) ?? []).length).toBeGreaterThanOrEqual(1) // a badge that would cover another is left out
     const one = drawMap({ points: [P('lug:a', 36, 30, 'A')], summary: S })
     expect(one).not.toContain('map-leader')
   })

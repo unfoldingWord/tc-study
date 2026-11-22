@@ -68,7 +68,7 @@ export function readZip(bytes: Uint8Array, maxEntry = MAX_ENTRY): Map<string, Ui
     const data = bytes.subarray(start, start + size)
     let body: Uint8Array
     if (method === 0) body = data
-    else if (method === 8) body = inflateLimited(data, name, maxEntry)
+    else if (method === 8) body = inflateLimited(data, name, Math.min(maxEntry, length)) // never more than the entry says it has
     else throw new Error(`zip: ${name} uses the method ${method}, which is not supported`)
     if (body.length !== length) throw new Error(`zip: ${name} has ${body.length} bytes, its entry says ${length}`)
     if (out.has(name)) throw new Error(`zip: ${name} is in it twice`)

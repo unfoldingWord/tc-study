@@ -8,7 +8,8 @@
 import type { Basemap, BasemapPath } from '../model'
 import { readDbf, readShp, type Shape } from '../source/shapefile'
 import { readZip } from '../source/zip'
-import { basemapId, encodeBasemap } from '../read/basemap'
+import { sha256 } from '../codec/sha256'
+import { encodeBasemap } from '../read/basemap'
 
 type Pt = [number, number]
 
@@ -248,7 +249,7 @@ export function buildBasemap(zips: { land: Uint8Array; lakes: Uint8Array; rivers
   })
   const model: Basemap = { bbox: [...BASEMAP_BBOX], paths }
   const bytes = encodeBasemap(model)
-  const id = basemapId(bytes) // the sha256 of the inflated bytes: not of the compressor's output
+  const id = sha256(bytes) // the id of a complement is the sha256 of its file bytes, so pako 2.1.0 at level 9 is part of the build
   const count = (layer: number): number => paths.filter((p) => p.layer === layer).length
   const points = paths.reduce((n, p) => n + p.points.length, 0)
   report.push(`basemap: ${count(1)} land rings, ${count(2)} lakes, ${count(3)} river paths, ${points} points, ${bytes.length} bytes`)
