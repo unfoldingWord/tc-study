@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { bridgeBook, bridgeCatalog, buildFrozenCases, caseFilesOn, expectedText, keysOf, PYTHON_NOT_YET, runBuildCases, TESTS_DIR } from '../spec/tests/build-cases'
+import { bridgeBook, bridgeCatalog, buildFrozenCases, caseFilesOn, expectedText, keysOf, outputOfFile, PYTHON_NOT_YET, runBuildCases, TESTS_DIR } from '../spec/tests/build-cases'
 import { firstDifference } from '../spec/tests/compare'
 import { mapView } from './read/map'
 import { canonicalJson, readerOutput } from './read/output'
@@ -33,10 +33,10 @@ const PACKAGE_DIR = join(import.meta.dir, '..')
 const bytesOf = (path: string): Uint8Array => new Uint8Array(readFileSync(path))
 const readWith = (name: string): Promise<unknown> => {
   const trustedKeys = keysOf(TESTS_DIR, name)
-  return readerOutput(bytesOf(join(TESTS_DIR, name)), trustedKeys === undefined ? {} : { trustedKeys })
+  return outputOfFile(name, bytesOf(join(TESTS_DIR, name)), trustedKeys === undefined ? {} : { trustedKeys })
 }
 const outputOf = async (name: string): Promise<Out> => (await readWith(name)) as Out
-const expectedOf = (name: string): unknown => JSON.parse(readFileSync(join(TESTS_DIR, name.replace(/\.(seg|tcpack)$/, '.expected.json')), 'utf8'))
+const expectedOf = (name: string): unknown => JSON.parse(readFileSync(join(TESTS_DIR, name.replace(/\.(seg|tcpack|basemap)$/, '.expected.json')), 'utf8'))
 
 const FILES = caseFilesOn(TESTS_DIR)
 
@@ -57,6 +57,97 @@ describe('the case files', () => {
       'entero-fuera-de-rango/header.seg',
       'idioma-parcial/map-core.seg',
       'macula-v2/orig-rut.seg',
+      'mapas/geo-clave-extra.seg',
+      'mapas/geo-columna-corta.seg',
+      'mapas/geo-columna-form-corta.seg',
+      'mapas/geo-columna-lat-corta.seg',
+      'mapas/geo-columna-lon-corta.seg',
+      'mapas/geo-columna-sure-corta.seg',
+      'mapas/geo-en-parte.seg',
+      'mapas/geo-form-0-en-un-lugar.seg',
+      'mapas/geo-form-6.seg',
+      'mapas/geo-latitud-fuera.seg',
+      'mapas/geo-latitud-negativa-fuera.seg',
+      'mapas/geo-limites-del-globo.seg',
+      'mapas/geo-longitud-fuera.seg',
+      'mapas/geo-longitud-negativa-fuera.seg',
+      'mapas/geo-no-bytes.seg',
+      'mapas/geo-persona-con-forma.seg',
+      'mapas/geo-persona-con-latitud.seg',
+      'mapas/geo-persona-con-longitud.seg',
+      'mapas/geo-sin-columna.seg',
+      'mapas/geo-sin-punto-con-latitud.seg',
+      'mapas/geo-sin-punto-con-longitud.seg',
+      'mapas/geo-sure-4.seg',
+      'mapas/geo-valor-en-una-persona.seg',
+      'mapas/lugares-alias-desordenado.seg',
+      'mapas/lugares-alias-id-de-persona.seg',
+      'mapas/lugares-alias-repetido.seg',
+      'mapas/lugares-alias-sin-ids.seg',
+      'mapas/lugares-alias-vacio.seg',
+      'mapas/lugares-en-parte.seg',
+      'mapas/lugares-id-de-persona.seg',
+      'mapas/lugares-id-desconocido.seg',
+      'mapas/lugares-names-no-es-mapa.seg',
+      'mapas/lugares-nombre-vacio.seg',
+      'mapas/lugares-nota-de-persona.seg',
+      'mapas/lugares-nota-vacia.seg',
+      'mapas/lugares-sin-aliases.seg',
+      'mapas/lugares-sin-names.seg',
+      'mapas/lugares-sin-notes.seg',
+      'mapas/lugares-vacia-y-clave-extra.seg',
+      'mapas/lugares-valor-no-texto.seg',
+      'mapas/mapa-base-abierto-de-1-punto.basemap',
+      'mapas/mapa-base-anidado-de-mas.basemap',
+      'mapas/mapa-base-bbox-de-3.basemap',
+      'mapas/mapa-base-bbox-decimal.basemap',
+      'mapas/mapa-base-bbox-fuera-del-globo.basemap',
+      'mapas/mapa-base-bbox-invertido.basemap',
+      'mapas/mapa-base-bbox-sur-mayor-que-norte.basemap',
+      'mapas/mapa-base-bbox-texto.basemap',
+      'mapas/mapa-base-borde-dentro.basemap',
+      'mapas/mapa-base-bytes-de-mas.basemap',
+      'mapas/mapa-base-capa-0.basemap',
+      'mapas/mapa-base-capa-4-cuenta-0.basemap',
+      'mapas/mapa-base-capa-4-punto-fuera.basemap',
+      'mapas/mapa-base-capa-4-se-salta.basemap',
+      'mapas/mapa-base-capa-4-un-punto.basemap',
+      'mapas/mapa-base-capa-5-se-salta.basemap',
+      'mapas/mapa-base-capa-texto.basemap',
+      'mapas/mapa-base-capas-y-cuentas-distintas.basemap',
+      'mapas/mapa-base-cerrado-de-2-puntos.basemap',
+      'mapas/mapa-base-clave-extra.basemap',
+      'mapas/mapa-base-cortado.basemap',
+      'mapas/mapa-base-cuenta-menor-que-x.basemap',
+      'mapas/mapa-base-cuerpo-no-es-mapa.basemap',
+      'mapas/mapa-base-inflado-de-mas.basemap',
+      'mapas/mapa-base-no-deflate.basemap',
+      'mapas/mapa-base-punto-fuera.basemap',
+      'mapas/mapa-base-sin-capa.basemap',
+      'mapas/mapa-base-sin-y.basemap',
+      'mapas/mapa-base-vacio.basemap',
+      'mapas/mapa-base-x-corta.basemap',
+      'mapas/mapa-base-y-larga.basemap',
+      'mapas/mapa-base.basemap',
+      'mapas/personas-con-id-de-lugar.seg',
+      'mapas/rutas-clave-extra.seg',
+      'mapas/rutas-cuenta-0.seg',
+      'mapas/rutas-dos-rutas-de-un-evento.seg',
+      'mapas/rutas-en-parte.seg',
+      'mapas/rutas-evento-fuera.seg',
+      'mapas/rutas-evento-no-es-evento.seg',
+      'mapas/rutas-evento-repetido.seg',
+      'mapas/rutas-largos-distintos.seg',
+      'mapas/rutas-parada-fuera-de-ids.seg',
+      'mapas/rutas-parada-no-es-lugar.seg',
+      'mapas/rutas-parada-repetida-seguida.seg',
+      'mapas/rutas-parada-sin-punto.seg',
+      'mapas/rutas-paradas-de-mas.seg',
+      'mapas/rutas-paradas-de-menos.seg',
+      'mapas/rutas-sin-stops.seg',
+      'mapas/rutas-una-parada.seg',
+      'mapas/topics-core-es-419.seg',
+      'mapas/xtopics-core.seg',
       'nota-varios-versiculos/book.seg',
       'obs-5m/obs-5m.seg',
       'obsimg/obsimg.seg',
@@ -98,8 +189,8 @@ describe('the case files', () => {
   })
 
   test('each has an expected.json beside it, and every expected.json has its file', () => {
-    for (const name of FILES) expect(existsSync(join(TESTS_DIR, name.replace(/\.(seg|tcpack)$/, '.expected.json')))).toBe(true)
-    const expected = new Set(FILES.map((name) => name.replace(/\.(seg|tcpack)$/, '.expected.json')))
+    for (const name of FILES) expect(existsSync(join(TESTS_DIR, name.replace(/\.(seg|tcpack|basemap)$/, '.expected.json')))).toBe(true)
+    const expected = new Set(FILES.map((name) => name.replace(/\.(seg|tcpack|basemap)$/, '.expected.json')))
     const listed = caseFilesOn(TESTS_DIR, /\.expected\.json$/)
     expect(listed.filter((name) => !expected.has(name))).toEqual([])
   })
@@ -113,7 +204,7 @@ describe('the case files', () => {
 
   test('an expected.json is the canonical text indented by two spaces, an error on one line, with LF line ends', () => {
     for (const name of FILES) {
-      const path = join(TESTS_DIR, name.replace(/\.(seg|tcpack)$/, '.expected.json'))
+      const path = join(TESTS_DIR, name.replace(/\.(seg|tcpack|basemap)$/, '.expected.json'))
       const text = readFileSync(path, 'utf8')
       expect(text.includes('\r')).toBe(false)
       expect(text.endsWith('\n')).toBe(true)
@@ -459,9 +550,9 @@ describe('the cross-reader check (compare.ts)', () => {
         [
           'import sys, json',
           `sys.path.insert(0, ${JSON.stringify(join(PACKAGE_DIR, 'spec', 'reader-py'))})`,
-          'from lp3read import read_file, canonical_text',
+          'from lp3read import read_file, read_basemap, canonical_text',
           'trusted = json.load(open(sys.argv[3])) if len(sys.argv) > 3 and sys.argv[2] == "--keys" else None',
-          'out = read_file(open(sys.argv[1], "rb").read(), trusted=trusted)',
+          'out = (read_basemap if sys.argv[1].endswith(".basemap") else read_file)(open(sys.argv[1], "rb").read(), **({} if sys.argv[1].endswith(".basemap") else {"trusted": trusted}))',
           'name = sys.argv[1].replace(chr(92), "/")',
           'if name.endswith("container/minimal.seg"):',
           '    out["texts"][0]["pieces"][0][0] += "x"',

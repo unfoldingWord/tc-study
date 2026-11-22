@@ -23,6 +23,7 @@ topics-core-tables = {
                                ; as everywhere (tests/README.md)
   "coverage": coverage,        ; required, v1
   ? "people": topics-people,   ; optional, v1; core only; from ACAI (ids.md, "Names of people")
+  ? "places": topics-places,   ; optional, v1; core only; from ACAI (ids.md, "Builder rules: places names")
 }
 
 ; What this language calls people where the pack cannot derive it (ids.md, "Names of people", which is normative). The name a
@@ -40,6 +41,17 @@ topics-people = {
   "aliases": { * tstr => [+ topic-id] },  ; another name (not empty) -> the per: ids it names, sorted by code point, no
                                         ; repeat; only a name not given by the rule above, the English title or the first
                                         ; map name of a tW article joined to the person (ids.md)
+}
+
+; The table "places" has the shape and the rules of "people", with "lug:" ids in place of "per:" ids: every key of "names" and "notes"
+; and every id of an alias starts "lug:" (a reader rejects another prefix with E_BODY, as "people" does for a "lug:" id); a name
+; or a note is a non-empty text; the ids of an alias are sorted by code point and not repeated; an alias is a non-empty text and
+; names at least one id; a reader reads the three keys and ignores any other; a "lug:" id the installed xtopics lacks is ignored
+; by a client, never an error. How the builder fills it is in ids.md ("Builder rules: places names").
+topics-places = {
+  "names": { * topic-id => tstr },
+  "notes": { * topic-id => tstr },
+  "aliases": { * tstr => [+ topic-id] },
 }
 
 ; "source" says where the name came from: the aligned text ("alignment"), the language's own book outline

@@ -14,26 +14,29 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { trimAcai } from '@bt-synergy/language-pack-v3'
+import { trimAcai, trimAcaiPlaces } from '@bt-synergy/language-pack-v3'
 import { filesOfTarball, manifestOf } from './tarball'
 
 /**
- * A pinned source: one file (`path`), or, with `tree: "acai"`, a folder of a GitHub repository. For a folder every file under `path` (it
- * ends in `/`) is taken from the tarball of the commit; the sha256 of their manifest (`tarball.ts` `manifestOf`) must be
+ * A pinned source: one file (`path`), or, with `tree: "acai"` or `tree: "acai-places"`, a folder of a GitHub repository. For a folder every file
+ * under `path` (it ends in `/`) is taken from the tarball of the commit; the sha256 of their manifest (`tarball.ts` `manifestOf`) must be
  * `manifestSha256` (GitHub tarballs are not stable byte for byte, the files in them are), and the files are trimmed into `target` (ACAI's
- * `trimAcai`), whose sha256 is `sha256`.
+ * `trimAcai` for the people, `trimAcaiPlaces` for the places), whose sha256 is `sha256`. With `host: "url"` the file is `url` (a site that
+ * has no commits, such as Natural Earth): `commit` is then the release the site names, and the download is checked against `sha256` as any file is.
  */
 export type TopicSource = {
   name: string
   repository: string
-  host: 'github' | 'door43'
+  host: 'github' | 'door43' | 'url'
+  /** `host: "url"` only: the address of the file. */
+  url?: string
   commit: string
   path: string
   sha256: string
   rawSha256?: string
   eol?: 'crlf'
   target: string
-  tree?: 'acai'
+  tree?: 'acai' | 'acai-places'
   manifestSha256?: string
 }
 type Io = { log: (line: string) => void; error: (line: string) => void }
@@ -42,6 +45,10 @@ type FetchFn = (url: string) => Promise<Response>
 const encodePath = (p: string): string => p.split('/').map(encodeURIComponent).join('/')
 
 export function urlOf(s: TopicSource): string {
+  if (s.host === 'url') {
+    if (s.url === undefined) throw new Error(`${s.name}: host "url" needs a url`)
+    return s.url
+  }
   if (s.tree !== undefined) return `https://codeload.github.com/${s.repository}/tar.gz/${s.commit}`
   return s.host === 'github'
     ? `https://raw.githubusercontent.com/${s.repository}/${s.commit}/${encodePath(s.path)}`
@@ -67,7 +74,8 @@ export async function treeBytes(s: TopicSource, body: AsyncIterable<Uint8Array>)
   if (manifest !== s.manifestSha256) return { error: `${s.target}: the ${files.size} files under ${s.path} have the manifest sha256 ${manifest}, the pin says ${s.manifestSha256}` }
   const texts = new Map([...files].map(([p, b]) => [p, new TextDecoder().decode(b)]))
   const issues: string[] = []
-  return { bytes: new TextEncoder().encode(trimAcai(texts, s.commit, issues)), files: files.size, issues }
+  const trim = s.tree === 'acai-places' ? trimAcaiPlaces : trimAcai
+  return { bytes: new TextEncoder().encode(trim(texts, s.commit, issues)), files: files.size, issues }
 }
 
 const USAGE = 'Usage: fetch-topic-sources --out <dir> [--work <dir>]'

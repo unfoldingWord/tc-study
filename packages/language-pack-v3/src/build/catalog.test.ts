@@ -324,6 +324,13 @@ describe('buildCatalog', () => {
     }
   })
 
+  test('a catalog lists at most one complement of kind basemap: a second is an error (a reader does not reject it)', async () => {
+    const basemap = (n: number): Complement => ({ kind: 'basemap', id: bytesOfHex(fingerprint(n)), size: 5, media: 'application/cbor', version: '1' })
+    const one = await build({ about, resources: [resource(TN)], complements: [basemap(30), { kind: 'images', id: bytesOfHex(fingerprint(31)), size: 5, media: 'application/zip', version: '1' }] })
+    expect(catalogView((await readSegment(one.bytes, { known: CATALOG_TABLES })).seg).complements?.map((c) => c.kind)).toEqual(['basemap', 'images'])
+    await expect(build({ about, resources: [resource(TN)], complements: [basemap(30), basemap(32)] })).rejects.toThrow('at most one complement of kind "basemap"')
+  })
+
   test('the common catalog has no lang; a catalog may have no requires and no complements', async () => {
     const orig = (await titus()).built[1]
     const catalog = await buildCatalog({

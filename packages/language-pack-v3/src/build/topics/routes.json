@@ -1,0 +1,38 @@
+[
+  {
+    "event": "ev:first-missionary-journey",
+    "stops": ["lug:antioch-act-6-5", "lug:seleucia", "lug:salamis", "lug:paphos", "lug:perga", "lug:antioch-act-13-14", "lug:iconium", "lug:lystra", "lug:derbe", "lug:lystra", "lug:iconium", "lug:antioch-act-13-14", "lug:perga", "lug:attalia", "lug:antioch-act-6-5"]
+  },
+  {
+    "event": "ev:second-missionary-journey",
+    "stops": ["lug:antioch-act-6-5", "lug:derbe", "lug:lystra", "lug:iconium", "lug:troas", "lug:samothrace", "lug:neapolis", "lug:philippi", "lug:amphipolis", "lug:apollonia", "lug:thessalonica", "lug:berea", "lug:athens", "lug:corinth", "lug:cenchreae", "lug:ephesus", "lug:caesarea", "lug:jerusalem", "lug:antioch-act-6-5"]
+  },
+  {
+    "event": "ev:third-missionary-journey",
+    "stops": ["lug:antioch-act-6-5", "lug:ephesus", "lug:philippi", "lug:corinth", "lug:philippi", "lug:troas", "lug:assos", "lug:mitylene", "lug:chios", "lug:samos", "lug:miletus", "lug:cos", "lug:rhodes", "lug:patara", "lug:tyre", "lug:acco", "lug:caesarea", "lug:jerusalem"]
+  },
+  {
+    "event": "ev:paul-s-journey-to-rome",
+    "stops": ["lug:caesarea", "lug:sidon", "lug:myra", "lug:cnidus", "lug:salmone", "lug:fairhavens", "lug:cauda", "lug:malta", "lug:syracuse", "lug:rhegium", "lug:puteoli", "lug:forumofappius", "lug:threetaverns", "lug:rome"]
+  },
+  {
+    "event": "ev:exodus-from-egypt",
+    "stops": ["lug:rameses", "lug:succoth-exo-12-37", "lug:etham", "lug:pi-hahiroth", "lug:marah", "lug:elim", "lug:dophkah", "lug:alush", "lug:rephidim", "lug:sinai"]
+  },
+  {
+    "event": "ev:wilderness-wanderings",
+    "stops": ["lug:sinai", "lug:kibroth-hattaavah", "lug:hazeroth", "lug:hormount", "lug:zalmonah", "lug:punon", "lug:oboth", "lug:iye-abarim", "lug:dibon-num-21-30", "lug:nebomount", "lug:moabplains"]
+  },
+  {
+    "event": "ev:lifetime-of-abraham",
+    "stops": ["lug:ur", "lug:haran", "lug:shechem", "lug:bethel-gen-12-8", "lug:egypt", "lug:hebron", "lug:gerar", "lug:beersheba"]
+  },
+  {
+    "event": "ev:lifetime-of-jacob",
+    "stops": ["lug:beersheba", "lug:bethel-gen-12-8", "lug:haran", "lug:mahanaim", "lug:succoth-gen-33-17", "lug:shechem", "lug:bethel-gen-12-8", "lug:bethlehem-gen-35-16", "lug:hebron", "lug:beersheba", "lug:egypt"]
+  },
+  {
+    "event": "ev:joseph-and-mary-flee-to-egypt",
+    "stops": ["lug:bethlehem-gen-35-16", "lug:egypt", "lug:nazareth"]
+  }
+]

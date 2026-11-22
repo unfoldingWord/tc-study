@@ -6,7 +6,7 @@ Written from the specification alone (``packages/language-pack-v3/spec/``): ``co
 
     python lp3read.py <file>
 
-prints the reader output of the file as the canonical text of ``tests/README.md`` and exits 0, or prints
+(a file whose name ends ``.basemap`` is a complement of kind ``basemap``, catalog.md, and is read as one) prints the reader output of the file as the canonical text of ``tests/README.md`` and exits 0, or prints
 ``{"error": "<code>"}`` and exits 1 when the file is rejected (2: the file cannot be read; 3: an unexpected exception,
 a bug of this reader and not a verdict on the file).
 
@@ -64,8 +64,8 @@ KNOWN_TABLES = {
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
-    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks", "obs-frames", "gender"},
-    "topics": {"names", "local", "coverage", "people"},
+    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges", "chunks", "obs-frames", "gender", "geo", "routes"},
+    "topics": {"names", "local", "coverage", "people", "places"},
     "aligned": {"keys", "strongs", "data"},
 }
 REQUIRED_TABLES = {
@@ -1701,8 +1701,8 @@ BOOK_SOURCES = ("text", "list", "none")
 # Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
 CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
              "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"},
-             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks", "obs-frames", "gender"},
-             "topics": {"coverage", "local", "people"}}
+             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges", "chunks", "obs-frames", "gender", "geo", "routes"},
+             "topics": {"coverage", "local", "people", "places"}}
 
 
 def _map_header(p: Segment) -> tuple[bool, int | None]:
@@ -2045,6 +2045,56 @@ def _decode_xtopics_core(p: Segment) -> dict:
                 _bad()
             gender[tid] = v
         out["gender"] = gender
+    if p.has("geo"):
+        out["geo"] = _xtopics_geo(p.t["geo"], ids, topics)
+    if p.has("routes"):
+        out["routes"] = _xtopics_routes(p.t["routes"], ids, topics)
+    return out
+
+
+def _xtopics_geo(t, ids: list[str], topics: dict) -> dict:
+    """The table geo (xtopics.cddl): lat, lon (deltas), sure, form (uvarints), one value per row of topics.ids. Returns the entry of each place."""
+    if type(t) is not dict or any(k not in t for k in ("lat", "lon", "sure", "form")):
+        _bad()
+    sure, form = uvarints(t["sure"]), uvarints(t["form"])
+    lat, lon = deltas(t["lat"], -MAX_INT), deltas(t["lon"], -MAX_INT)
+    if any(len(c) != len(ids) for c in (sure, form, lat, lon)):
+        _bad()
+    out = {}
+    for i, tid in enumerate(ids):
+        if sure[i] > 3:
+            _bad()
+        if topics[tid]["kind"] != "place":
+            if sure[i] or form[i] or lat[i] or lon[i]:
+                _bad()                      # only a place has a value
+            continue
+        if not 1 <= form[i] <= 5:
+            _bad()
+        if sure[i] == 0:
+            if lat[i] or lon[i]:
+                _bad()                      # no point: 0, 0
+        elif not (-9000 <= lat[i] <= 9000 and -18000 <= lon[i] <= 18000):
+            _bad()
+        out[tid] = {"lat": lat[i], "lon": lon[i], "sure": sure[i], "form": form[i]}
+    return out
+
+
+def _xtopics_routes(t, ids: list[str], topics: dict) -> list:
+    """The table routes (xtopics.cddl): event, count, stops (uvarints); rows of topics.ids."""
+    if type(t) is not dict or any(k not in t for k in ("event", "count", "stops")):
+        _bad()
+    event, count, stops = uvarints(t["event"]), uvarints(t["count"]), uvarints(t["stops"])
+    if len(event) != len(count) or len(stops) != sum(count):
+        _bad()
+    out, at = [], 0
+    for e, c in zip(event, count):
+        if e >= len(ids) or topics[ids[e]]["kind"] != "event" or c < 2:
+            _bad()
+        run = stops[at:at + c]
+        at += c
+        if any(s >= len(ids) or topics[ids[s]]["kind"] != "place" for s in run) or any(a == b for a, b in zip(run, run[1:])):
+            _bad()
+        out.append({"event": ids[e], "stops": [ids[s] for s in run]})
     return out
 
 
@@ -2092,18 +2142,20 @@ def _decode_topics(p: Segment) -> dict:
         out["local"] = {k: {key: jsonable(v[key]) for key in ("names", "refs", "related") if key in v} for k, v in local.items()}
     out["coverage"] = _coverage(p.t["coverage"])
     if p.has("people"):
-        out["people"] = _topics_people(p.t["people"])
+        out["people"] = _topics_people(p.t["people"], "per:")
+    if p.has("places"):
+        out["places"] = _topics_people(p.t["places"], "lug:")
     return out
 
 
-def _topics_people(t) -> dict:
-    """The table people of a topics core (topics.cddl): names, notes, aliases; any other key is ignored."""
+def _topics_people(t, prefix: str) -> dict:
+    """The table people (``per:``) or places (``lug:``) of a topics core (topics.cddl): names, notes, aliases; any other key is ignored."""
     if type(t) is not dict or any(k not in t for k in ("names", "notes", "aliases")):
         _bad()
     out = {}
     for key in ("names", "notes"):
         m = t[key]
-        if type(m) is not dict or any(type(k) is not str or not k.startswith("per:") for k in m):
+        if type(m) is not dict or any(type(k) is not str or not k.startswith(prefix) for k in m):
             _bad()
         if any(not is_str(v) or v == "" for v in m.values()):
             _bad()
@@ -2115,8 +2167,8 @@ def _topics_people(t) -> dict:
     for k, v in a.items():
         if type(k) is not str or k == "" or type(v) is not list or len(v) == 0:
             _bad()
-        if any(not is_str(x) or not x.startswith("per:") for x in v) or any(x >= y for x, y in zip(v, v[1:])):
-            _bad()                          # per: ids, sorted by code point, no repeat
+        if any(not is_str(x) or not x.startswith(prefix) for x in v) or any(x >= y for x, y in zip(v, v[1:])):
+            _bad()                          # ids of the prefix, sorted by code point, no repeat
         aliases[k] = list(v)
     out["aliases"] = aliases
     return out
@@ -2435,6 +2487,58 @@ def read_file(data: bytes, expect: str | None = None, trusted: dict | None = Non
         return {"error": e.code}
 
 
+BASEMAP_MAX = 4194304                       # the most a basemap inflates to (catalog.md)
+
+
+def read_basemap(data: bytes) -> dict:
+    """The reader output of a ``basemap`` complement file (catalog.md, "The basemap complement"): ``{"bbox", "paths"}`` or ``{"error": code}``.
+
+    The id the catalog lists is the sha256 of the file bytes, checked by whoever downloads the file, as for any complement. A layer above 3 is skipped,
+    not drawn, not an error."""
+    try:
+        inflater = zlib.decompressobj(-15)
+        try:
+            body = inflater.decompress(data, BASEMAP_MAX + 1)
+        except zlib.error:
+            _fail("E_INFLATE")
+        if len(body) > BASEMAP_MAX or not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
+            _fail("E_INFLATE")
+        try:
+            doc = _cbor_one(body)
+        except _TooDeep:
+            _fail("E_LIMIT")
+        except _Malformed:
+            _bad()
+        if type(doc) is not dict or any(k not in doc for k in ("bbox", "layer", "count", "x", "y")):
+            _bad()
+        if not _ints_in_range(doc):
+            _bad()
+        bbox = doc["bbox"]
+        if type(bbox) is not list or len(bbox) != 4 or any(type(n) is not int for n in bbox):
+            _bad()
+        w, s, e, n = bbox
+        if w > e or s > n or w < -18000 or e > 18000 or s < -9000 or n > 9000:
+            _bad()
+        layer, count = uvarints(doc["layer"]), uvarints(doc["count"])
+        x, y = deltas(doc["x"], -MAX_INT), deltas(doc["y"], -MAX_INT)
+        if len(layer) != len(count):
+            _bad()
+        if any(l < 1 or (l <= 3 and c < (2 if l == 3 else 3)) for l, c in zip(layer, count)):
+            _bad()
+        if len(x) != sum(count) or len(y) != len(x):
+            _bad()
+        if any(not (w <= a <= e and s <= b <= n) for a, b in zip(x, y)):
+            _bad()
+        paths, at = [], 0
+        for l, c in zip(layer, count):
+            if l <= 3:
+                paths.append({"layer": l, "points": [[x[at + k], y[at + k]] for k in range(c)]})
+            at += c
+        return {"bbox": bbox, "paths": paths}
+    except LP3Error as e:
+        return {"error": e.code}
+
+
 def compact_text(obj) -> str:
     """The canonical text of tests/README.md: no whitespace, keys sorted by code point, UTF-8 not escaped."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -2500,7 +2604,7 @@ def main(argv: list[str]) -> int:
         sys.stderr.write(f"lp3read: {e}\n")
         return 2
     try:
-        out = read_file(data, trusted=trusted)
+        out = read_basemap(data) if path.endswith(".basemap") else read_file(data, trusted=trusted)
         text = canonical_text(out)
     except Exception as e:  # a bug of this reader, never a verdict on the file: exit 3, not 1
         sys.stderr.write(f"lp3read: internal error ({type(e).__name__}: {e}); this is a bug of the reader, "

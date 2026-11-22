@@ -17,6 +17,8 @@ export type TipnrRecord = {
   id: string
   names: TipnrName[]
   relations: { type: TipnrRelationType; unique: string }[]
+  /** A place only: the point of the Google Maps link of its record (`@lat,lon,14z`), degrees, when the link has one. TIPNR copied it from OpenBible.info once. */
+  point?: { lat: number; lon: number }
 }
 
 const PERSON_RELATIONS: [number, TipnrRelationType][] = [[2, 'parent'], [3, 'sibling'], [4, 'partner'], [5, 'child'], [6, 'tribe']]
@@ -63,6 +65,15 @@ function parseRefs(text: string, issues: string[], where: string): TipnrName['re
     }
   }
   return refs
+}
+
+/** The point of the link of a place record (columns 4 and 5 are a Google Maps and a palopenmaps link, both `@lat,lon`), or `undefined`. */
+function pointOf(cols: string[]): { lat: number; lon: number } | undefined {
+  for (const col of [cols[4], cols[5]]) {
+    const m = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(col ?? '')
+    if (m !== null && Math.abs(Number(m[1])) <= 90 && Math.abs(Number(m[2])) <= 180) return { lat: Number(m[1]), lon: Number(m[2]) }
+  }
+  return undefined
 }
 
 type Draft = Omit<TipnrRecord, 'id'> & { slug: string; suffix: string }
@@ -115,6 +126,7 @@ export function parseTipnr(text: string, issues: string[]): TipnrRecord[] {
       uStrong,
       names: [],
       relations: relationsOf(cols, kind === 'person' ? PERSON_RELATIONS : PLACE_RELATIONS),
+      ...(kind === 'place' ? (() => { const point = pointOf(cols); return point === undefined ? {} : { point } })() : {}),
       slug: slug(unique.split('@')[0]),
       suffix,
     }

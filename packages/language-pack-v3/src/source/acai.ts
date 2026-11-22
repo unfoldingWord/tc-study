@@ -153,3 +153,144 @@ export function joinAcai(
   )
   return { byPer, aliases }
 }
+
+/**
+ * One place record of ACAI (`places/json/`), trimmed. `id` and `primary` are ACAI's own ids (`place:Bethel`); a record whose `primary` is
+ * another id is an alias record. `tipnr`: the TIPNR names ACAI gives (`Luz|Bethel@Gen.12.8-Zec`), as ACAI writes them. `tw`: the titles of
+ * the uW Translation Words articles ACAI names. `types`: `place_types.acai` in ACAI's order (the first is the one the map form is taken
+ * from), each trimmed. `labels`: the preferred label per ACAI language code (the six of Mini), in NFC.
+ */
+export type AcaiPlace = { id: string; primary: string; tipnr: string[]; tw: string[]; types: string[]; labels: Record<string, string> }
+
+/** One ACAI file's record (an object, or a list whose first item is the record), trimmed; `undefined` when it is not a place record. */
+function trimOnePlace(json: unknown): AcaiPlace | undefined {
+  const d = Array.isArray(json) ? json[0] : json
+  if (!isRecord(d) || typeof d.id !== 'string' || !d.id.startsWith('place:')) return undefined
+  const alt = isRecord(d.alternate_sources) ? d.alternate_sources : {}
+  const tw = strings(alt.aquifer)
+    .map((a) => a.split('|'))
+    .filter((p) => p.length === 3 && p[2] === 'UWTranslationWords' && p[1].trim() !== '')
+    .map((p) => nfc(p[1]))
+  const labels: Record<string, string> = {}
+  const loc = isRecord(d.localizations) ? d.localizations : {}
+  for (const code of [...KEEP_LANGS].sort(compareCodePoints)) {
+    const l = loc[code]
+    if (isRecord(l) && typeof l.preferred_label === 'string' && nfc(l.preferred_label) !== '') labels[code] = nfc(l.preferred_label)
+  }
+  const pt = isRecord(d.place_types) ? d.place_types : {}
+  return {
+    id: d.id,
+    primary: typeof d.primary_id === 'string' && d.primary_id !== '' ? d.primary_id : d.id,
+    tipnr: [...new Set(strings(alt.tipnr).map((t) => t.trim()))].sort(compareCodePoints),
+    tw: [...new Set(tw)].sort(compareCodePoints),
+    types: strings(pt.acai)
+      .map((t) => t.trim())
+      .filter((t) => t !== ''),
+    labels,
+  }
+}
+
+/**
+ * The trimmed text of the ACAI places: the files of `places/json/` (path to text), each read as JSON. Keeps only `id`, `primary_id`,
+ * `alternate_sources.tipnr`, the `UWTranslationWords` titles, `place_types.acai` and the `preferred_label` of the six languages. A file that
+ * is not JSON or not a place record goes to `issues` and is left out. Records sorted by id; the same files give the same text.
+ * ({@link trimAcai}, which reads the people, is not changed.)
+ */
+export function trimAcaiPlaces(files: Map<string, string>, commit: string, issues: string[]): string {
+  const places: AcaiPlace[] = []
+  const seen = new Set<string>()
+  for (const path of [...files.keys()].sort(compareCodePoints)) {
+    let json: unknown
+    try {
+      json = JSON.parse(files.get(path)!)
+    } catch {
+      issues.push(`acai: ${path} is not JSON: left out`)
+      continue
+    }
+    const p = trimOnePlace(json)
+    if (p === undefined) issues.push(`acai: ${path} is not a place record: left out`)
+    else if (seen.has(p.id)) issues.push(`acai: ${path}: ${p.id} is twice: the second is left out`)
+    else {
+      seen.add(p.id)
+      places.push(p)
+    }
+  }
+  places.sort((a, b) => compareCodePoints(a.id, b.id))
+  return `${JSON.stringify({ source: ACAI_SOURCE.key, commit, places })}\n`
+}
+
+/** The places of a trimmed ACAI text ({@link trimAcaiPlaces}). Throws `Error` when the text is not one. */
+export function parseAcaiPlaces(text: string): { commit: string; places: AcaiPlace[] } {
+  const d: unknown = JSON.parse(text)
+  if (!isRecord(d) || d.source !== ACAI_SOURCE.key || typeof d.commit !== 'string' || !Array.isArray(d.places)) {
+    throw new Error('not a trimmed ACAI places file (acai/places.json): run fetch-topic-sources again')
+  }
+  const places = d.places.map((p, i) => {
+    if (!isRecord(p) || typeof p.id !== 'string' || typeof p.primary !== 'string' || !isRecord(p.labels)) {
+      throw new Error(`acai/places.json: record ${i} is not a trimmed place`)
+    }
+    const labels: Record<string, string> = {}
+    for (const [k, v] of Object.entries(p.labels)) if (typeof v === 'string') labels[k] = v
+    return { id: p.id, primary: p.primary, tipnr: strings(p.tipnr), tw: strings(p.tw), types: strings(p.types), labels }
+  })
+  places.sort((a, b) => compareCodePoints(a.id, b.id))
+  return { commit: d.commit, places }
+}
+
+/**
+ * ACAI's places joined to the `lug:` topics (`ids.md`, "Builder rules: places names"). A place record (not an alias record) names TIPNR unique
+ * names, each as `Other name|Unique@Ref-Range` or `Unique@Ref-Range`; only the text after the last `|` is the unique name. **Step 1:** the
+ * `lug:` topics whose `ref` is one of them, exactly. **Step 2,** only for a record step 1 gives nothing for (ACAI names an older version of the
+ * TIPNR record: `Jerusalem@Jos.10.1-Rev`): the `lug:` topic whose name before `@` is the name before `@` of one of them, when it is the only
+ * topic with that name. The record is joined when its names give exactly one `lug:`; more than one is reported, not joined. An alias record
+ * (`primary` another id) gets the topic of its primary. ACAI never makes or changes an id.
+ */
+export function joinAcaiPlaces(
+  places: AcaiPlace[],
+  lugOfRef: Map<string, string>,
+  lugsOfName: Map<string, string[]>,
+  report: string[],
+): { byLug: Map<string, AcaiPlace>; aliases: { place: AcaiPlace; lug: string }[] } {
+  const sorted = [...places].sort((a, b) => compareCodePoints(a.id, b.id))
+  const own = new Map<string, string>()
+  let none = 0
+  let byName = 0
+  for (const p of sorted) {
+    if (p.primary !== p.id) continue
+    const uniques = [...new Set(p.tipnr.map((t) => t.slice(t.lastIndexOf('|') + 1).trim()).filter((t) => t.includes('@')))]
+    let found = [...new Set(uniques.map((u) => lugOfRef.get(u)).filter((x): x is string => x !== undefined))]
+    let second = false
+    if (found.length === 0) {
+      const names = [...new Set(uniques.map((u) => u.slice(0, u.indexOf('@')).trim()))]
+      found = [...new Set(names.flatMap((n) => ((lugsOfName.get(n) ?? []).length === 1 ? lugsOfName.get(n)! : [])))]
+      second = found.length > 0
+    }
+    if (found.length === 1) {
+      own.set(p.id, found[0])
+      if (second) byName++
+    } else if (found.length === 0) none++
+    else report.push(`review: acai ${p.id}: its TIPNR names give ${found.length} places (${found.sort(compareCodePoints).join(', ')}): not joined`)
+  }
+  const byLug = new Map<string, AcaiPlace>()
+  for (const p of sorted) {
+    const lug = own.get(p.id)
+    if (lug === undefined) continue
+    if (byLug.has(lug)) {
+      report.push(`review: acai ${p.id} and ${byLug.get(lug)!.id} are both ${lug}: only the first is used, with its alias records`)
+      continue
+    }
+    byLug.set(lug, p)
+  }
+  const aliases: { place: AcaiPlace; lug: string }[] = []
+  let lost = 0
+  for (const p of sorted) {
+    if (p.primary === p.id) continue
+    const lug = own.get(p.primary)
+    if (lug !== undefined && byLug.get(lug)?.id === p.primary) aliases.push({ place: p, lug })
+    else lost++
+  }
+  report.push(
+    `acai: ${byLug.size} place records joined to TIPNR (${byName} by the name before @), ${none} with no TIPNR place, ${aliases.length} alias records joined, ${lost} alias records left out (their primary is not joined, not used, or an alias record)`,
+  )
+  return { byLug, aliases }
+}
