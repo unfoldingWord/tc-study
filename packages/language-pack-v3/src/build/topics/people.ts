@@ -4,15 +4,15 @@
  */
 import { compareCodePoints } from '../../codec/columns'
 import type { TopicsPeople, XtopicsCore } from '../../model'
-import { ACAI_LANGS, type AcaiPerson, joinAcai, splitLabel } from '../../source/acai'
+import { ACAI_LANGS, type AcaiPerson, type AcaiPlace, joinAcai, joinAcaiPlaces, splitLabel } from '../../source/acai'
 import type { TipnrRecord } from '../../source/tipnr'
 import { strongBase, strongKeyOfDStrong } from './xtopics'
 
-/** Per `per:` id, the `tw:names/` concepts joined to it by a `same-as` of the core, sorted by code point. */
-export function twOfPeople(core: Pick<XtopicsCore, 'relations'>): Map<string, string[]> {
+/** Per id of `prefix` (`per:` or `lug:`), the `tw:names/` concepts joined to it by a `same-as` of the core, sorted by code point. */
+export function twOfTopics(core: Pick<XtopicsCore, 'relations'>, prefix: 'per:' | 'lug:'): Map<string, string[]> {
   const out = new Map<string, string[]>()
   for (const r of core.relations ?? []) {
-    if (r.type !== 'same-as' || !r.from.startsWith('tw:names/') || !r.to.startsWith('per:')) continue
+    if (r.type !== 'same-as' || !r.from.startsWith('tw:names/') || !r.to.startsWith(prefix)) continue
     const list = out.get(r.to)
     if (list === undefined) out.set(r.to, [r.from])
     else if (!list.includes(r.from)) list.push(r.from)
@@ -20,6 +20,12 @@ export function twOfPeople(core: Pick<XtopicsCore, 'relations'>): Map<string, st
   for (const list of out.values()) list.sort(compareCodePoints)
   return out
 }
+
+/** Per `per:` id, the `tw:names/` concepts joined to it by a `same-as` of the core, sorted by code point. */
+export const twOfPeople = (core: Pick<XtopicsCore, 'relations'>): Map<string, string[]> => twOfTopics(core, 'per:')
+
+/** Per `lug:` id, the `tw:names/` concepts joined to it by a `same-as` of the core, sorted by code point (a concept may be joined to a person and a place). */
+export const twOfPlaces = (core: Pick<XtopicsCore, 'relations'>): Map<string, string[]> => twOfTopics(core, 'lug:')
 
 /**
  * Steps 2 and 3 of the rule: the first name in the language map (`mapNames`, the `names` of the language's `map` core) of the first
@@ -53,21 +59,41 @@ export function buildPeople(o: {
   lang: string
   xtopics: Pick<XtopicsCore, 'topics' | 'relations'> & Partial<Pick<XtopicsCore, 'occurrences' | 'strongs'>>
   mapNames: Record<string, string[]>
-  acai: AcaiPerson[]
-  /** The TIPNR records: how many verses call a person by an alias (its name lines). Without them, no alias is left out for that. */
+  acai: AcaiPerson[] | AcaiPlace[]
+  /** `place`: the same table for places (`lug:` ids, the ACAI places, `ids.md`, "Builder rules: places names"), built by the same rules. Default `person`. */
+  kind?: 'person' | 'place'
+  /** The TIPNR records: how many verses call a person (or place) by an alias (its name lines). Without them, no alias is left out for that. */
   records?: TipnrRecord[]
   report: string[]
 }): TopicsPeople | undefined {
+  const kind = o.kind ?? 'person'
+  const prefix = kind === 'person' ? 'per:' : 'lug:'
+  const what = kind === 'person' ? 'people' : 'places'
   const code = ACAI_LANGS[o.lang]
   if (code === undefined) {
-    o.report.push(`people: ACAI has no names in ${o.lang}: no people table`)
+    o.report.push(`${what}: ACAI has no names in ${o.lang}: no ${what} table`)
     return undefined
   }
   const perOfRef = new Map<string, string>()
-  for (const [id, t] of o.xtopics.topics) if (t.kind === 'person' && id.startsWith('per:')) perOfRef.set(t.ref, id)
+  const lugsOfName = new Map<string, string[]>()
+  for (const [id, t] of o.xtopics.topics) {
+    if (t.kind !== kind || !id.startsWith(prefix)) continue
+    perOfRef.set(t.ref, id)
+    const name = t.ref.split('@')[0].trim()
+    const list = lugsOfName.get(name)
+    if (list === undefined) lugsOfName.set(name, [id])
+    else list.push(id)
+  }
   const joinReport: string[] = []
-  const { byPer, aliases } = joinAcai(o.acai, perOfRef, joinReport)
-  const tw = twOfPeople(o.xtopics)
+  let byPer: Map<string, { labels: Record<string, string> }>
+  let aliases: { person: { labels: Record<string, string> }; per: string }[]
+  if (kind === 'person') ({ byPer, aliases } = joinAcai(o.acai as AcaiPerson[], perOfRef, joinReport))
+  else {
+    const joined = joinAcaiPlaces(o.acai as AcaiPlace[], perOfRef, lugsOfName, joinReport)
+    byPer = joined.byLug
+    aliases = joined.aliases.map((a) => ({ person: a.place, per: a.lug }))
+  }
+  const tw = twOfTopics(o.xtopics, prefix)
   const nfc = (s: string): string => s.normalize('NFC')
   // The map names are NFC as map.cddl stores them; made NFC here too, so both sides are compared byte for byte after NFC
   const mapNames: Record<string, string[]> = {}
@@ -98,7 +124,7 @@ export function buildPeople(o: {
     set.add(per)
   }
   for (const [id, t] of o.xtopics.topics) {
-    if (t.kind !== 'person' || !id.startsWith('per:')) continue
+    if (t.kind !== kind || !id.startsWith(prefix)) continue
     find(nameOf(id), id)
     find(t.title, id)
     for (const c of tw.get(id) ?? []) find(o.mapNames[c]?.[0] ?? '', id)
@@ -161,21 +187,21 @@ export function buildPeople(o: {
     set.add(per)
   }
   for (const [id, t] of o.xtopics.topics) {
-    if (t.kind !== 'person' || !id.startsWith('per:')) continue
+    if (t.kind !== kind || !id.startsWith(prefix)) continue
     hold(nameOf(id), id)
     hold(t.title, id)
     for (const c of tw.get(id) ?? []) hold(o.mapNames[c]?.[0] ?? '', id)
   }
   for (const [name, ids] of Object.entries(people.aliases)) for (const id of ids) hold(name, id)
-  if (o.records === undefined || o.records.length === 0 || o.xtopics.occurrences === undefined) o.report.push(`people: ${o.lang}: no TIPNR records or no counts: no alias is weighed against another person's name`)
+  if (o.records === undefined || o.records.length === 0 || o.xtopics.occurrences === undefined) o.report.push(`${what}: ${o.lang}: no TIPNR records or no counts: no alias is weighed against another person's name`)
   const out = [...new Set(leftOut)].sort(compareCodePoints)
-  if (out.length > 0) o.report.push(`people: ${o.lang}: ${out.length} aliases left out, mostly another person's name: ${out.join('; ')}`)
+  if (out.length > 0) o.report.push(`${what}: ${o.lang}: ${out.length} aliases left out, mostly another person's name: ${out.join('; ')}`)
   for (const [per, note] of [...noteOf].sort((a, b) => compareCodePoints(a[0], b[0]))) {
     if ((holders.get(nameOf(per))?.size ?? 0) > 1) people.notes[per] = note
   }
   o.report.push(
-    ...joinReport.map((line) => `people: ${line}`),
-    `people: ${o.lang}: ${Object.keys(names).length} names, ${Object.keys(people.notes).length} notes, ${Object.keys(people.aliases).length} aliases stored (${byPer.size} people joined)`,
+    ...joinReport.map((line) => `${what}: ${line}`),
+    `${what}: ${o.lang}: ${Object.keys(names).length} names, ${Object.keys(people.notes).length} notes, ${Object.keys(people.aliases).length} aliases stored (${byPer.size} people joined)`,
   )
   const empty = Object.keys(names).length + Object.keys(people.notes).length + Object.keys(people.aliases).length === 0
   return empty ? undefined : people

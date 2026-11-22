@@ -12,7 +12,7 @@
 import { compareCodePoints } from '../../codec/columns'
 import { BOOKS, bookNumber } from '../../ids'
 import type { BookModel, OrigModel, TopicName, TopicsCore, TopicsPart, XtopicsCore } from '../../model'
-import type { AcaiPerson } from '../../source/acai'
+import type { AcaiPerson, AcaiPlace } from '../../source/acai'
 import type { TipnrRecord } from '../../source/tipnr'
 import { alignedNames } from './alignedNames'
 import { buildPeople } from './people'
@@ -50,7 +50,7 @@ export function buildTopics(o: {
   /** The release of each resource the names come from (key, release). */
   releases: Map<string, string>
   /** The ACAI people and its key and release: the `people` table (`ids.md`, "Names of people"); needs `mapNames`. */
-  acai?: { people: AcaiPerson[]; res: [string, string] }
+  acai?: { people: AcaiPerson[]; /** The ACAI places: the `places` table, built by the rules of `people` (`ids.md`, "Builder rules: places names"). */ places?: AcaiPlace[]; res: [string, string] }
   /** The `names` of the language's map core (the titles of its articles). */
   mapNames?: Record<string, string[]>
 }): { core: TopicsCore; parts: TopicsPart[]; report: string[] } {
@@ -165,6 +165,9 @@ export function buildTopics(o: {
   // People: what the language calls people where nothing else in the pack says it
   const people = o.acai === undefined ? undefined : buildPeople({ lang, xtopics, mapNames: o.mapNames ?? {}, acai: o.acai.people, records: o.records, report })
   if (people !== undefined) touch(o.acai!.res[0], [])
+  const places =
+    o.acai?.places === undefined ? undefined : buildPeople({ lang, kind: 'place', xtopics, mapNames: o.mapNames ?? {}, acai: o.acai.places, records: o.records, report })
+  if (places !== undefined) touch(o.acai!.res[0], [])
   const releases = new Map(o.releases)
   if (o.acai !== undefined) releases.set(o.acai.res[0], o.acai.res[1])
   const res = [...used.keys()].sort(compareCodePoints).map((key): [string, string] => [key, releases.get(key) ?? ''])
@@ -173,6 +176,7 @@ export function buildTopics(o: {
   const core: TopicsCore = { lang, part: 'core', res, names, coverage }
   if (Object.keys(local).length > 0) core.local = local
   if (people !== undefined) core.people = people
+  if (places !== undefined) core.places = places
   const parts: TopicsPart[] = []
   for (const book of order(partNames.keys())) {
     const lists = new Map<string, number[]>()

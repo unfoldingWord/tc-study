@@ -64,7 +64,9 @@ import {
   xtopicsView,
   type XtopicsCore,
   type AcaiPerson,
+  type AcaiPlace,
   parseAcai,
+  parseAcaiPlaces,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
@@ -344,6 +346,20 @@ function topicTexts(dir: string) {
     frames,
     // ACAI's people, trimmed by fetch-topic-sources (`acai/people.json`): gender, same-as (common) and the people table (language)
     acai: text(join(dir, 'acai', 'people.json')),
+    // The maps (E1): OpenBible.info, ACAI's places and the three Natural Earth zips. A topics folder without `openbible/` builds as before, with no maps.
+    ...(existsSync(join(dir, 'openbible', 'ancient.jsonl'))
+      ? {
+          maps: {
+            openbible: text(join(dir, 'openbible', 'ancient.jsonl')),
+            acaiPlaces: text(join(dir, 'acai', 'places.json')),
+            basemap: {
+              land: new Uint8Array(readFileSync(join(dir, 'naturalearth', 'ne_10m_land.zip'))),
+              lakes: new Uint8Array(readFileSync(join(dir, 'naturalearth', 'ne_10m_lakes.zip'))),
+              rivers: new Uint8Array(readFileSync(join(dir, 'naturalearth', 'ne_10m_rivers_lake_centerlines.zip'))),
+            },
+          },
+        }
+      : {}),
   }
 }
 
@@ -432,6 +448,8 @@ type Common = {
   report: string[]
   published: boolean
   core?: Segment
+  /** The complements the common catalog lists (the `basemap`), with their bytes. */
+  complements?: { complement: { kind: string; id: Uint8Array }; bytes: Uint8Array }[]
 }
 
 /** The published common catalog in `dir`: it has to hold the units the language needs, `orig:<book>` for each book and `xmap` if there is a map. */
@@ -549,7 +567,7 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
       throw new Error(`Cannot read the book names ${o.bookNames}: ${(error as Error).message}`)
     }
   }
-  let topics: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; release: string } } | undefined
+  let topics: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; places?: AcaiPlace[]; release: string } } | undefined
   if (topicSources !== undefined) {
     const core = published !== undefined ? { seg: published.core! } : common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
     if (core === undefined) throw new Error('--topics: the common part has no xtopics core (no originals were built?)')
@@ -558,7 +576,9 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
     const records = parseTipnr(topicSources.tipnr, issues)
     for (const line of issues) if (!common.report.includes(`topics: ${line}`)) common.report.push(`topics: ${line}`)
     const acai = parseAcai(topicSources.acai)
-    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records, acai: { people: acai.people, release: acai.commit.slice(0, 8) } }
+    const places = topicSources.maps === undefined ? undefined : parseAcaiPlaces(topicSources.maps.acaiPlaces)
+    if (places !== undefined && places.commit !== acai.commit) throw new Error('acai/places.json and acai/people.json are of different commits of ACAI')
+    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records, acai: { people: acai.people, ...(places === undefined ? {} : { places: places.places }), release: acai.commit.slice(0, 8) } }
   }
   // Without --ta-config the related of the tA articles comes from the links alone (a log line says so).
   const taKeys = (await source.resources(lang)).filter((ref) => ref.kind === 'Translation Academy').map((ref) => ref.key)
@@ -635,6 +655,12 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
   for (const segment of [...common.segments, ...built.segments]) await writeFile(join(o.out, 'segments', `${segment.id}.seg`), segment.bytes)
   if (common.catalog !== undefined) await writeFile(join(o.out, 'catalog-common.seg'), common.catalog.bytes)
   else await rm(join(o.out, 'catalog-common.seg'), { force: true })
+  // The complements of the common catalog (the `basemap`), under the hex of their sha256: not segments, so not in segments/
+  await rm(join(o.out, 'complements'), { recursive: true, force: true })
+  if (common.complements !== undefined && common.complements.length > 0) {
+    await mkdir(join(o.out, 'complements'), { recursive: true })
+    for (const c of common.complements) await writeFile(join(o.out, 'complements', `${hex(c.complement.id)}.${c.complement.kind}`), c.bytes)
+  }
   await writeFile(join(o.out, `catalog-${lang}.seg`), built.catalog.bytes)
   await writeFile(join(o.out, 'report.txt'), `${report.join('\n')}\n`)
   if (registryFile !== undefined) {

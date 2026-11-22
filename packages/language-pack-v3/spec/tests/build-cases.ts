@@ -33,7 +33,7 @@ import { extractOrig, origSegment } from '../../src/build/orig'
 import { buildXmap } from '../../src/build/xmap/build'
 import { xmapSegment } from '../../src/build/xmap/segment'
 import { topicsSegment, xtopicsSegment } from '../../src/build/topics/segment'
-import { encodeUvarints } from '../../src/codec/columns'
+import { encodeDeltas, encodeUvarints } from '../../src/codec/columns'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, readHeader, readSegment, type Segment, writeSegment } from '../../src/codec/container'
@@ -42,7 +42,7 @@ import type { BookModel, HelpRow, MapCore, MapPart, ObsModel, OrigModel, TextMod
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
-import { type Json, readerOutput, sortKeys } from '../../src/read/output'
+import { basemapOutput, type Json, readerOutput, sortKeys } from '../../src/read/output'
 import { zipSource } from '../../src/source/zipSource'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../../src/source/rows'
 import { keyId, publicKeyOf, signCatalog } from '../../src/sign'
@@ -74,7 +74,7 @@ const originalsOnly = () => partsSource({ list: ORIGINALS_LIST, partsDir: PARTS 
 // The files of the cases
 
 /** The `.seg` and `.tcpack` files under `root` (or the files that match `pattern`), as paths relative to it with `/`, sorted. `data/` is not a case. */
-export function caseFilesOn(root: string, pattern: RegExp = /\.(seg|tcpack)$/): string[] {
+export function caseFilesOn(root: string, pattern: RegExp = /\.(seg|tcpack|basemap)$/): string[] {
   const out: string[] = []
   const walk = (dir: string, prefix: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -418,7 +418,7 @@ async function localWithExtraKey(): Promise<Uint8Array> {
  * The cases that need keys have a `<name>.keys.json` beside the file: an object from key id to the 64 hex digits of a raw public key, the keys a
  * reader is given. It is the only thing about keys that is stored, and a public key at that.
  */
-export const keysName = (name: string): string => name.replace(/\.(seg|tcpack)$/, '.keys.json')
+export const keysName = (name: string): string => name.replace(/\.(seg|tcpack|basemap)$/, '.keys.json')
 /** The trusted keys of a case file (`undefined` when it has no `.keys.json`: it is read with no keys). */
 export function keysOf(root: string, name: string): Record<string, Uint8Array> | undefined {
   const path = join(root, keysName(name))
@@ -739,6 +739,154 @@ async function kinship(): Promise<Map<string, Uint8Array>> {
   return out
 }
 
+// Case 27: the maps tables: `geo` and `routes` of the xtopics core, `places` of a language's topics core, and the `basemap` complement
+
+/**
+ * The files of case 27: an xtopics core with places (the two Bethels, Jerusalem, Emmaus with a doubtful point, Tarsus, Seleucia as a port, India as a
+ * region, a place with no point), a person who was born in one, a journey event and its route, and `geo`; an es-419 topics core with `places`; a
+ * `basemap` of three paths; and each with the defects a reader rejects, and one of each accepted with a key the schema does not list.
+ */
+async function maps(): Promise<Map<string, Uint8Array>> {
+  const TIPNR = 'STEPBible/STEPBible-Data/TIPNR'
+  const OB = 'openbibleinfo/Bible-Geocoding-Data'
+  const THEO = 'robertrouse/theographic-bible-metadata'
+  const place = (title: string, ref: string): Topic => ({ kind: 'place', source: TIPNR, ref, title, ustrong: '' })
+  const topics = new Map<string, Topic>([
+    ['ev:first-missionary-journey', { kind: 'event', source: THEO, ref: '1', title: 'First Missionary Journey', ustrong: '' }],
+    ['lug:abel', place('Abel', 'Abel@1Sa.6.18')],
+    ['lug:antioch', place('Antioch', 'Antioch@Act.6.5-Gal')],
+    ['lug:bethel-gen-12-8', place('Bethel', 'Bethel@Gen.12.8-Zec')],
+    ['lug:bethel-jos-19-4', place('Bethel', 'Bethel@Jos.12.16-1Sa')],
+    ['lug:emmaus', place('Emmaus', 'Emmaus@Luk.24.13')],
+    ['lug:india', place('India', 'India@Est.1.1-Est')],
+    ['lug:jerusalem', place('Jerusalem', 'Jerusalem@Jos.10.1-Rev')],
+    ['lug:seleucia', place('Seleucia', 'Seleucia@Act.13.4')],
+    ['lug:tarsus', place('Tarsus', 'Tarsus@Act.9.11-Act')],
+    ['per:paul', { kind: 'person', source: TIPNR, ref: 'Paul@Act.13.9-Rev', title: 'Paul', ustrong: '' }],
+  ])
+  const geo: NonNullable<XtopicsCore['geo']> = {
+    'lug:abel': { lat: 0, lon: 0, sure: 0, form: 1 },
+    'lug:antioch': { lat: 3623, lon: 3617, sure: 3, form: 1 },
+    'lug:bethel-gen-12-8': { lat: 3192, lon: 3524, sure: 3, form: 1 },
+    'lug:bethel-jos-19-4': { lat: 3124, lon: 3484, sure: 1, form: 1 },
+    'lug:emmaus': { lat: 3180, lon: 3500, sure: 1, form: 1 },
+    'lug:india': { lat: 2200, lon: 7700, sure: 1, form: 2 },
+    'lug:jerusalem': { lat: 3178, lon: 3523, sure: 3, form: 1 },
+    'lug:seleucia': { lat: 3612, lon: 3592, sure: 3, form: 5 },
+    'lug:tarsus': { lat: 3691, lon: 3489, sure: 3, form: 1 },
+  }
+  const rel = (from: string, type: string, to: string, source: string, confidence: number) => ({ from, to, type, source, confidence })
+  const core: XtopicsCore = {
+    part: 'core',
+    res: [[TIPNR, 'be4191f0'], [OB, '7eb18a5e'], [THEO, '744355c7']],
+    coverage: new Map([[TIPNR, { whole: ['act'], partial: [] }], [OB, { whole: [], partial: [] }], [THEO, { whole: ['act'], partial: [] }]]),
+    topics,
+    occurrences: new Map([...topics.keys()].map((id) => [id, new Map([['act', [2, 2] as [number, number]]])])),
+    relations: [rel('per:paul', 'born-in', 'lug:tarsus', THEO, 80)],
+    geo,
+    routes: [{ event: 'ev:first-missionary-journey', stops: ['lug:antioch', 'lug:seleucia', 'lug:antioch', 'lug:jerusalem', 'lug:antioch'] }],
+  }
+  const x = xtopicsSegment(core)
+  const lang = topicsSegment({
+    lang: ES,
+    part: 'core',
+    res: [[GLT, 'v42']],
+    coverage: new Map([[GLT, { whole: ['act'], partial: [] }]]),
+    names: {},
+    places: {
+      names: { 'lug:jerusalem': 'Jerusalén', 'lug:tarsus': 'Tarso' },
+      notes: { 'lug:bethel-gen-12-8': 'de Efraín', 'lug:bethel-jos-19-4': 'de Simeón' },
+      aliases: { Sion: ['lug:jerusalem'], Luz: ['lug:bethel-gen-12-8'] },
+    },
+  })
+  const write = async (seg: Segment): Promise<Uint8Array> => (await writeSegment(seg)).bytes
+  const withX = (t: Record<string, unknown>): Segment => ({ h: x.h, t: { ...x.t, ...t } as Segment['t'] })
+  const withPlaces = (places: unknown): Segment => ({ h: lang.h, t: { ...lang.t, places } as Segment['t'] })
+  const ids = [...topics.keys()]
+  const column = (f: (id: string, i: number) => number, n = ids.length) => ids.slice(0, n).map(f)
+  const geoOf = (over: Partial<Record<'lat' | 'lon' | 'sure' | 'form', (id: string, i: number) => number>> = {}, n = ids.length) => {
+    const get = (key: 'lat' | 'lon' | 'sure' | 'form') => (id: string, i: number): number => (over[key] !== undefined ? over[key]!(id, i) : (geo[id]?.[key] ?? 0))
+    return {
+      lat: encodeDeltas(column(get('lat'), n)),
+      lon: encodeDeltas(column(get('lon'), n)),
+      sure: encodeUvarints(column(get('sure'), n)),
+      form: encodeUvarints(column(get('form'), n)),
+    }
+  }
+  const at = (id: string): number => ids.indexOf(id)
+  const routeTable = (event: number[], count: number[], stops: number[]) => ({ event: encodeUvarints(event), count: encodeUvarints(count), stops: encodeUvarints(stops) })
+  const [ev, ant, sel, jer, abel, paul, tarsus] = [at('ev:first-missionary-journey'), at('lug:antioch'), at('lug:seleucia'), at('lug:jerusalem'), at('lug:abel'), at('per:paul'), at('lug:tarsus')]
+  const places = lang.t.places as { names: Record<string, string>; notes: Record<string, string>; aliases: Record<string, string[]> }
+  const out = new Map<string, Uint8Array>()
+  out.set('mapas/xtopics-core.seg', await write(x))
+  out.set('mapas/topics-core-es-419.seg', await write(lang))
+  // geo: rejected
+  out.set('mapas/geo-columna-corta.seg', await write(withX({ geo: geoOf({}, ids.length - 1) })))
+  out.set('mapas/geo-sure-4.seg', await write(withX({ geo: geoOf({ sure: (id) => (id === 'lug:jerusalem' ? 4 : (geo[id]?.sure ?? 0)) }) })))
+  out.set('mapas/geo-form-0-en-un-lugar.seg', await write(withX({ geo: geoOf({ form: (id) => (id === 'lug:jerusalem' ? 0 : (geo[id]?.form ?? 0)) }) })))
+  out.set('mapas/geo-form-6.seg', await write(withX({ geo: geoOf({ form: (id) => (id === 'lug:jerusalem' ? 6 : (geo[id]?.form ?? 0)) }) })))
+  out.set('mapas/geo-valor-en-una-persona.seg', await write(withX({ geo: geoOf({ sure: (id) => (id === 'per:paul' ? 1 : (geo[id]?.sure ?? 0)) }) })))
+  out.set('mapas/geo-sin-punto-con-latitud.seg', await write(withX({ geo: geoOf({ lat: (id) => (id === 'lug:abel' ? 1 : (geo[id]?.lat ?? 0)) }) })))
+  out.set('mapas/geo-latitud-fuera.seg', await write(withX({ geo: geoOf({ lat: (id) => (id === 'lug:jerusalem' ? 9001 : (geo[id]?.lat ?? 0)) }) })))
+  out.set('mapas/geo-longitud-fuera.seg', await write(withX({ geo: geoOf({ lon: (id) => (id === 'lug:india' ? 18001 : (geo[id]?.lon ?? 0)) }) })))
+  out.set('mapas/geo-sin-columna.seg', await write(withX({ geo: { lat: geoOf().lat, lon: geoOf().lon, sure: geoOf().sure } })))
+  out.set('mapas/geo-no-bytes.seg', await write(withX({ geo: { ...geoOf(), form: [1, 2] } })))
+  // geo: a part with a core table
+  const part = xtopicsSegment({ part: 'act', occurrences: new Map([['per:paul', [verseId('act', 9, 11)]]]) })
+  out.set('mapas/geo-en-parte.seg', await write({ h: { ...part.h, tables: { ...part.h.tables, geo: [1, false] } }, t: { ...part.t, geo: geoOf() } as Segment['t'] }))
+  // geo: (0, 0) with a point is valid, and a key the schema does not list is left out
+  out.set('mapas/geo-clave-extra.seg', await write(withX({ geo: { ...geoOf({ lat: (id) => (id === 'lug:emmaus' ? 0 : (geo[id]?.lat ?? 0)), lon: (id) => (id === 'lug:emmaus' ? 0 : (geo[id]?.lon ?? 0)) }), accuracy: 'a key a later version adds' } })))
+  // routes: rejected
+  out.set('mapas/rutas-largos-distintos.seg', await write(withX({ routes: routeTable([ev], [2, 2], [ant, sel, ant, jer]) })))
+  out.set('mapas/rutas-paradas-de-mas.seg', await write(withX({ routes: routeTable([ev], [3], [ant, sel, jer, ant]) })))
+  out.set('mapas/rutas-una-parada.seg', await write(withX({ routes: routeTable([ev], [1], [ant]) })))
+  out.set('mapas/rutas-evento-no-es-evento.seg', await write(withX({ routes: routeTable([paul], [2], [ant, sel]) })))
+  out.set('mapas/rutas-parada-no-es-lugar.seg', await write(withX({ routes: routeTable([ev], [2], [ant, paul]) })))
+  out.set('mapas/rutas-parada-repetida-seguida.seg', await write(withX({ routes: routeTable([ev], [3], [ant, sel, sel]) })))
+  out.set('mapas/rutas-evento-repetido.seg', await write(withX({ routes: routeTable([ev, ev], [2, 2], [ant, sel, ant, jer]) })))
+  out.set('mapas/rutas-evento-fuera.seg', await write(withX({ routes: routeTable([ids.length], [2], [ant, sel]) })))
+  out.set('mapas/rutas-parada-sin-punto.seg', await write(withX({ routes: routeTable([ev], [2], [abel, tarsus]) })))
+  out.set('mapas/rutas-en-parte.seg', await write({ h: { ...part.h, tables: { ...part.h.tables, routes: [1, false] } }, t: { ...part.t, routes: routeTable([ev], [2], [ant, sel]) } as Segment['t'] }))
+  out.set('mapas/rutas-clave-extra.seg', await write(withX({ routes: { ...routeTable([ev], [2], [ant, sel]), note: 'a key a later version adds' } })))
+  // places: rejected, and accepted
+  out.set('mapas/lugares-id-de-persona.seg', await write(withPlaces({ ...places, names: { 'per:paul': 'Pablo', ...places.names } })))
+  out.set('mapas/lugares-nota-de-persona.seg', await write(withPlaces({ ...places, notes: { 'per:paul': 'apóstol', ...places.notes } })))
+  out.set('mapas/lugares-nombre-vacio.seg', await write(withPlaces({ ...places, names: { ...places.names, 'lug:tarsus': '' } })))
+  out.set('mapas/lugares-nota-vacia.seg', await write(withPlaces({ ...places, notes: { ...places.notes, 'lug:bethel-gen-12-8': '' } })))
+  out.set('mapas/lugares-alias-desordenado.seg', await write(withPlaces({ ...places, aliases: { ...places.aliases, Betel: ['lug:bethel-jos-19-4', 'lug:bethel-gen-12-8'] } })))
+  out.set('mapas/lugares-alias-repetido.seg', await write(withPlaces({ ...places, aliases: { ...places.aliases, Betel: ['lug:bethel-gen-12-8', 'lug:bethel-gen-12-8'] } })))
+  out.set('mapas/lugares-alias-sin-ids.seg', await write(withPlaces({ ...places, aliases: { ...places.aliases, Salem: [] } })))
+  out.set('mapas/lugares-alias-id-de-persona.seg', await write(withPlaces({ ...places, aliases: { ...places.aliases, Saulo: ['per:paul'] } })))
+  out.set('mapas/lugares-alias-vacio.seg', await write(withPlaces({ ...places, aliases: { '': ['lug:jerusalem'], ...places.aliases } })))
+  out.set('mapas/lugares-sin-aliases.seg', await write(withPlaces({ names: places.names, notes: places.notes })))
+  out.set('mapas/lugares-vacia-y-clave-extra.seg', await write(withPlaces({ names: {}, notes: {}, aliases: {}, descriptions: { 'lug:jerusalem': 'a key a later version adds' } })))
+  // basemap: a complement, not a segment (`catalog.md`)
+  const base = (doc: Record<string, unknown>): Uint8Array => deflateRaw(encodeDeterministic(doc as never), { level: 9 })
+  const good = {
+    bbox: [800, 2200, 5200, 4300],
+    layer: encodeUvarints([1, 2, 3]),
+    count: encodeUvarints([4, 3, 2]),
+    x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3500, 3600]),
+    y: encodeDeltas([2300, 2300, 2800, 2800, 3200, 3200, 3300, 3000, 3400]),
+  }
+  const withB = (over: Record<string, unknown>): Uint8Array => base({ ...good, ...over })
+  out.set('mapas/mapa-base.basemap', withB({}))
+  out.set('mapas/mapa-base-clave-extra.basemap', withB({ name: 'a key a later version adds' }))
+  out.set('mapas/mapa-base-cerrado-de-2-puntos.basemap', withB({ count: encodeUvarints([2, 3, 2]), x: encodeDeltas([1000, 1500, 3500, 3600, 3550, 3500, 3600]), y: encodeDeltas([2300, 2300, 3200, 3200, 3300, 3000, 3400]) }))
+  out.set('mapas/mapa-base-abierto-de-1-punto.basemap', withB({ count: encodeUvarints([4, 3, 1]), x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3600]), y: encodeDeltas([2300, 2300, 2800, 2800, 3200, 3200, 3300, 3400]) }))
+  out.set('mapas/mapa-base-capa-4.basemap', withB({ layer: encodeUvarints([1, 4, 3]) }))
+  out.set('mapas/mapa-base-punto-fuera.basemap', withB({ x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3500, 5300]) }))
+  out.set('mapas/mapa-base-borde-dentro.basemap', withB({ x: encodeDeltas([800, 5200, 5200, 800, 3500, 3600, 3550, 3500, 3600]), y: encodeDeltas([2200, 2200, 4300, 4300, 3200, 3200, 3300, 3000, 3400]) }))
+  out.set('mapas/mapa-base-x-corta.basemap', withB({ x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3500]) }))
+  out.set('mapas/mapa-base-capas-y-cuentas-distintas.basemap', withB({ count: encodeUvarints([4, 3]) }))
+  out.set('mapas/mapa-base-bbox-invertido.basemap', withB({ bbox: [5200, 2200, 800, 4300] }))
+  out.set('mapas/mapa-base-bbox-de-3.basemap', withB({ bbox: [800, 2200, 5200] }))
+  out.set('mapas/mapa-base-sin-y.basemap', base({ bbox: good.bbox, layer: good.layer, count: good.count, x: good.x }))
+  out.set('mapas/mapa-base-no-deflate.basemap', new Uint8Array([1, 2, 3, 4, 5]))
+  out.set('mapas/mapa-base-bytes-de-mas.basemap', new Uint8Array([...withB({}), 0]))
+  return out
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -779,6 +927,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('obsimg/obsimg.seg', await obsPictures())
   out.set('obs-5m/obs-5m.seg', await obsFiveMovements())
   for (const [name, bytes] of await kinship()) out.set(name, bytes)
+  for (const [name, bytes] of await maps()) out.set(name, bytes)
   out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
   out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out
@@ -806,7 +955,12 @@ export function expectedText(output: unknown): string {
   return `${indented(data, '')}\n`
 }
 
-const expectedName = (name: string): string => name.replace(/\.(seg|tcpack)$/, '.expected.json')
+const expectedName = (name: string): string => name.replace(/\.(seg|tcpack|basemap)$/, '.expected.json')
+
+/** What the reader says of a case file: a `.basemap` is a complement (`catalog.md`), anything else a segment or a transfer file. */
+export async function outputOfFile(name: string, bytes: Uint8Array, options: Parameters<typeof readerOutput>[1] = {}): Promise<unknown> {
+  return name.endsWith('.basemap') ? basemapOutput(bytes) : readerOutput(bytes, options)
+}
 
 // Writing and checking
 
@@ -844,7 +998,7 @@ export async function runBuildCases(o: { root?: string; refreeze?: boolean; chec
     if (name.endsWith('.keys.json')) continue
     const expected = expectedName(name)
     const keys = built.has(keysName(name)) ? keysFromText(new TextDecoder().decode(built.get(keysName(name)))) : undefined
-    put(expected, expectedText(await readerOutput(bytes, keys === undefined ? {} : { trustedKeys: keys })), onDisk(expected), 'the TypeScript reader')
+    put(expected, expectedText((await outputOfFile(name, bytes, keys === undefined ? {} : { trustedKeys: keys })) as Json), onDisk(expected), 'the TypeScript reader')
   }
   return report
 }

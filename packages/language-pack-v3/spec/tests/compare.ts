@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compareCodePoints } from '../../src/codec/columns'
 import { canonicalJson, type Json, readerOutput, sortKeys } from '../../src/read/output'
-import { buildBigSegments, caseFilesOn, keysName, keysOf, PYTHON_NOT_YET, TESTS_DIR } from './build-cases'
+import { buildBigSegments, caseFilesOn, keysName, keysOf, outputOfFile, PYTHON_NOT_YET, TESTS_DIR } from './build-cases'
 
 const DEFAULT_READER = join(TESTS_DIR, '..', 'reader-py', 'lp3read.py')
 const MAX_VALUE = 80
@@ -97,7 +97,7 @@ async function disagreement(name: string, bytes: Uint8Array, file: string, pytho
   // A TypeScript exception (not a FormatError, which readerOutput turns into an error object) is a mismatch of this file, not the end of the run.
   let ts: Json
   try {
-    ts = sortKeys(await readerOutput(bytes, trustedKeys === undefined ? {} : { trustedKeys }))
+    ts = sortKeys((await outputOfFile(name, bytes, trustedKeys === undefined ? {} : { trustedKeys })) as Json)
   } catch (error) {
     return `${name}: the TypeScript reader threw: ${(error as Error).message}`
   }

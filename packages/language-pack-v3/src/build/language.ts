@@ -32,9 +32,9 @@
  */
 import { compareCodePoints } from '../codec/columns'
 import type { Segment } from '../codec/container'
-import { sha256Hex } from '../codec/sha256'
+import { sha256, sha256Hex } from '../codec/sha256'
 import { BOOKS, bookNumber, bookSet } from '../ids'
-import type { About, ArticleModel, BookModel, CatalogResource, LexEntry, OrigModel } from '../model'
+import type { About, ArticleModel, BookModel, CatalogResource, Complement, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import type { RoleHint } from './sections'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
@@ -62,10 +62,15 @@ import { topicsSegment, xtopicsSegment } from './topics/segment'
 import { buildTopics } from './topics/topics'
 import { chunksOfText, chunksTable } from './topics/chunks'
 import { parseObsFrames } from '../source/obsFrames'
-import { buildXtopics, chapterLengths, type TwName, type XtopicsSources } from './topics/xtopics'
+import { buildXtopics, chapterLengths, type MapsInput, type TwName, type XtopicsSources } from './topics/xtopics'
+import { buildBasemap } from './basemap'
+import BORN_DIED_EXCLUDE from './topics/born-died-exclude.json'
+import PLACE_NAMES from './topics/place-names.json'
+import ROUTES from './topics/routes.json'
+import { parseOpenBible } from '../source/openbible'
 import { parseObsRefs } from '../source/obsRefs'
-import { ACAI_SOURCE, type AcaiPerson, parseAcai } from '../source/acai'
-import { parseTheographic } from '../source/theographic'
+import { ACAI_SOURCE, type AcaiPerson, type AcaiPlace, parseAcai, parseAcaiPlaces } from '../source/acai'
+import { parseTheoBirthDeath, parseTheographic } from '../source/theographic'
 import { parseTipnr } from '../source/tipnr'
 import type { XmapCore, XmapPart, XtopicsCore } from '../model'
 import type { TipnrRecord } from '../source/tipnr'
@@ -271,7 +276,7 @@ export async function buildLanguage(o: {
   bookNames?: Record<string, [string, string, string]>
   partial?: boolean
   /** `acai`: the ACAI people ({@link parseAcai}) and its release: the `people` table of the topics core (`ids.md`, "Names of people"). */
-  topics?: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; release: string } }
+  topics?: { xtopics: XtopicsCore; records: TipnrRecord[]; acai?: { people: AcaiPerson[]; places?: AcaiPlace[]; release: string } }
   aligned?: boolean
   /** The Five Movements manual: the tables `tf-*` of the `obs` segment. Off by default: without it every segment is the same bytes. The build throws when the manual has errors (`obs-5m-checks.md`). */
   obsTf?: ObsTfInput
@@ -474,19 +479,22 @@ export async function buildLanguage(o: {
       obs: stories,
       obsRes: obs?.res.map(([key]) => key),
       releases: new Map(refs.map((ref) => [ref.key, tagOf(ref.stamp)])),
-      ...(o.topics.acai === undefined ? {} : { acai: { people: o.topics.acai.people, res: [ACAI_SOURCE.key, o.topics.acai.release] as [string, string] }, mapNames }),
+      ...(o.topics.acai === undefined ? {} : { acai: { people: o.topics.acai.people, ...(o.topics.acai.places === undefined ? {} : { places: o.topics.acai.places }), res: [ACAI_SOURCE.key, o.topics.acai.release] as [string, string] }, mapNames }),
     })
     report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
     const rows: RowKey[] = [...mapRows.values()].flat()
     if (tn !== undefined) for (const book of origs.keys()) if (tn.books.includes(book)) await addKeys(rows, source.rows({ lang, book, resource: tn.key }))
     if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
     rows.push({ layer: 'topics', key: `tipnr|${sha256Hex(JSON.stringify(o.topics.records))}` }, { layer: 'topics', key: `xtopics|${sha256Hex([...xt.topics.keys()].join('\n'))}` })
-    if (built.core.people !== undefined) {
+    const acaiNames = built.core.people !== undefined || built.core.places !== undefined
+    if (acaiNames) {
       rows.push({ layer: 'topics', key: `acai|${sha256Hex(JSON.stringify(o.topics.acai!.people))}` })
-      acaiResource = { key: ACAI_SOURCE.key, title: ACAI_CREDIT.title, subject: 'Topics', release: o.topics.acai!.release, license: ACAI_CREDIT.license, attribution: ACAI_CREDIT.attribution, books: bookSet([]) }
+      if (built.core.places !== undefined) rows.push({ layer: 'topics', key: `acai-places|${sha256Hex(JSON.stringify(o.topics.acai!.places))}` })
+      const credit = acaiCredit(built.core.places !== undefined)
+      acaiResource = { key: ACAI_SOURCE.key, title: credit.title, subject: 'Topics', release: o.topics.acai!.release, license: credit.license, attribution: credit.attribution, books: bookSet([]) }
     }
     const keys = built.core.res.map(([key]) => key)
-    const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp })), ...(built.core.people === undefined ? [] : [{ key: ACAI_SOURCE.key, stamp: o.topics.acai!.release }])])
+    const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp })), ...(acaiNames ? [{ key: ACAI_SOURCE.key, stamp: o.topics.acai!.release }] : [])])
     await add(topicsSegment(built.core), inputs, keys)
     for (const part of built.parts) await add(topicsSegment(part), inputs, keys)
   }
@@ -545,8 +553,31 @@ export const ACAI_CREDIT = {
     'ACAI Biblical Entity Data © 2024 BiblioNexus (https://github.com/BibleAquifer/ACAI), CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changed: only the gender, the names and other names in six languages and the uW Translation Words titles of the people were extracted, joined to TIPNR and reduced; the names are reproduced where the pack cannot derive them',
 } as const
 
+/** The catalog's words for ACAI when its places are used too (`spec/fuentes.md`). */
+export function acaiCredit(places: boolean): { title: string; license: string; attribution: string } {
+  if (!places) return ACAI_CREDIT
+  return {
+    title: 'ACAI Biblical Entity Data: people and places',
+    license: ACAI_CREDIT.license,
+    attribution:
+      'ACAI Biblical Entity Data © 2024 BiblioNexus (https://github.com/BibleAquifer/ACAI), CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Changed: only the gender of people, the names and other names of people and places in six languages, the type of places and the uW Translation Words titles were extracted, joined to TIPNR and reduced; the names are reproduced where the pack cannot derive them',
+  }
+}
+
+/** OpenBible.info Bible Geocoding Data (`spec/fuentes.md`): the points of the places, with their certainty. */
+export const OPENBIBLE_SOURCE = {
+  key: 'openbibleinfo/Bible-Geocoding-Data',
+  release: '7eb18a5e',
+  title: 'OpenBible.info Bible Geocoding Data',
+  license: 'CC-BY-4.0',
+  attribution: 'Bible Geocoding Data, OpenBible.info (https://github.com/openbibleinfo/Bible-Geocoding-Data), CC BY 4.0. Changed: only the best point, a certainty level and the place type',
+} as const
+
+/** The `basemap` complement of the common catalog (`spec/catalog.md`): what the catalog says of it. */
+export const BASEMAP_LICENSE = 'Public domain (Natural Earth 10m: land 5.1.1, lakes 5.0.0, rivers_lake_centerlines 5.0.0; made with Natural Earth)'
+
 /** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */
-const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines' | 'acai'> = {
+const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines' | 'acai' | 'openbible'> = {
   tipnr: ['STEPBible/STEPBible-Data/TIPNR', 'be4191f0'],
   theographic: ['robertrouse/theographic-bible-metadata', '744355c7'],
   obs: ['unfoldingWord/en/obs', 'v9'],
@@ -628,8 +659,13 @@ export async function buildCommon(o: {
     frames?: Map<string, string>
     /** The trimmed ACAI people (`acai/people.json`, `trimAcai`): the `gender` table and the `same-as` of ACAI */
     acai?: string
+    /**
+     * The maps: `openbible` (`openbible/ancient.jsonl`) and `acaiPlaces` (`acai/places.json`, `trimAcaiPlaces`) give `geo`, `routes`, `born-in`, `died-in` and the
+     * `same-as` of places; they need `acai`. The three zips of Natural Earth (`basemap`) give the complement `basemap`.
+     */
+    maps?: { openbible: string; acaiPlaces: string; basemap?: { land: Uint8Array; lakes: Uint8Array; rivers: Uint8Array } }
   }
-}): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[] }> {
+}): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[]; complements: { complement: Complement; bytes: Uint8Array }[] }> {
   const refs = await o.source.resources(ORIGINALS)
   const books = o.books === undefined ? booksOf(refs) : canonical(o.books)
   const segments: BuiltSegment[] = []
@@ -731,6 +767,7 @@ export async function buildCommon(o: {
       const parsed = parseAcai(t.acai)
       acai = parsed.people
       res.acai = [ACAI_SOURCE.key, parsed.commit.slice(0, 8)]
+      if (t.maps !== undefined && parseAcaiPlaces(t.maps.acaiPlaces).commit !== parsed.commit) throw new Error('acai/places.json and acai/people.json are of different commits of ACAI')
       if (lang !== undefined) {
         twTitles = new Map()
         for (const ref of (await o.source.resources(lang)).filter((r) => r.kind === 'Translation Words').sort((a, b) => compareCodePoints(a.key, b.key))) {
@@ -745,7 +782,20 @@ export async function buildCommon(o: {
         }
       }
     }
-    const built = buildXtopics({ tipnr, events, obs, outlines, origs, res, twNames, ...(acai === undefined ? {} : { acai, twTitles }) })
+    let maps: MapsInput | undefined
+    if (t.maps !== undefined) {
+      if (t.acai === undefined) throw new Error('topics.maps needs topics.acai: the places of ACAI are read with the people')
+      maps = {
+        openbible: parseOpenBible(t.maps.openbible, issues),
+        acaiPlaces: parseAcaiPlaces(t.maps.acaiPlaces).places,
+        birthDeath: parseTheoBirthDeath(t.theographic, []),
+        routes: ROUTES,
+        exclude: BORN_DIED_EXCLUDE as MapsInput['exclude'],
+        placeNames: PLACE_NAMES,
+      }
+      res.openbible = [OPENBIBLE_SOURCE.key, OPENBIBLE_SOURCE.release]
+    }
+    const built = buildXtopics({ tipnr, events, obs, outlines, origs, res, twNames, ...(acai === undefined ? {} : { acai, twTitles }), ...(maps === undefined ? {} : { maps }) })
     report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
     const resWithoutUlt = built.core.res
     // The section map: the sections of the English ULT (its ts milestones), per book of the originals built
@@ -815,12 +865,22 @@ export async function buildCommon(o: {
       }
     }
     const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
+    // The maps are read by the core only (geo, routes, born-in, died-in, the places of ACAI): the parts keep the inputs and bytes of a build without them
+    const mapsRows =
+      t.maps === undefined
+        ? []
+        : [
+            { layer: 'topics', key: `openbible|${sha256Hex(t.maps.openbible)}` },
+            { layer: 'topics', key: `acai-places|${sha256Hex(t.maps.acaiPlaces)}` },
+            { layer: 'topics', key: `maps-lists|${sha256Hex(JSON.stringify([ROUTES, BORN_DIED_EXCLUDE, PLACE_NAMES]))}` },
+          ]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))
     // ACAI is read by the core only (gender, same-as): the parts keep the inputs and bytes of a build without it
     const acaiUsed = res.acai !== undefined && built.core.res.some(([key]) => key === res.acai![0])
+    const openbibleUsed = res.openbible !== undefined && built.core.res.some(([key]) => key === res.openbible![0])
     const acaiRows = acaiUsed ? [{ layer: 'topics', key: `acai|${sha256Hex(t.acai!)}` }] : []
     const stamps = [
-      ...resWithoutUlt.filter(([key]) => key !== res.acai?.[0]).map(([key, release]) => ({ key, stamp: release })),
+      ...resWithoutUlt.filter(([key]) => key !== res.acai?.[0] && key !== res.openbible?.[0]).map(([key, release]) => ({ key, stamp: release })),
       ...origs.map((orig) => ({ key: orig.key, stamp: orig.stamp })),
     ]
     const inputs = inputsOf(rows, stamps)
@@ -831,8 +891,9 @@ export async function buildCommon(o: {
       ...(built.core.obsFrames === undefined ? [] : [{ key: OBS_FRAMES_SOURCE.key, stamp: OBS_FRAMES_SOURCE.release }]),
       // ACAI's same-as compares its titles with those of the tW of the map language: that tW is an input of the core too
       ...(acaiUsed ? [{ key: res.acai![0], stamp: res.acai![1] }, ...twUsed] : []),
+      ...(openbibleUsed ? [{ key: res.openbible![0], stamp: res.openbible![1] }] : []),
     ]
-    const coreInputs = built.core.chunks === undefined && built.core.obsFrames === undefined && !acaiUsed ? inputs : inputsOf([...rows, ...chunkRows, ...frameRows, ...acaiRows], coreStamps)
+    const coreInputs = built.core.chunks === undefined && built.core.obsFrames === undefined && !acaiUsed && !openbibleUsed ? inputs : inputsOf([...rows, ...chunkRows, ...frameRows, ...acaiRows, ...mapsRows], coreStamps)
     segments.push(await builtSegment(xtopicsSegment(built.core), coreInputs))
     for (const part of built.parts) segments.push(await builtSegment(xtopicsSegment(part), inputs))
     const topicKeys = new Set(built.core.res.map(([key]) => key))
@@ -841,7 +902,11 @@ export async function buildCommon(o: {
       if (!topicKeys.has(key)) continue
       extra.push({ key, title: info.title, subject: 'Topics', release, license: info.license, attribution: info.attribution, books: bookSet(built.core.coverage.get(key)?.whole ?? []) })
     }
-    if (acaiUsed) extra.push({ key: res.acai![0], title: ACAI_CREDIT.title, subject: 'Topics', release: res.acai![1], license: ACAI_CREDIT.license, attribution: ACAI_CREDIT.attribution, books: bookSet([]) })
+    if (acaiUsed) {
+      const credit = acaiCredit(maps !== undefined)
+      extra.push({ key: res.acai![0], title: credit.title, subject: 'Topics', release: res.acai![1], license: credit.license, attribution: credit.attribution, books: bookSet([]) })
+    }
+    if (openbibleUsed) extra.push({ key: OPENBIBLE_SOURCE.key, title: OPENBIBLE_SOURCE.title, subject: 'Topics', release: OPENBIBLE_SOURCE.release, license: OPENBIBLE_SOURCE.license, attribution: OPENBIBLE_SOURCE.attribution, books: bookSet([]) })
     if (ult !== undefined && built.core.chunks !== undefined) {
       if (!listed.some((ref) => ref.key === ult.key)) listed.push(ult)
       used.add(ult.key)
@@ -853,8 +918,13 @@ export async function buildCommon(o: {
     }
   }
 
+  const complements: { complement: Complement; bytes: Uint8Array }[] = []
+  if (o.topics?.maps?.basemap !== undefined) {
+    const built = buildBasemap(o.topics.maps.basemap, report)
+    complements.push({ complement: { kind: 'basemap', id: sha256(built.bytes), size: built.bytes.length, media: 'application/cbor', version: '1', license: BASEMAP_LICENSE }, bytes: built.bytes })
+  }
   segments.sort(compareSegments)
   const resources = [...catalogResources(listed, used), ...extra].sort((a, b) => compareCodePoints(a.key, b.key))
-  const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources, segments })
-  return { segments, catalog, report }
+  const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources, segments, ...(complements.length === 0 ? {} : { complements: complements.map((c) => c.complement) }) })
+  return { segments, catalog, report, complements }
 }
