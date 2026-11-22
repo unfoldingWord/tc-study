@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { trimAcai } from '@bt-synergy/language-pack-v3'
+import { trimAcai, trimAcaiPlaces } from '@bt-synergy/language-pack-v3'
 import { main, toCrlf, type TopicSource, urlOf } from './fetch-topic-sources'
 import { manifestOf } from './tarball'
 import { tarGz } from './tarball.fixture'
@@ -27,10 +27,11 @@ const sha = (t: string | Uint8Array): string => createHash('sha256').update(t).d
 const TREE_FILES: [string, string][] = [
   ['people/json/Isaac.json', JSON.stringify({ id: 'person:Isaac', primary_id: 'person:Isaac', gender: 'male', localizations: { spa: { preferred_label: 'Isaac' } } })],
   ['people/json/Sarah.json', JSON.stringify({ id: 'person:Sarah', primary_id: 'person:Sarah', gender: 'female', localizations: { spa: { preferred_label: 'Sara' } } })],
+  ['places/json/Bethel.json', JSON.stringify({ id: 'place:Bethel', primary_id: 'place:Bethel', alternate_sources: { tipnr: ['Bethel@Gen.12.8-Zec'] }, place_types: { acai: ['town'] }, localizations: { spa: { preferred_label: 'Betel' } } })],
   ['README.md', 'not in the folder'],
 ]
 const treeFiles = (prefix: string) => new Map(TREE_FILES.filter(([p]) => p.startsWith(prefix)).map(([p, t]) => [p, new TextEncoder().encode(t)]))
-const trimmed = (s: TopicSource): string => trimAcai(new Map(TREE_FILES.filter(([p]) => p.startsWith(s.path))), s.commit, [])
+const trimmed = (s: TopicSource): string => (s.tree === 'acai-places' ? trimAcaiPlaces : trimAcai)(new Map(TREE_FILES.filter(([p]) => p.startsWith(s.path))), s.commit, [])
 
 /** The pins with the hashes of the fake bodies, and a fetch that serves them by URL. */
 function fake(corrupt?: string) {
@@ -48,7 +49,7 @@ function fake(corrupt?: string) {
     const s = byUrl.get(url)
     if (!s) return new Response('nope', { status: 404 })
     if (s.tree !== undefined) {
-      const files = s.name === corrupt ? TREE_FILES.map(([p, t]): [string, string] => [p, `${t} `]) : TREE_FILES
+      const files = corrupt !== undefined && urlOf(sources.find((x) => x.name === corrupt)!) === url ? TREE_FILES.map(([p, t]): [string, string] => [p, `${t} `]) : TREE_FILES
       return new Response(tarGz(`${s.repository.split('/')[1]}-${s.commit}`, files))
     }
     return new Response(s.name === corrupt ? 'tampered' : body(s))
@@ -126,8 +127,9 @@ describe('fetch-topic-sources', () => {
       'unfoldingWord/en_obs': commitOf('English OBS'),
       'bcv-commons/bible-story-builder': commitOf('Bible Story Builder'),
       'BibleAquifer/ACAI': commitOf('ACAI'),
+      'openbibleinfo/Bible-Geocoding-Data': commitOf('OpenBible.info'),
     }
-    for (const s of PINS.sources) expect(s.commit).toBe(want[s.repository])
+    for (const s of PINS.sources) if (s.host !== 'url') expect(s.commit).toBe(want[s.repository])
     const theo = [...md.matchAll(/`(events|people|places|verses)\.json` `([0-9a-f]{64})`/g)]
     expect(theo.length).toBe(4)
     for (const m of theo) expect(PINS.sources.find((s) => s.target === `theographic/${m[1]}.json`)?.sha256).toBe(m[2])
@@ -142,7 +144,15 @@ describe('fetch-topic-sources', () => {
     expect(acai.manifestSha256).toBe(/ACAI.*manifest sha256 `([0-9a-f]{64})`/.exec(md)![1])
     expect(acai.sha256).toBe(/ACAI.*trimmed file sha256 `([0-9a-f]{64})`/.exec(md)![1])
     expect(urlOf(acai)).toBe('https://codeload.github.com/BibleAquifer/ACAI/tar.gz/5375d0d334bb6d635ef1813e4d3df58eb30efcca')
-    expect(PINS.sources.length).toBe(1 + 4 + 50 + 50 + 1)
+    const places = PINS.sources.find((s) => s.name === 'acai-places')!
+    expect(places.commit).toBe(acai.commit)
+    expect(places.manifestSha256).toBe(/ACAI places.*manifest sha256 `([0-9a-f]{64})`/.exec(md)![1])
+    expect(places.sha256).toBe(/ACAI places.*trimmed file sha256 `([0-9a-f]{64})`/.exec(md)![1])
+    expect(PINS.sources.find((s) => s.name === 'openbible-ancient')?.sha256).toBe(/OpenBible.info Bible Geocoding.*sha256 of the file: `([0-9a-f]{64})`/.exec(md)![1])
+    for (const name of ['land', 'lakes', 'rivers_lake_centerlines']) {
+      expect(PINS.sources.find((s) => s.name === `naturalearth-${name}`)?.sha256).toBe(new RegExp(`\`ne_10m_${name}\.zip\` \`([0-9a-f]{64})\``).exec(md)![1])
+    }
+    expect(PINS.sources.length).toBe(1 + 4 + 50 + 50 + 1 + 1 + 1 + 3)
   })
 
   test('the URLs are raw GitHub for GitHub repositories and Door43 for the stories', () => {
@@ -150,6 +160,7 @@ describe('fetch-topic-sources', () => {
     expect(urls.find((u) => u.includes('TIPNR'))).toMatch(/^https:\/\/raw\.githubusercontent\.com\/STEPBible\/STEPBible-Data\/be4191f[0-9a-f]+\/Proper%20Nouns\/TIPNR%20-/)
     expect(urls.find((u) => u.endsWith('events.json'))).toMatch(/^https:\/\/raw\.githubusercontent\.com\/robertrouse\/theographic-bible-metadata\/744355c[0-9a-f]+\/json\/events\.json$/)
     expect(urls.find((u) => u.endsWith('01.md'))).toBe('https://git.door43.org/unfoldingWord/en_obs/raw/commit/d39a1dc7a7557ac54e4a8fecc3462147fe7eec3b/content/01.md')
+    expect(urls.filter((u) => u.startsWith('https://naciscdn.org/naturalearth/10m/physical/ne_10m_')).length).toBe(3)
     expect(urls.find((u) => u.endsWith('OBS/01/01.md'))).toBe('https://raw.githubusercontent.com/bcv-commons/bible-story-builder/c07d45395d01b987c31f4e06871314f129c975e8/templates/OBS/01/01.md')
   })
 })

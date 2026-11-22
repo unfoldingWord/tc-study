@@ -58,7 +58,7 @@ export { origView } from './read/orig'
 export { topicsView, xtopicsView } from './read/topics'
 export { BASEMAP_LAYERS, BASEMAP_MAX_BYTES, decodeBasemap, encodeBasemap } from './read/basemap'
 export { parseTipnr, type TipnrRecord } from './source/tipnr'
-export { ACAI_LANGS, ACAI_SOURCE, type AcaiPerson, parseAcai, splitLabel, trimAcai } from './source/acai'
+export { ACAI_LANGS, ACAI_SOURCE, type AcaiPerson, type AcaiPlace, parseAcai, parseAcaiPlaces, splitLabel, trimAcai, trimAcaiPlaces } from './source/acai'
 export { derivedPersonName, personName, twOfPeople } from './build/topics/people'
 export {
   type ComplementFile,
