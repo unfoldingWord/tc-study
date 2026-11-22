@@ -874,7 +874,7 @@ async function maps(): Promise<Map<string, Uint8Array>> {
   out.set('mapas/mapa-base-clave-extra.basemap', withB({ name: 'a key a later version adds' }))
   out.set('mapas/mapa-base-cerrado-de-2-puntos.basemap', withB({ count: encodeUvarints([2, 3, 2]), x: encodeDeltas([1000, 1500, 3500, 3600, 3550, 3500, 3600]), y: encodeDeltas([2300, 2300, 3200, 3200, 3300, 3000, 3400]) }))
   out.set('mapas/mapa-base-abierto-de-1-punto.basemap', withB({ count: encodeUvarints([4, 3, 1]), x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3600]), y: encodeDeltas([2300, 2300, 2800, 2800, 3200, 3200, 3300, 3400]) }))
-  out.set('mapas/mapa-base-capa-4.basemap', withB({ layer: encodeUvarints([1, 4, 3]) }))
+  out.set('mapas/mapa-base-capa-4-se-salta.basemap', withB({ layer: encodeUvarints([1, 4, 3]) }))
   out.set('mapas/mapa-base-punto-fuera.basemap', withB({ x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3500, 5300]) }))
   out.set('mapas/mapa-base-borde-dentro.basemap', withB({ x: encodeDeltas([800, 5200, 5200, 800, 3500, 3600, 3550, 3500, 3600]), y: encodeDeltas([2200, 2200, 4300, 4300, 3200, 3200, 3300, 3000, 3400]) }))
   out.set('mapas/mapa-base-x-corta.basemap', withB({ x: encodeDeltas([1000, 1500, 1500, 1000, 3500, 3600, 3550, 3500]) }))
@@ -884,6 +884,61 @@ async function maps(): Promise<Map<string, Uint8Array>> {
   out.set('mapas/mapa-base-sin-y.basemap', base({ bbox: good.bbox, layer: good.layer, count: good.count, x: good.x }))
   out.set('mapas/mapa-base-no-deflate.basemap', new Uint8Array([1, 2, 3, 4, 5]))
   out.set('mapas/mapa-base-bytes-de-mas.basemap', new Uint8Array([...withB({}), 0]))
+  // basemap (Corrección 1): more defects, and what a reader accepts (an empty map, a layer above 3 skipped)
+  // CBOR nested 70 levels deep, written by hand (the encoder refuses it): the last key's value 0 is replaced by 70 one-item arrays around 1
+  const deepBody = encodeDeterministic({ ...good, zzzzzz: 0 } as never)
+  const deep = deflateRaw(new Uint8Array([...deepBody.subarray(0, deepBody.length - 1), ...new Uint8Array(70).fill(0x81), 1]), { level: 9 })
+  out.set('mapas/mapa-base-inflado-de-mas.basemap', withB({ pad: new Uint8Array(4_300_000) }))
+  out.set('mapas/mapa-base-cortado.basemap', withB({}).subarray(0, withB({}).length - 4))
+  out.set('mapas/mapa-base-anidado-de-mas.basemap', deep)
+  out.set('mapas/mapa-base-bbox-fuera-del-globo.basemap', withB({ bbox: [800, 2200, 5200, 9100] }))
+  out.set('mapas/mapa-base-bbox-texto.basemap', withB({ bbox: 'text' }))
+  out.set('mapas/mapa-base-bbox-sur-mayor-que-norte.basemap', withB({ bbox: [800, 4300, 5200, 2200] }))
+  // a float in bbox, written by hand (the encoder refuses it): the first element, 800 (0x19 0x03 0x20), becomes the float64 800.5
+  const plain = encodeDeterministic(good as never)
+  const at800 = plain.findIndex((b, i) => b === 0x19 && plain[i + 1] === 0x03 && plain[i + 2] === 0x20)
+  const float = new Uint8Array(8)
+  new DataView(float.buffer).setFloat64(0, 800.5, false)
+  out.set('mapas/mapa-base-bbox-decimal.basemap', deflateRaw(new Uint8Array([...plain.subarray(0, at800), 0xfb, ...float, ...plain.subarray(at800 + 3)]), { level: 9 }))
+  out.set('mapas/mapa-base-capa-texto.basemap', withB({ layer: 'abc' }))
+  out.set('mapas/mapa-base-cuerpo-no-es-mapa.basemap', base([1, 2, 3] as never))
+  out.set('mapas/mapa-base-y-larga.basemap', withB({ y: encodeDeltas([2300, 2300, 2800, 2800, 3200, 3200, 3300, 3000, 3400, 3500]) }))
+  out.set('mapas/mapa-base-cuenta-menor-que-x.basemap', withB({ count: encodeUvarints([3, 3, 2]) }))
+  out.set('mapas/mapa-base-capa-0.basemap', withB({ layer: encodeUvarints([0, 2, 3]) }))
+  out.set('mapas/mapa-base-sin-capa.basemap', base({ bbox: good.bbox, count: good.count, x: good.x, y: good.y }))
+  out.set('mapas/mapa-base-vacio.basemap', withB({ layer: encodeUvarints([]), count: encodeUvarints([]), x: encodeDeltas([]), y: encodeDeltas([]) }))
+  out.set('mapas/mapa-base-capa-5-se-salta.basemap', withB({ layer: encodeUvarints([1, 5, 3]) }))
+  // geo: more defects, and the limits of the globe, which are valid
+  const only = (key: 'lat' | 'lon' | 'sure' | 'form', id: string, value: number) => ({ [key]: (i: string) => (i === id ? value : (geo[i]?.[key] ?? 0)) })
+  out.set('mapas/geo-latitud-negativa-fuera.seg', await write(withX({ geo: geoOf(only('lat', 'lug:jerusalem', -9001)) })))
+  out.set('mapas/geo-longitud-negativa-fuera.seg', await write(withX({ geo: geoOf(only('lon', 'lug:india', -18001)) })))
+  out.set('mapas/geo-sin-punto-con-longitud.seg', await write(withX({ geo: geoOf(only('lon', 'lug:abel', 1)) })))
+  out.set('mapas/geo-persona-con-forma.seg', await write(withX({ geo: geoOf(only('form', 'per:paul', 1)) })))
+  out.set('mapas/geo-persona-con-latitud.seg', await write(withX({ geo: geoOf(only('lat', 'per:paul', 5)) })))
+  out.set('mapas/geo-persona-con-longitud.seg', await write(withX({ geo: geoOf(only('lon', 'per:paul', 5)) })))
+  const shortColumn = (key: 'lat' | 'lon' | 'sure' | 'form') => {
+    const g = geoOf()
+    const full = geoOf({}, ids.length - 1)
+    return { ...g, [key]: full[key] }
+  }
+  for (const key of ['lat', 'lon', 'sure', 'form'] as const) out.set(`mapas/geo-columna-${key}-corta.seg`, await write(withX({ geo: shortColumn(key) })))
+  out.set('mapas/geo-limites-del-globo.seg', await write(withX({ geo: geoOf({ lat: (i) => (i === 'lug:abel' ? 9000 : i === 'lug:india' ? -9000 : (geo[i]?.lat ?? 0)), lon: (i) => (i === 'lug:abel' ? 18000 : i === 'lug:india' ? -18000 : (geo[i]?.lon ?? 0)), sure: (i) => (i === 'lug:abel' || i === 'lug:india' ? 1 : (geo[i]?.sure ?? 0)) }) })))
+  // routes: more defects, and an event with two routes, which is valid
+  out.set('mapas/rutas-parada-fuera-de-ids.seg', await write(withX({ routes: routeTable([ev], [2], [ant, ids.length + 3]) })))
+  out.set('mapas/rutas-sin-stops.seg', await write(withX({ routes: { event: encodeUvarints([ev]), count: encodeUvarints([2]) } })))
+  out.set('mapas/rutas-cuenta-0.seg', await write(withX({ routes: routeTable([ev], [0], []) })))
+  out.set('mapas/rutas-paradas-de-menos.seg', await write(withX({ routes: routeTable([ev], [3], [ant, sel]) })))
+  out.set('mapas/rutas-dos-rutas-de-un-evento.seg', await write(withX({ routes: routeTable([ev, ev], [2, 3], [ant, sel, ant, jer, sel]) })))
+  // places: more defects, and an id the common lacks, which is valid
+  const people = { names: { 'per:paul': 'Pablo' }, notes: {}, aliases: {} }
+  const topicsPart = topicsSegment({ lang: ES, part: 'act', names: new Map([['lug:jerusalem', [verseId('act', 9, 26)]]]) })
+  out.set('mapas/lugares-en-parte.seg', await write({ h: { ...topicsPart.h, tables: { ...topicsPart.h.tables, places: [1, false] } }, t: { ...topicsPart.t, places } as Segment['t'] }))
+  out.set('mapas/lugares-sin-names.seg', await write(withPlaces({ notes: places.notes, aliases: places.aliases })))
+  out.set('mapas/lugares-sin-notes.seg', await write(withPlaces({ names: places.names, aliases: places.aliases })))
+  out.set('mapas/lugares-names-no-es-mapa.seg', await write(withPlaces({ ...places, names: ['Jerusalén'] })))
+  out.set('mapas/lugares-valor-no-texto.seg', await write(withPlaces({ ...places, names: { 'lug:tarsus': 5 } })))
+  out.set('mapas/personas-con-id-de-lugar.seg', await write({ h: { ...lang.h, tables: { ...lang.h.tables, people: [1, false] } }, t: { ...lang.t, people: { ...people, names: { 'lug:jerusalem': 'Jerusalén' } } } as Segment['t'] }))
+  out.set('mapas/lugares-id-desconocido.seg', await write(withPlaces({ ...places, names: { ...places.names, 'lug:not-in-the-common': 'Lugar' } })))
   return out
 }
 

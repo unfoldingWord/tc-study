@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { MapSet, Topic, TopicsCore, XtopicsCore, XtopicsPart } from '@bt-synergy/language-pack-v3'
 import type { PackReader } from '../reader'
-import { distance, inMediterranean, passagePlaces, placeQuery, placesOf, route, trip, travelDays } from './geo'
+import { distance, inMediterranean, passagePlaces, placeQuery, type PlaceRef, placesOf, route, trip, travelDays } from './geo'
 
 const v = (book: number, chapter: number, verse: number): number => book * 1_000_000 + chapter * 1000 + verse
 const act = (c: number, x: number): number => v(44, c, x)
@@ -52,38 +52,49 @@ describe('travelDays: the vectors of the design (5.8)', () => {
   })
 })
 
+/** A place as an answer gives it: the tests of `trip` write only the point, certainty and form. */
+const ref = (p: { lat?: number; lon?: number; sure: 0 | 1 | 2 | 3; form: 1 | 2 | 3 | 4 | 5 }): PlaceRef => ({ id: 'lug:x', name: 'X', ...p })
+const tripOf = (a: Parameters<typeof ref>[0], b: Parameters<typeof ref>[0]) => trip(ref(a), ref(b))
+
 describe('trip', () => {
+  test('no point (sure 0, or no lat and lon): nothing to measure', () => {
+    const here = { lat: 31.78, lon: 35.22, sure: 3 as const, form: 1 as const }
+    expect(tripOf(here, { sure: 0, form: 1 })).toBeUndefined()
+    expect(tripOf({ ...here, sure: 0 }, here)).toBeUndefined()
+    expect(tripOf(here, { lat: 33, sure: 3, form: 1 })).toBeUndefined()
+    expect(tripOf({ lon: 35, sure: 3, form: 1 }, here)).toBeUndefined()
+  })
   const jerusalem = { lat: 31.78, lon: 35.22, sure: 3 as const, form: 1 as const }
   const damascus = { lat: 33.51, lon: 36.29, sure: 3 as const, form: 1 as const }
   test('land: foot and horse, no ship', () => {
-    const t = trip(jerusalem, damascus)!
+    const t = tripOf(jerusalem, damascus)!
     expect(t.days).toEqual({ foot: { low: 8, high: 11 }, horse: { low: 4, high: 6 } })
   })
   test('medium certainty: days are given and the certainty is the lowest of the two; low: no days', () => {
-    expect(trip(jerusalem, { ...damascus, sure: 2 })!.sure).toBe(2)
-    expect(trip(jerusalem, { ...damascus, sure: 2 })!.days).toBeDefined()
-    expect(trip(jerusalem, { ...damascus, sure: 1 })!.days).toBeUndefined()
+    expect(tripOf(jerusalem, { ...damascus, sure: 2 })!.sure).toBe(2)
+    expect(tripOf(jerusalem, { ...damascus, sure: 2 })!.days).toBeDefined()
+    expect(tripOf(jerusalem, { ...damascus, sure: 1 })!.days).toBeUndefined()
   })
   test('closer than 3 km: "next to", no days', () => {
-    const t = trip(jerusalem, { ...jerusalem, lat: 31.79 })!
+    const t = tripOf(jerusalem, { ...jerusalem, lat: 31.79 })!
     expect(t.near).toBe(true)
     expect(t.days).toBeUndefined()
   })
   test('a river or a region has no point to measure', () => {
-    expect(trip(jerusalem, { ...damascus, form: 3 })).toBeUndefined()
-    expect(trip(jerusalem, { ...damascus, form: 2 })).toBeUndefined()
+    expect(tripOf(jerusalem, { ...damascus, form: 3 })).toBeUndefined()
+    expect(tripOf(jerusalem, { ...damascus, form: 2 })).toBeUndefined()
   })
   test('ship: only between two ports of the Mediterranean', () => {
     const caesarea = { lat: 32.5, lon: 34.89, sure: 3 as const, form: 5 as const }
     const rome = { lat: 41.89, lon: 12.49, sure: 3 as const, form: 5 as const }
-    expect(trip(caesarea, rome)!.days!.ship).toBeDefined()
-    expect(trip(caesarea, { ...rome, form: 1 })!.days!.ship).toBeUndefined() // an inland city
+    expect(tripOf(caesarea, rome)!.days!.ship).toBeDefined()
+    expect(tripOf(caesarea, { ...rome, form: 1 })!.days!.ship).toBeUndefined() // an inland city
     const aqaba = { lat: 29.53, lon: 35, sure: 3 as const, form: 5 as const } // the Red Sea: latitude below 30
-    expect(trip(caesarea, aqaba)!.days!.ship).toBeUndefined()
+    expect(tripOf(caesarea, aqaba)!.days!.ship).toBeUndefined()
     const trebizond = { lat: 41.0, lon: 39.7, sure: 3 as const, form: 5 as const } // the Black Sea: longitude above 37
-    expect(trip(caesarea, trebizond)!.days!.ship).toBeUndefined()
+    expect(tripOf(caesarea, trebizond)!.days!.ship).toBeUndefined()
     const sinope = { lat: 42.03, lon: 35.15, sure: 3 as const, form: 5 as const } // the Black Sea: latitude above 41, longitude above 26
-    expect(trip(caesarea, sinope)!.days!.ship).toBeUndefined()
+    expect(tripOf(caesarea, sinope)!.days!.ship).toBeUndefined()
     expect(inMediterranean(rome)).toBe(true)
   })
 })
@@ -122,7 +133,10 @@ const core: XtopicsCore = {
     { from: 'tw:names/antioch', to: 'lug:antioch', type: 'same-as', source: TIPNR, confidence: 70 },
   ],
   geo: GEO,
-  routes: [{ event: 'ev:journey', stops: ['lug:antioch', 'lug:seleucia', 'lug:salamis', 'lug:perga', 'lug:antioch'] }],
+  routes: [
+    { event: 'ev:journey', stops: ['lug:antioch', 'lug:seleucia', 'lug:salamis', 'lug:perga', 'lug:antioch'] },
+    { event: 'ev:journey', stops: ['lug:antioch', 'lug:perga'] }, // an alternative route of the same event
+  ],
 }
 const parts = new Map<string, XtopicsPart>([['act', { part: 'act', occurrences: new Map(Object.entries(VERSES)) }]])
 const topics: TopicsCore = {
@@ -204,6 +218,13 @@ describe('route', () => {
       ['lug:antioch', act(14, 26)],
     ])
   })
+  test('an event with two routes: the first by default, the other by its index, and how many there are', async () => {
+    const first = await route(reader(), 'ev:journey')
+    expect([first.data!.index, first.data!.count]).toEqual([0, 2])
+    const second = await route(reader(), 'ev:journey', 1)
+    expect(second.data!.stops.map((x) => x.place.id)).toEqual(['lug:antioch', 'lug:perga'])
+    expect((await route(reader(), 'ev:journey', 2)).data).toBeNull()
+  })
   test('no routes table, or an event without a route: null', async () => {
     expect((await route(reader({ routes: false }), 'ev:journey')).data).toBeNull()
     expect((await route(reader(), 'ev:other')).data).toBeNull()
@@ -230,5 +251,30 @@ describe('the sample built with the maps (buildSample({ geo: true }))', () => {
     expect(x?.res.map(([k]) => k)).toContain('openbibleinfo/Bible-Geocoding-Data')
     expect(Object.keys(t?.places?.names ?? {}).length).toBeGreaterThan(0)
     expect([...(sample.complements?.values() ?? [])].map((b) => decodeBasemap(b).paths.length)).toEqual([3])
+  })
+});
+
+describe('the samples for old clients (old-clients.ts --geo and --geo-bad)', () => {
+  test('the geo sample has a route and a born-in; the bad-rows sample has the same tables and a common core a reader of this version rejects', async () => {
+    const { buildSample } = await import('../../test/sample')
+    const { KNOWN, readHeader, readSegment, xtopicsView } = await import('@bt-synergy/language-pack-v3')
+    const read = async (badRows: boolean): Promise<XtopicsCore | 'rejected'> => {
+      const sample = await buildSample({ geo: true, badRows })
+      for (const bytes of sample.segments.values()) {
+        const h = readHeader(bytes).header.h as { class?: string; part?: string }
+        if (h.class !== 'xtopics' || h.part !== 'core') continue
+        try {
+          return xtopicsView((await readSegment(bytes, { known: KNOWN.xtopics })).seg) as XtopicsCore
+        } catch {
+          return 'rejected'
+        }
+      }
+      throw new Error('no core')
+    }
+    const good = await read(false)
+    expect(good).not.toBe('rejected')
+    expect((good as XtopicsCore).routes).toEqual([{ event: 'ev:exodus-from-egypt', stops: ['lug:egypt', 'lug:jerusalem'] }])
+    expect((good as XtopicsCore).relations?.some((r) => r.type === 'born-in' && r.from === 'per:abraham' && r.to === 'lug:ur')).toBe(true)
+    expect(await read(true)).toBe('rejected')
   })
 });

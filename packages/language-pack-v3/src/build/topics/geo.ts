@@ -59,7 +59,8 @@ export function haversineKm(a: { lat: number; lon: number }, b: { lat: number; l
   return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
-const scaled = (degrees: number): number => Math.round(degrees * 100)
+/** Degrees x 100: `Math.round` of the float64 product (half toward +infinity); `+ 0` turns a -0 into 0. */
+const scaled = (degrees: number): number => Math.round(degrees * 100) + 0
 
 /**
  * The `geo` of every place of `topics` (kind place, id `lug:`). `lugOfRef` and `acaiByLug` are the joins the caller made; `records` are the TIPNR

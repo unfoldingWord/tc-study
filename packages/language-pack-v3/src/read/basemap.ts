@@ -12,13 +12,14 @@ import { deflateRaw, Inflate } from 'pako'
 import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic } from '../codec/cbor'
 import { ColumnError, decodeDeltas, decodeUvarints, encodeDeltas, encodeUvarints } from '../codec/columns'
 import { FormatError } from '../codec/errors'
+import { sha256 } from '../codec/sha256'
 import { hasOwn, isMap } from '../codec/values'
 import type { Basemap, BasemapPath } from '../model'
 
 /** The most a basemap inflates to: 4 MiB. */
 export const BASEMAP_MAX_BYTES = 4_194_304
 
-/** The layers: 1 land, 2 lake (both closed), 3 river (open). */
+/** The layers this version draws: 1 land, 2 lake (both closed), 3 river (open). A layer above 3 is skipped by a reader (not an error), so a new layer needs no new version. */
 export const BASEMAP_LAYERS = [1, 2, 3] as const
 
 function bad(what: string): never {
@@ -34,8 +35,9 @@ function checkShape(bbox: number[], layer: number[], count: number[], x: number[
   if (layer.length !== count.length) bad('layer and count have different lengths')
   let total = 0
   layer.forEach((l, i) => {
-    if (l < 1 || l > 3) bad(`layer[${i}] is ${l}`)
-    if (count[i] < (l === 3 ? 2 : 3)) bad(`path ${i} has ${count[i]} points, too few for ${l === 3 ? 'an open' : 'a closed'} path`)
+    if (l < 1) bad(`layer[${i}] is ${l}`)
+    // a layer above 3 is a later version's: it has to add up in x and y like any path, and is skipped when the paths are read
+    if (l <= 3 && count[i] < (l === 3 ? 2 : 3)) bad(`path ${i} has ${count[i]} points, too few for ${l === 3 ? 'an open' : 'a closed'} path`)
     total += count[i]
   })
   if (x.length !== total || y.length !== total) bad(`x and y have ${x.length} and ${y.length} values, and count adds up to ${total}`)
@@ -44,21 +46,33 @@ function checkShape(bbox: number[], layer: number[], count: number[], x: number[
   }
 }
 
-/** The bytes of a basemap; throws `E_BODY` for a model the reader would reject. */
-export function encodeBasemap(model: Basemap): Uint8Array {
+/**
+ * The inflated bytes of a basemap (the CBOR map); throws `E_BODY` for a model the reader would reject. Its sha256 is the `id` of the complement
+ * (`catalog.md`), like a segment's: it does not depend on the compressor.
+ */
+export function basemapBody(model: Basemap): Uint8Array {
   const layer = model.paths.map((p) => p.layer as number)
   const count = model.paths.map((p) => p.points.length)
   const x = model.paths.flatMap((p) => p.points.map((pt) => pt[0]))
   const y = model.paths.flatMap((p) => p.points.map((pt) => pt[1]))
   checkShape([...model.bbox], layer, count, x, y)
-  const body = encodeDeterministic({
+  return encodeDeterministic({
     bbox: [...model.bbox],
     layer: encodeUvarints(layer),
     count: encodeUvarints(count),
     x: encodeDeltas(x),
     y: encodeDeltas(y),
   } as unknown as CborValue)
-  return deflateRaw(body, { level: 9 })
+}
+
+/** The bytes of a basemap complement: {@link basemapBody} compressed with deflate-raw. */
+export function encodeBasemap(model: Basemap): Uint8Array {
+  return deflateRaw(basemapBody(model), { level: 9 })
+}
+
+/** The `id` the catalog lists for a basemap complement: the sha256 of its inflated bytes. Throws {@link FormatError} `E_INFLATE` when the bytes do not inflate. */
+export function basemapId(bytes: Uint8Array): Uint8Array {
+  return sha256(inflate(bytes))
 }
 
 interface InflateState {
@@ -96,8 +110,12 @@ function inflate(bytes: Uint8Array): Uint8Array {
 }
 
 /** The basemap the bytes hold. Throws {@link FormatError} (`E_INFLATE`, `E_LIMIT` or `E_BODY`) at the first defect; a key the schema does not list is ignored. */
-export function decodeBasemap(bytes: Uint8Array): Basemap {
+export function decodeBasemap(bytes: Uint8Array, expectedId?: Uint8Array): Basemap {
   const body = inflate(bytes)
+  if (expectedId !== undefined) {
+    const id = sha256(body)
+    if (id.length !== expectedId.length || id.some((b, i) => b !== expectedId[i])) throw new FormatError('E_ID', 'the sha256 of the inflated basemap is not the id the catalog lists')
+  }
   let value: CborValue
   try {
     value = decodeCbor(body)
@@ -123,7 +141,7 @@ export function decodeBasemap(bytes: Uint8Array): Basemap {
     layer.forEach((l, i) => {
       const points: [number, number][] = []
       for (let k = 0; k < count[i]; k++, at++) points.push([x[at], y[at]])
-      paths.push({ layer: l as 1 | 2 | 3, points })
+      if (l <= 3) paths.push({ layer: l as 1 | 2 | 3, points })
     })
     const [w, s, e, n] = bbox as number[]
     return { bbox: [w, s, e, n], paths }

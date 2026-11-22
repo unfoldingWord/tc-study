@@ -61,7 +61,8 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 type TheoFiles = { events: string; verses: string; people: string; places: string }
 
 /** The verse of each verse record, and the people and the places with the verses they have. */
-function load(files: TheoFiles, issues: string[]): { people: Named; places: Named; rawPeople: Rec[]; verseOf: Map<string, number> } {
+type Loaded = { people: Named; places: Named; rawPeople: Rec[]; verseOf: Map<string, number> }
+function load(files: TheoFiles, issues: string[]): Loaded {
   // Verse record id -> verse id (OSIS reference, no versification conversion).
   const verseOf = new Map<string, number>()
   for (const r of records(files.verses, 'verses', issues)) {
@@ -92,9 +93,10 @@ function load(files: TheoFiles, issues: string[]): { people: Named; places: Name
         const id = verseOf.get(v)
         if (id !== undefined) verses.add(id)
       }
-      const lat = Number(r.fields.openBibleLat ?? r.fields.latitude)
-      const lon = Number(r.fields.openBibleLong ?? r.fields.longitude)
-      const has = (r.fields.openBibleLat ?? r.fields.latitude) !== undefined && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+      const number = (v: unknown): number => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : Number.NaN)
+      const lat = number(r.fields.openBibleLat ?? r.fields.latitude)
+      const lon = number(r.fields.openBibleLong ?? r.fields.longitude)
+      const has = Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
       map.set(r.id, has ? { name, verses, point: { lat, lon } } : { name, verses })
     }
     return map
@@ -105,9 +107,13 @@ function load(files: TheoFiles, issues: string[]): { people: Named; places: Name
 
 /**
  * The birth and death places of Theographic's people (`birthPlace`, `deathPlace`), for `born-in` and `died-in`. Anything that cannot be used goes to `issues`.
+ * Reads the files again: {@link parseTheographicAll} reads them once for both.
  */
 export function parseTheoBirthDeath(files: TheoFiles, issues: string[]): TheoBirthDeath[] {
-  const { people, places, rawPeople } = load(files, issues)
+  return birthDeathFrom(load(files, issues), issues)
+}
+
+function birthDeathFrom({ people, places, rawPeople }: Loaded, issues: string[]): TheoBirthDeath[] {
   const out: TheoBirthDeath[] = []
   for (const r of rawPeople) {
     const person = people.get(r.id)
@@ -131,11 +137,18 @@ export function parseTheoBirthDeath(files: TheoFiles, issues: string[]): TheoBir
 }
 
 /** Parses the events of Theographic. Anything that cannot be used is described in `issues`. */
-export function parseTheographic(
-  files: TheoFiles,
-  issues: string[],
-): TheoEvent[] {
-  const { people, places, verseOf } = load(files, issues)
+export function parseTheographic(files: TheoFiles, issues: string[]): TheoEvent[] {
+  return eventsFrom(files, issues, load(files, issues))
+}
+
+/** The events and the births and deaths of Theographic, reading the four files once; what cannot be used goes to `issues` once. */
+export function parseTheographicAll(files: TheoFiles, issues: string[]): { events: TheoEvent[]; birthDeath: TheoBirthDeath[] } {
+  const loaded = load(files, issues)
+  return { events: eventsFrom(files, issues, loaded), birthDeath: birthDeathFrom(loaded, issues) }
+}
+
+function eventsFrom(files: TheoFiles, issues: string[], loaded: Loaded): TheoEvent[] {
+  const { people, places, verseOf } = loaded
 
   const raw = records(files.events, 'events', issues)
     .filter((r) => {

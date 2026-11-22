@@ -183,15 +183,12 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     t.geo = { lat: encodeDeltas(lat), lon: encodeDeltas(lon), sure: encodeUvarints(sure), form: encodeUvarints(form) }
   }
   if (m.routes !== undefined) {
-    const events = new Set<string>()
     const event: number[] = []
     const count: number[] = []
     const stops: number[] = []
     for (const r of m.routes) {
       const e = number.get(r.event)
       if (e === undefined || m.topics.get(r.event)!.kind !== 'event') throw new Error(`routes: ${JSON.stringify(r.event)} is not an event of the topics`)
-      if (events.has(r.event)) throw new Error(`routes: ${JSON.stringify(r.event)} has two routes`)
-      events.add(r.event)
       if (r.stops.length < 2) throw new Error(`routes: ${JSON.stringify(r.event)} has fewer than 2 stops`)
       r.stops.forEach((id, i) => {
         if (!number.has(id) || m.topics.get(id)!.kind !== 'place') throw new Error(`routes: the stop ${JSON.stringify(id)} of ${JSON.stringify(r.event)} is not a place of the topics`)

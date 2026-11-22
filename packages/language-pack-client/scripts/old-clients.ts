@@ -25,6 +25,11 @@
  * the `basemap` complement, and its es-419 topics core has `places` (`buildSample({ geo: true })`); the other is the sample as it is. An old client must
  * install and read both alike (it skips the optional tables it does not know and ignores the complement). PASS = identical `semantic`.
  *   bun packages/language-pack-client/scripts/old-clients.ts --geo [ref ...]
+ *
+ * With `--geo-bad` the "with" sample is the same, except that the new tables of the common xtopics core (`geo`, `routes`) carry rows that a reader of this
+ * version rejects (the "bad rows in new tables" case of `diseno-mapas.md` 3.8). An old client does not know the tables, so it must read it like the plain sample,
+ * people and family included (the runner reads `people()` and `family('per:isaac')` when the ref has them).
+ *   bun packages/language-pack-client/scripts/old-clients.ts --geo-bad [ref ...]
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -37,8 +42,9 @@ import { buildSample, type Sample } from '../test/sample'
 
 const frames = process.argv.includes('--frames')
 const kin = process.argv.includes('--kin')
-const geo = process.argv.includes('--geo')
-const given = process.argv.slice(2).filter((a) => a !== '--frames' && a !== '--kin' && a !== '--geo')
+const geoBad = process.argv.includes('--geo-bad')
+const geo = process.argv.includes('--geo') || geoBad
+const given = process.argv.slice(2).filter((a) => a !== '--frames' && a !== '--kin' && a !== '--geo' && a !== '--geo-bad')
 const refs = given.length > 0 ? given : ['569b88a6', '302631d4']
 
 function run(cmd: string, args: string[], cwd: string): { code: number; out: string } {
@@ -85,7 +91,7 @@ const client = createClient({ store, source, trust: { trustedKeys: { [keyId]: by
 const refresh = await client.refresh('es-419')
 const install = await client.install('es-419', { books: ['tit'] })
 const r = await client.open('es-419')
-const obs = await r.obs()
+const obs = r.obs ? await r.obs() : null
 const tit = await r.book('tit')
 const out = {
   refresh: { names: refresh.catalogs.map((c) => c.name), unchanged: refresh.unchanged, updates: refresh.updates },
@@ -99,6 +105,8 @@ const safe = async (f) => { try { return await f() } catch (e) { return 'error: 
 const stories = await safe(async () => (await r.stories('tit 1:1')).data)
 const sections = await safe(async () => (r.sections ? (await r.sections('tit')).data : 'no sections query'))
 const maps = await safe(async () => Object.keys(await r.maps()).filter((k) => k !== 'revision').sort())
+const people = await safe(async () => (r.people ? (await r.people()).data.length : 'no people query'))
+const family = await safe(async () => (r.family ? (await r.family('per:isaac')).data.children.map((c) => c.id) : 'no family query'))
 out.semantic = {
   maps,
   refresh: out.refresh.names,
@@ -108,6 +116,8 @@ out.semantic = {
   read: out.read,
   stories,
   sections,
+  people,
+  family,
 }
 console.log(JSON.stringify(out, null, 1))
 `
@@ -130,7 +140,7 @@ async function main(): Promise<number> {
   const withDir = join(tmp, 'packs-with')
   const withoutDir = join(tmp, 'packs-without')
   // with --frames: the "with" folder is a sample whose common xtopics core has obs-frames (its own keys)
-  const withSample = frames ? await buildSample({ frames: framesFixture() }) : kin ? await buildSample({ acai: true }) : geo ? await buildSample({ geo: true }) : sample
+  const withSample = frames ? await buildSample({ frames: framesFixture() }) : kin ? await buildSample({ acai: true }) : geo ? await buildSample({ geo: true, badRows: geoBad }) : sample
   if (geo) {
     // the control: the "with" sample has geo in the common xtopics core, places in the es-419 topics core and a complement in the common catalog
     const tablesOf = (smp: Sample): string[] => {
@@ -142,8 +152,22 @@ async function main(): Promise<number> {
       return out.sort()
     }
     const [w, wo] = [tablesOf(withSample), tablesOf(sample)]
-    if (w.join() !== 'topics.places,xtopics.geo' || wo.length !== 0 || withSample.complements?.size !== 1) throw new Error(`the samples are not what they should be: ${w.join() || 'none'} and ${wo.join() || 'none'}, ${withSample.complements?.size ?? 0} complements`)
-    console.log(`control: the "with" sample has ${w.join(' and ')} and a basemap complement, the other none`)
+    if (w.join() !== 'topics.places,xtopics.geo,xtopics.routes' || wo.length !== 0 || withSample.complements?.size !== 1) throw new Error(`the samples are not what they should be: ${w.join() || 'none'} and ${wo.join() || 'none'}, ${withSample.complements?.size ?? 0} complements`)
+    // the control reads the core of the "with" sample: a route and a born-in, or (bad rows) a reader of this version rejects it
+    for (const bytes of withSample.segments.values()) {
+      const h = readHeader(bytes).header.h as { class?: unknown; part?: unknown }
+      if (h.class !== 'xtopics' || h.part !== 'core') continue
+      let core: XtopicsCore | undefined
+      try {
+        core = xtopicsView((await readSegment(bytes, { known: KNOWN.xtopics })).seg) as XtopicsCore
+      } catch {
+        core = undefined
+      }
+      if (geoBad) {
+        if (core !== undefined) throw new Error('the bad-rows sample is read by a reader of this version: it should be rejected')
+      } else if (core === undefined || (core.routes?.length ?? 0) < 1 || !(core.relations ?? []).some((r) => r.type === 'born-in')) throw new Error('the geo sample has no route or no born-in')
+    }
+    console.log(`control: the "with" sample has ${w.join(' and ')}, a born-in, and a basemap complement${geoBad ? ', and its geo and routes rows are bad' : ''}; the other has none`)
     writePacks(withDir, withSample)
   } else if (kin) {
     // the control: the "with" sample has gender in the common xtopics core and people in the es-419 topics core, the other has neither
@@ -176,7 +200,7 @@ async function main(): Promise<number> {
   }
   else writePacks(withDir, sample, await buildObsimgFixture(sample))
   writePacks(withoutDir, sample)
-  console.log(`packs: ${withDir} (with ${frames ? 'obs-frames' : kin ? 'gender and people' : geo ? 'geo, places and basemap' : 'zxx-obsimg'}), ${withoutDir} (without)`)
+  console.log(`packs: ${withDir} (with ${frames ? 'obs-frames' : kin ? 'gender and people' : geoBad ? 'bad geo and routes rows, places and basemap' : geo ? 'geo, places and basemap' : 'zxx-obsimg'}), ${withoutDir} (without)`)
 
   let failures = 0
   for (const ref of refs) {
@@ -197,7 +221,7 @@ async function main(): Promise<number> {
         const d = JSON.parse(a.out) as { state: { units: object }; read: unknown }
         console.log(`  units: ${Object.keys(d.state.units).join(', ')}\n  read: ${JSON.stringify(d.read)}`)
         if (frames || kin || geo) console.log(`  semantic: ${semantic(a.out).slice(0, 600)}`)
-        console.log(`PASS ${ref}: identical ${frames ? 'reads with and without obs-frames' : kin ? 'reads with and without gender and people' : geo ? 'reads with and without geo, places and the basemap' : 'dumps with and without zxx-obsimg'} (${a.out.length} chars)`)
+        console.log(`PASS ${ref}: identical ${frames ? 'reads with and without obs-frames' : kin ? 'reads with and without gender and people' : geoBad ? 'reads with and without (bad rows of) geo and routes, places and the basemap' : geo ? 'reads with and without geo, places and the basemap' : 'dumps with and without zxx-obsimg'} (${a.out.length} chars)`)
       } else {
         failures++
         console.log(`FAIL ${ref}: the dumps differ\n--- with:\n${a.out.slice(0, 1500)}\n--- without:\n${b.out.slice(0, 1500)}`)

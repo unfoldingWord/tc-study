@@ -1,0 +1,56 @@
+{
+  "coverage": {
+    "es-419_gl/es-419/glt": {
+      "whole": [
+        "act"
+      ]
+    }
+  },
+  "h": {
+    "class": "topics",
+    "lang": "es-419",
+    "part": "core",
+    "res": [
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "names": [
+        1,
+        true
+      ],
+      "places": [
+        1,
+        false
+      ]
+    },
+    "v": 1
+  },
+  "id": "c7fb8bcc3c789fe3c277c5029d21774f8db2dd6ee25db8f183b2413358d11c23",
+  "names": {},
+  "places": {
+    "aliases": {
+      "Luz": [
+        "lug:bethel-gen-12-8"
+      ],
+      "Sion": [
+        "lug:jerusalem"
+      ]
+    },
+    "names": {
+      "lug:jerusalem": "Jerusalén",
+      "lug:not-in-the-common": "Lugar",
+      "lug:tarsus": "Tarso"
+    },
+    "notes": {
+      "lug:bethel-gen-12-8": "de Efraín",
+      "lug:bethel-jos-19-4": "de Simeón"
+    }
+  }
+}

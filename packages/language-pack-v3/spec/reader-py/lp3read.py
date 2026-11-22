@@ -2086,11 +2086,10 @@ def _xtopics_routes(t, ids: list[str], topics: dict) -> list:
     event, count, stops = uvarints(t["event"]), uvarints(t["count"]), uvarints(t["stops"])
     if len(event) != len(count) or len(stops) != sum(count):
         _bad()
-    out, at, seen = [], 0, set()
+    out, at = [], 0
     for e, c in zip(event, count):
-        if e >= len(ids) or topics[ids[e]]["kind"] != "event" or e in seen or c < 2:
+        if e >= len(ids) or topics[ids[e]]["kind"] != "event" or c < 2:
             _bad()
-        seen.add(e)
         run = stops[at:at + c]
         at += c
         if any(s >= len(ids) or topics[ids[s]]["kind"] != "place" for s in run) or any(a == b for a, b in zip(run, run[1:])):
@@ -2491,8 +2490,10 @@ def read_file(data: bytes, expect: str | None = None, trusted: dict | None = Non
 BASEMAP_MAX = 4194304                       # the most a basemap inflates to (catalog.md)
 
 
-def read_basemap(data: bytes) -> dict:
-    """The reader output of a ``basemap`` complement file (catalog.md, "The basemap complement"): ``{"bbox", "paths"}`` or ``{"error": code}``."""
+def read_basemap(data: bytes, expected_id: bytes | None = None) -> dict:
+    """The reader output of a ``basemap`` complement file (catalog.md, "The basemap complement"): ``{"bbox", "paths"}`` or ``{"error": code}``.
+
+    ``expected_id``: the id the catalog lists, the sha256 of the inflated bytes; another one is ``E_ID``. A layer above 3 is skipped, not drawn, not an error."""
     try:
         inflater = zlib.decompressobj(-15)
         try:
@@ -2501,6 +2502,8 @@ def read_basemap(data: bytes) -> dict:
             _fail("E_INFLATE")
         if len(body) > BASEMAP_MAX or not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
             _fail("E_INFLATE")
+        if expected_id is not None and hashlib.sha256(body).digest() != expected_id:
+            _fail("E_ID")
         try:
             doc = _cbor_one(body)
         except _TooDeep:
@@ -2521,7 +2524,7 @@ def read_basemap(data: bytes) -> dict:
         x, y = deltas(doc["x"], -MAX_INT), deltas(doc["y"], -MAX_INT)
         if len(layer) != len(count):
             _bad()
-        if any(not 1 <= l <= 3 or c < (2 if l == 3 else 3) for l, c in zip(layer, count)):
+        if any(l < 1 or (l <= 3 and c < (2 if l == 3 else 3)) for l, c in zip(layer, count)):
             _bad()
         if len(x) != sum(count) or len(y) != len(x):
             _bad()
@@ -2529,7 +2532,8 @@ def read_basemap(data: bytes) -> dict:
             _bad()
         paths, at = [], 0
         for l, c in zip(layer, count):
-            paths.append({"layer": l, "points": [[x[at + k], y[at + k]] for k in range(c)]})
+            if l <= 3:
+                paths.append({"layer": l, "points": [[x[at + k], y[at + k]] for k in range(c)]})
             at += c
         return {"bbox": bbox, "paths": paths}
     except LP3Error as e:

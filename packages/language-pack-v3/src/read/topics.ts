@@ -317,12 +317,9 @@ function readRoutes(value: unknown, topics: Map<string, Topic>): Route[] {
   let total = 0
   for (const c of count) total += c
   if (stops.length !== total) xbad(`routes.stops has ${stops.length} entries, and routes.count adds up to ${total}`)
-  const seen = new Set<number>()
   let at = 0
   return event.map((e, i) => {
     if (e >= ids.length || topics.get(ids[e])!.kind !== 'event') xbad(`routes.event[${i}] is not a topic of kind event`)
-    if (seen.has(e)) xbad(`routes.event repeats ${JSON.stringify(ids[e])}`)
-    seen.add(e)
     if (count[i] < 2) xbad(`routes.count[${i}] is ${count[i]}, below 2`)
     const list: string[] = []
     for (let k = 0; k < count[i]; k++) {

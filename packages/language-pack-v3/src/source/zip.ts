@@ -3,7 +3,7 @@
  * shapefile zips, whose sha256 the pins check before anything is read. Not supported (an `Error`): encryption, ZIP64, other methods, a
  * multi-disk archive. The size of an entry is limited (`MAX_ENTRY`). Uses `pako`; no Node module is used.
  */
-import { inflateRaw } from 'pako'
+import { Inflate } from 'pako'
 
 /** The largest entry read (bytes): the biggest Natural Earth file here is 10 MB. */
 export const MAX_ENTRY = 64 * 1024 * 1024
@@ -11,8 +11,29 @@ export const MAX_ENTRY = 64 * 1024 * 1024
 const u16 = (b: Uint8Array, at: number): number => b[at] | (b[at + 1] << 8)
 const u32 = (b: Uint8Array, at: number): number => (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (b[at + 3] << 24)) >>> 0
 
+/** Inflates a deflate-raw entry, stopping as soon as it passes {@link MAX_ENTRY} (a zip bomb is never held whole). */
+function inflateLimited(data: Uint8Array, name: string, max: number): Uint8Array {
+  const inflator = new Inflate({ raw: true })
+  const chunks: Uint8Array[] = []
+  let total = 0
+  inflator.onData = (chunk) => {
+    total += (chunk as Uint8Array).length
+    if (total > max) throw new Error(`zip: ${name} inflates to more than ${max} bytes`)
+    chunks.push(chunk as Uint8Array)
+  }
+  inflator.push(data, true)
+  if (inflator.err !== 0) throw new Error(`zip: ${name} does not inflate`)
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const c of chunks) {
+    out.set(c, at)
+    at += c.length
+  }
+  return out
+}
+
 /** The entries of a ZIP archive, by name. Throws `Error` for anything that is not a plain ZIP or for an entry above {@link MAX_ENTRY}. */
-export function readZip(bytes: Uint8Array): Map<string, Uint8Array> {
+export function readZip(bytes: Uint8Array, maxEntry = MAX_ENTRY): Map<string, Uint8Array> {
   let end = -1
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65535); i--) {
     if (u32(bytes, i) === 0x06054b50) {
@@ -40,17 +61,15 @@ export function readZip(bytes: Uint8Array): Map<string, Uint8Array> {
     at += 46 + nameLength + extra + comment
     if ((flags & 1) !== 0) throw new Error(`zip: ${name} is encrypted`)
     if (name.endsWith('/')) continue
-    if (length > MAX_ENTRY) throw new Error(`zip: ${name} is larger than ${MAX_ENTRY} bytes`)
+    if (length > maxEntry) throw new Error(`zip: ${name} is larger than ${maxEntry} bytes`)
     if (u32(bytes, local) !== 0x04034b50) throw new Error(`zip: the local header of ${name} is damaged`)
     const start = local + 30 + u16(bytes, local + 26) + u16(bytes, local + 28)
     if (start + size > bytes.length) throw new Error(`zip: ${name} is cut short`)
     const data = bytes.subarray(start, start + size)
     let body: Uint8Array
     if (method === 0) body = data
-    else if (method === 8) {
-      const inflated = inflateRaw(data)
-      body = inflated
-    } else throw new Error(`zip: ${name} uses the method ${method}, which is not supported`)
+    else if (method === 8) body = inflateLimited(data, name, maxEntry)
+    else throw new Error(`zip: ${name} uses the method ${method}, which is not supported`)
     if (body.length !== length) throw new Error(`zip: ${name} has ${body.length} bytes, its entry says ${length}`)
     if (out.has(name)) throw new Error(`zip: ${name} is in it twice`)
     out.set(name, body)

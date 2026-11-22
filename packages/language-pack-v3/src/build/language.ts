@@ -32,7 +32,7 @@
  */
 import { compareCodePoints } from '../codec/columns'
 import type { Segment } from '../codec/container'
-import { sha256, sha256Hex } from '../codec/sha256'
+import { sha256Hex } from '../codec/sha256'
 import { BOOKS, bookNumber, bookSet } from '../ids'
 import type { About, ArticleModel, BookModel, CatalogResource, Complement, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
@@ -70,7 +70,7 @@ import ROUTES from './topics/routes.json'
 import { parseOpenBible } from '../source/openbible'
 import { parseObsRefs } from '../source/obsRefs'
 import { ACAI_SOURCE, type AcaiPerson, type AcaiPlace, parseAcai, parseAcaiPlaces } from '../source/acai'
-import { parseTheoBirthDeath, parseTheographic } from '../source/theographic'
+import { parseTheographic, parseTheographicAll } from '../source/theographic'
 import { parseTipnr } from '../source/tipnr'
 import type { XmapCore, XmapPart, XtopicsCore } from '../model'
 import type { TipnrRecord } from '../source/tipnr'
@@ -485,7 +485,8 @@ export async function buildLanguage(o: {
     const rows: RowKey[] = [...mapRows.values()].flat()
     if (tn !== undefined) for (const book of origs.keys()) if (tn.books.includes(book)) await addKeys(rows, source.rows({ lang, book, resource: tn.key }))
     if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
-    rows.push({ layer: 'topics', key: `tipnr|${sha256Hex(JSON.stringify(o.topics.records))}` }, { layer: 'topics', key: `xtopics|${sha256Hex([...xt.topics.keys()].join('\n'))}` })
+    // The point of a TIPNR place is read by the common core only: it is not part of what a language was built from, so a language catalog does not change without the maps
+    rows.push({ layer: 'topics', key: `tipnr|${sha256Hex(JSON.stringify(o.topics.records.map(({ point: _point, ...record }) => record)))}` }, { layer: 'topics', key: `xtopics|${sha256Hex([...xt.topics.keys()].join('\n'))}` })
     const acaiNames = built.core.people !== undefined || built.core.places !== undefined
     if (acaiNames) {
       rows.push({ layer: 'topics', key: `acai|${sha256Hex(JSON.stringify(o.topics.acai!.people))}` })
@@ -743,7 +744,7 @@ export async function buildCommon(o: {
     const issues: string[] = []
     const lastVerse = chapterLengths(origs)
     const tipnr = parseTipnr(t.tipnr, issues)
-    const events = parseTheographic(t.theographic, issues)
+    const { events, birthDeath } = t.maps === undefined ? { events: parseTheographic(t.theographic, issues), birthDeath: [] } : parseTheographicAll(t.theographic, issues)
     const obs = parseObsRefs(t.obs, issues, lastVerse)
     // The outlines of the English tN introductions (the first tN of mapLang by key)
     const outlines = new Map<string, { title: string; from: number; to: number }[]>()
@@ -794,7 +795,7 @@ export async function buildCommon(o: {
       maps = {
         openbible: parseOpenBible(t.maps.openbible, issues),
         acaiPlaces: parseAcaiPlaces(t.maps.acaiPlaces).places,
-        birthDeath: parseTheoBirthDeath(t.theographic, []),
+        birthDeath,
         routes: t.maps.lists?.routes ?? ROUTES,
         exclude: t.maps.lists?.exclude ?? (BORN_DIED_EXCLUDE as MapsInput['exclude']),
         placeNames: t.maps.lists?.placeNames ?? PLACE_NAMES,
@@ -927,7 +928,7 @@ export async function buildCommon(o: {
   const complements: { complement: Complement; bytes: Uint8Array }[] = []
   if (o.topics?.maps?.basemap !== undefined) {
     const built = buildBasemap(o.topics.maps.basemap, report)
-    complements.push({ complement: { kind: 'basemap', id: sha256(built.bytes), size: built.bytes.length, media: 'application/cbor', version: '1', license: BASEMAP_LICENSE }, bytes: built.bytes })
+    complements.push({ complement: { kind: 'basemap', id: built.id, size: built.bytes.length, media: 'application/cbor', version: '1', license: BASEMAP_LICENSE }, bytes: built.bytes })
   }
   segments.sort(compareSegments)
   const resources = [...catalogResources(listed, used), ...extra].sort((a, b) => compareCodePoints(a.key, b.key))

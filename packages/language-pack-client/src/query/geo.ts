@@ -3,13 +3,13 @@
  * the relations `born-in`, `died-in` and `place`) and the language's `map` and `topics` cores (the names, `ids.md` "Builder rules: places names"). The
  * verse of a route stop is not stored: {@link route} derives it (`ids.md`, "Builder rules: routes"). No Node module here.
  */
-import { personName, twOfPlaces, type GeoPoint, type TopicsCore, type XtopicsCore, type XtopicsPart } from '@bt-synergy/language-pack-v3'
+import { OPENBIBLE_SOURCE as OPENBIBLE, personName, twOfPlaces, type GeoPoint, type TopicsCore, type XtopicsCore, type XtopicsPart } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
 import { type Answer, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
 
 /** The resources the maps data comes from, as `res` keys of the `xtopics` core. */
-export const OPENBIBLE_SOURCE = 'openbibleinfo/Bible-Geocoding-Data'
+export const OPENBIBLE_SOURCE = OPENBIBLE.key
 export const THEOGRAPHIC_SOURCE = 'robertrouse/theographic-bible-metadata'
 
 const EARTH_RADIUS_KM = 6371
@@ -95,15 +95,22 @@ export type Trip = {
 
 const MEASURABLE = new Set([1, 4, 5])
 
-export function trip(a: GeoPlace, b: GeoPlace): Trip | undefined {
+/**
+ * The trip between two places as an answer gives them ({@link PlaceRef}): `undefined` when either has no point (`sure` 0, or no `lat` and `lon`), or a form
+ * that has nothing to measure (an area or a water).
+ */
+export function trip(a: PlaceRef, b: PlaceRef): Trip | undefined {
+  if (a.lat === undefined || a.lon === undefined || b.lat === undefined || b.lon === undefined || a.sure === 0 || b.sure === 0) return undefined
   if (!MEASURABLE.has(a.form) || !MEASURABLE.has(b.form)) return undefined
-  const d = distance(a, b)
+  const pa = { lat: a.lat, lon: a.lon }
+  const pb = { lat: b.lat, lon: b.lon }
+  const d = distance(pa, pb)
   const sure = Math.min(a.sure, b.sure) as 1 | 2 | 3
   const near = d.km < 3
   const out: Trip = { km: d.km, direction: d.direction, bearing: d.bearing, sure, near }
   if (!near && sure >= 2) {
     out.days = { foot: travelDays(d.km, 'foot'), horse: travelDays(d.km, 'horse') }
-    if (a.form === 5 && b.form === 5 && inMediterranean(a) && inMediterranean(b)) out.days.ship = travelDays(d.km, 'ship')
+    if (a.form === 5 && b.form === 5 && inMediterranean(pa) && inMediterranean(pb)) out.days.ship = travelDays(d.km, 'ship')
   }
   return out
 }
@@ -242,18 +249,20 @@ export async function passagePlaces(reader: PackReader, first: number, last: num
 
 /** A stop of a route: the place and the verse where the event names it after the stop before (`undefined` when the event names it nowhere after that). */
 export type RouteStop = { place: PlaceRef; verse?: number }
-export type RouteData = { event: { id: string; title: string }; stops: RouteStop[] }
+/** `index` of `count` routes the event has in the table (an event may have alternatives, in the order of the table). */
+export type RouteData = { event: { id: string; title: string }; stops: RouteStop[]; index: number; count: number }
 
 /**
  * The route of an event (`ev:` id) from the builder's list, in the order the list has: `data: null` when `xtopics` is not installed, the core has no
  * `routes` table, or the event has no route. The verse of a stop is the first verse of the place inside the event's verses at or after the verse of the stop
  * before; Jerusalem at the end of a journey does not take the verse of the start.
  */
-export async function route(reader: PackReader, eventId: string): Promise<Answer<RouteData | null>> {
+export async function route(reader: PackReader, eventId: string, index = 0): Promise<Answer<RouteData | null>> {
   if (typeof eventId !== 'string' || !eventId.startsWith('ev:')) throw new ClientError('E_ARG', `not an event id: ${JSON.stringify(eventId)}`)
   const out = newAnswer<RouteData | null>(reader, 'route')
   const ctx = await cores(reader, out)
-  const r = ctx?.core.routes?.find((x) => x.event === eventId)
+  const all = ctx?.core.routes?.filter((x) => x.event === eventId) ?? []
+  const r = all[index]
   if (ctx === undefined || r === undefined) return out
   const books = new Set<string>([...(ctx.core.occurrences.get(eventId)?.keys() ?? [])])
   const parts = await partsOf(reader, books)
@@ -270,7 +279,7 @@ export async function route(reader: PackReader, eventId: string): Promise<Answer
     cursor = inEvent[0]
     return { place, verse: cursor }
   })
-  out.data = { event: { id: eventId, title: ctx.core.topics.get(eventId)?.title ?? '' }, stops }
+  out.data = { event: { id: eventId, title: ctx.core.topics.get(eventId)?.title ?? '' }, stops, index, count: all.length }
   return out
 }
 

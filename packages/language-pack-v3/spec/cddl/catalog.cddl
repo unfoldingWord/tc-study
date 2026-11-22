@@ -77,13 +77,14 @@ complement = {
 }
 
 ; The bytes of a complement whose kind is "basemap" and whose version is "1" (catalog.md, "The basemap complement"): a CBOR map, deflate-raw
-; compressed (the codec of the segments, with no container), at most 4 MiB inflated. The sha256 of the compressed bytes is the complement's "id".
-; A reader rejects it (E_INFLATE for a stream that is not complete deflate or inflates to more, E_BODY for the rest) when:
+; compressed (the codec of the segments, with no container), at most 4 MiB inflated. The sha256 of the inflated bytes is the complement's "id" (as a segment's id is of its uncompressed form), and the media type
+; is that of the inflated bytes. A catalog lists at most one complement of kind "basemap".
+; A reader rejects it (E_INFLATE for a stream that is not complete deflate or inflates to more, E_LIMIT for CBOR nested more than 64 levels, E_BODY for the rest) when:
 ; - a key listed here is missing or of another type; bbox is not four integers, has west after east or south after north, or leaves the
 ;   globe (west and east -18000 to 18000, south and north -9000 to 9000); a key not listed here is ignored;
-; - layer and count have different lengths; a layer is not 1 to 3; a count is below 3 on a closed path (layer 1 or 2) or below 2 on an open one (3);
+; - layer and count have different lengths; a layer is 0 (a layer above 3 is skipped, not an error); a count is below 3 on a closed path (layer 1 or 2) or below 2 on an open one (3);
 ; - x or y has other than the sum of count values; a point is outside bbox (the edges are inside).
-; A closed path does not repeat its first point at the end. The paths are in the order the builder writes them (land, lakes, rivers).
+; A closed path does not repeat its first point at the end (a builder rule, not checked). The paths are in the order the builder writes them (land, lakes, rivers).
 basemap-v1 = {
   "bbox": [west: int, south: int, east: int, north: int],   ; degrees x 100 (800, 2200, 5200, 4300 for the first map)
   "layer": uvarints,           ; per path: 1 land (closed), 2 lake (closed), 3 river (open)

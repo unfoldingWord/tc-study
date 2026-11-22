@@ -8,7 +8,7 @@
 import type { Basemap, BasemapPath } from '../model'
 import { readDbf, readShp, type Shape } from '../source/shapefile'
 import { readZip } from '../source/zip'
-import { encodeBasemap } from '../read/basemap'
+import { basemapId, encodeBasemap } from '../read/basemap'
 
 type Pt = [number, number]
 
@@ -169,7 +169,8 @@ export function simplifyRing(ring: Pt[], tolerance: number): Pt[] {
 function quantize(points: Pt[], closed: boolean): [number, number][] {
   const out: [number, number][] = []
   for (const [x, y] of points) {
-    const q: [number, number] = [Math.round(x * 100), Math.round(y * 100)]
+    // Math.round of the float64 product (half toward +infinity); + 0 turns a -0 into 0
+    const q: [number, number] = [Math.round(x * 100) + 0, Math.round(y * 100) + 0]
     const last = out[out.length - 1]
     if (last === undefined || last[0] !== q[0] || last[1] !== q[1]) out.push(q)
   }
@@ -216,7 +217,7 @@ function ringsOf(shape: Shape, minArea: number): BasemapPath[] {
  * The basemap of the three Natural Earth zips (`ne_10m_land`, `ne_10m_lakes`, `ne_10m_rivers_lake_centerlines`): the model and the bytes of the complement.
  * `report` gets one line with the counts. Throws `Error` for a zip that lacks its `.shp` or `.dbf`.
  */
-export function buildBasemap(zips: { land: Uint8Array; lakes: Uint8Array; rivers: Uint8Array }, report: string[]): { model: Basemap; bytes: Uint8Array } {
+export function buildBasemap(zips: { land: Uint8Array; lakes: Uint8Array; rivers: Uint8Array }, report: string[]): { model: Basemap; bytes: Uint8Array; id: Uint8Array } {
   const open = (bytes: Uint8Array, name: string, fields: string[]): { shapes: (Shape | null)[]; rows: Record<string, string>[] } => {
     const files = readZip(bytes)
     const shp = files.get(`ne_10m_${name}.shp`)
@@ -247,8 +248,9 @@ export function buildBasemap(zips: { land: Uint8Array; lakes: Uint8Array; rivers
   })
   const model: Basemap = { bbox: [...BASEMAP_BBOX], paths }
   const bytes = encodeBasemap(model)
+  const id = basemapId(bytes) // the sha256 of the inflated bytes: not of the compressor's output
   const count = (layer: number): number => paths.filter((p) => p.layer === layer).length
   const points = paths.reduce((n, p) => n + p.points.length, 0)
   report.push(`basemap: ${count(1)} land rings, ${count(2)} lakes, ${count(3)} river paths, ${points} points, ${bytes.length} bytes`)
-  return { model, bytes }
+  return { model, bytes, id }
 }

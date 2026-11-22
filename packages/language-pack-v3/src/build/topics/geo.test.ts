@@ -182,3 +182,59 @@ describe('buildXtopics with the maps', () => {
     expect(core.routes).toBeUndefined()
   })
 })
+
+describe('events and places: the 15 km rule (placeFor and nearest)', () => {
+  const named = (id: string, unique: string, lat: number, lon: number): TipnrRecord => ({ ...record(id, unique, { lat, lon }), names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012008 }] }] })
+  const base = (places: TipnrRecord[], point: { lat: number; lon: number } | undefined, verses = [1012009]) => ({
+    tipnr: places,
+    events: [{ eventID: 1, id: 'ev:x', title: 'X', verses: [1012009], partOf: [], predecessor: [], participants: [], places: [{ name: 'Bethel', verses, ...(point === undefined ? {} : { point }) }] }],
+    obs: new Map(),
+    outlines: new Map(),
+    origs: [],
+    res: { tipnr: ['t', '1'], theographic: ['theo', '1'], obs: ['obs', '1'], acai: ['acai', '1'], openbible: ['ob', '1'] } as never,
+  })
+  const maps = (points: [string, number, number][]) => ({
+    openbible: points.map(([unique, lat, lon]) => ob(unique.split('@')[0], [unique], [[1000, lon, lat]])),
+    acaiPlaces: [],
+    birthDeath: [],
+    routes: [],
+    exclude: [],
+    placeNames: {},
+  })
+  const north = named('lug:bethel-a', 'Bethel@Gen.12.8-Zec', 31.92, 35.24)
+  const south = named('lug:bethel-b', 'Bethel@Jos.12.16-1Sa', 31.34, 35.12)
+  const near = named('lug:bethel-c', 'Bethel@Jud.1.22', 31.95, 35.25) // about 4 km from the north one
+  const pointsOf = (list: [string, number, number][]) => maps(list)
+  const place = (o: ReturnType<typeof buildXtopics>) => o.core.relations?.filter((r) => r.type === 'place').map((r) => r.to)
+
+  test('two records with the name and a verse, one within 15 km of Theographic\'s point: that one', () => {
+    // both match the verse; only the north one is near the point
+    const south2 = { ...south, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const north2 = { ...north, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const out = buildXtopics({ ...base([north2, south2], { lat: 31.9, lon: 35.2 }), maps: pointsOf([['Bethel@Gen.12.8', 31.92, 35.24], ['Bethel@Jos.12.16', 31.34, 35.12]]) })
+    expect(place(out)).toEqual(['lug:bethel-a'])
+  })
+  test('two records within 15 km: ambiguous, no relation, a review line', () => {
+    const a = { ...north, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const c = { ...near, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const out = buildXtopics({ ...base([a, c], { lat: 31.93, lon: 35.245 }), maps: pointsOf([['Bethel@Gen.12.8', 31.92, 35.24], ['Bethel@Jud.1.22', 31.95, 35.25]]) })
+    expect(place(out)).toBeUndefined()
+    expect(out.report.some((l) => l.startsWith('review: ev:x place'))).toBe(true)
+  })
+  test('none within 15 km: no relation', () => {
+    const a = { ...north, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const b = { ...south, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const out = buildXtopics({ ...base([a, b], { lat: 36, lon: 40 }), maps: pointsOf([['Bethel@Gen.12.8', 31.92, 35.24], ['Bethel@Jos.12.16', 31.34, 35.12]]) })
+    expect(place(out)).toBeUndefined()
+  })
+  test('no point from Theographic: the distance rule does not apply', () => {
+    const a = { ...north, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    const b = { ...south, names: [{ name: 'Bethel', dStrong: 'H1008', refs: [{ verse: 1012009 }] }] }
+    expect(place(buildXtopics({ ...base([a, b], undefined), maps: pointsOf([['Bethel@Gen.12.8', 31.92, 35.24], ['Bethel@Jos.12.16', 31.34, 35.12]]) }))).toBeUndefined()
+  })
+  test('the name matches but the verse does not: the places of that name decide by distance', () => {
+    // neither record has the event verse; two places have the name, one near the point
+    const out = buildXtopics({ ...base([north, south], { lat: 31.9, lon: 35.2 }, [1012010]), maps: pointsOf([['Bethel@Gen.12.8', 31.92, 35.24], ['Bethel@Jos.12.16', 31.34, 35.12]]) })
+    expect(place(out)).toEqual(['lug:bethel-a'])
+  })
+});

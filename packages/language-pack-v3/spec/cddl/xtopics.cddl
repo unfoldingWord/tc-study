@@ -54,8 +54,11 @@ xtopics-core-tables = {
 ; - a topic whose kind is not place (2) has sure = form = lat = lon = 0; a place has form 1 to 5;
 ; - sure is 0 to 3; with sure = 0, lat = lon = 0; with sure above 0, lat is -9000 to 9000 and lon -18000 to 18000
 ;   ((0, 0) is a valid point: "no point" is sure = 0, not a position);
-; - the table is in a core only. The scale (x 100) is fixed. Another value of sure or form would be a new version of the
-;   table (v2), which a reader of v1 skips after decoding it (container.md).
+; - the table is in a core only. The scale (x 100) is fixed. Form 5 (port) is a point that is also a seaport: wherever a rule
+;   says form 1, form 5 counts too.
+; - sure and form are closed sets in this version, as the values of gender are: a builder never writes another value, and another
+;   value would be a new version of the table (v2), which a reader of v1 skips after decoding it (container.md). Sure 1 mixes two
+;   origins, a point of OpenBible.info with a score below 500 and a point that only TIPNR gives; version 1 accepts both as low.
 geo = {
   "lat": deltas,               ; per topic: latitude x 100 rounded (0.01 degrees, about 1 km); 0 when sure is 0
   "lon": deltas,               ; longitude x 100 rounded; 0 when sure is 0
@@ -65,14 +68,14 @@ geo = {
                                ; that is also a seaport: drawn and measured as 1, and sailed to in travel days)
 }
 
-; Where this design says "form 1", form 5 counts too. A reader checks, and rejects with E_BODY otherwise:
+; Routes: the builder's list of journeys, a route being the places of an event in travel order. A reader checks, and rejects with E_BODY otherwise:
 ; - event and count have the same number of values; stops has the sum of count;
-; - every event is a row of topics.ids whose kind is event (3), and no event is repeated (one route per event); the order of
-;   the table is the order the builder's list has, which is the order shown, and is not sorted;
+; - every event is a row of topics.ids whose kind is event (3). An event may have more than one route (alternative routes, such as
+;   the Exodus): its routes are shown in the order of the table, which is the order the builder's list has and is not sorted;
 ; - every count is 2 or more; every stop is a row whose kind is place (2); a stop is never the same row as the stop before it
 ;   in its route (a place may come back later: Jerusalem);
 ; - a stop may have no point (geo sure 0) or no geo at all: that is valid.
-; The verse of a stop is not stored (ids.md, "Builder rules: routes"). The table may have no route; a builder does not write it then.
+; The verse of a stop is not stored: a client derives it (ids.md, "Builder rules: routes"). A core with no route has no table.
 routes = {
   "event": uvarints,           ; per route: a row of topics.ids
   "count": uvarints,           ; per route: how many stops
