@@ -149,3 +149,30 @@ describe('what was drawn, read back', () => {
     expect(() => drawMap({ points: [], summary: S, frame: { lat: 0, lon: 0, scale: Number.POSITIVE_INFINITY, width: 10, height: 10 } })).toThrow(RangeError)
   })
 })
+
+describe('circles and the route', () => {
+  test('a bunch of more than 12 that is pushed apart: the route goes through the circle\'s final center, and circles stay inside the frame', () => {
+    const frame = { lat: 36, lon: 30, scale: 200, width: 360, height: 240 }
+    const bunch = (tag: string, lat: number, lon: number): MapPoint[] => Array.from({ length: 14 }, (_, i) => P(`lug:${tag}${i}`, lat + i * 1e-6, lon, `${tag}${i}`))
+    // two bunches 12 px apart (their circles overlap and are pushed apart), one at the very edge of the frame
+    const a = unproject(frame, 180, 120)
+    const b = unproject(frame, 192, 120)
+    const edge = unproject(frame, 2, 120)
+    const svg = drawMap({ points: [...bunch('a', a.lat, a.lon), ...bunch('b', b.lat, b.lon), ...bunch('e', edge.lat, edge.lon)], frame, route: ['lug:a0', 'lug:b0', 'lug:e0'], summary: S })
+    const circles = circlesOf(svg)
+    expect(circles.length).toBe(3)
+    for (const [x, y] of circles) {
+      expect(x).toBeGreaterThanOrEqual(11 - 1e-6)
+      expect(y).toBeGreaterThanOrEqual(11 - 1e-6)
+    }
+    const route = /class="map-route"[^>]* d="M([-0-9.]+) ([-0-9.]+)L([-0-9.]+) ([-0-9.]+)L([-0-9.]+) ([-0-9.]+)"/.exec(svg)!
+    const points = [[Number(route[1]), Number(route[2])], [Number(route[3]), Number(route[4])], [Number(route[5]), Number(route[6])]]
+    for (const p of points) expect(circles.some(([x, y]) => Math.abs(x - p[0]) < 0.11 && Math.abs(y - p[1]) < 0.11)).toBe(true)
+    expect(Math.hypot(circles[0][0] - circles[1][0], circles[0][1] - circles[1][1])).toBeGreaterThanOrEqual(22)
+  })
+  test('a point that is not finite is refused with a clear error; a lone surrogate is dropped from a text', () => {
+    expect(() => drawMap({ points: [P('lug:bad', Number.NaN, 35, 'X')], summary: S })).toThrow('lug:bad')
+    expect(drawMap({ points: [P('a', 31, 35, 'A\uD800B')], summary: S })).toContain('>AB<')
+    expect(drawMap({ points: [P('a', 31, 35, 'A\u{1F600}B')], summary: S })).toContain('A\u{1F600}B')
+  })
+});

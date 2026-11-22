@@ -117,6 +117,8 @@ const esc = (s: string): string =>
   s
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
+    // a lone surrogate is not text XML can hold
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -261,6 +263,7 @@ export function drawMap(o: DrawMapOptions): string {
   const measure = o.measure ?? ((t: string): number => [...t].length * font * 0.6)
   const smooth = o.smooth ?? 1
   const pts = o.points
+  for (const p of pts) if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) throw new RangeError(`drawMap: the point ${JSON.stringify(p.id)} has a latitude or longitude that is not a finite number`)
   const frame = o.frame ?? fit(pts, W, H)
   if (![frame.lat, frame.lon, frame.scale].every(Number.isFinite) || frame.scale <= 0) throw new RangeError('drawMap: the frame must have a finite center and a scale above 0')
   const margin = 20
@@ -303,7 +306,7 @@ export function drawMap(o: DrawMapOptions): string {
   const where = new Map<string, Pt>(home)
   const leaderBoxes: [number, number, number, number][] = []
   const leaders: string[] = []
-  const circles: { at: Pt; n: number }[] = []
+  const circles: { at: Pt; n: number; ids: string[] }[] = []
   const hidden = new Set<string>() // markers drawn as part of a circle
   const clusterMode = drawn.length > 200
   const RING_MAX = 30
@@ -329,7 +332,7 @@ export function drawMap(o: DrawMapOptions): string {
       const cx = list.reduce((t, p) => t + home.get(p.id)![0], 0) / list.length
       const cy = list.reduce((t, p) => t + home.get(p.id)![1], 0) / list.length
       if (list.length > BUNCH) {
-        circles.push({ at: [cx, cy], n: list.length })
+        circles.push({ at: [cx, cy], n: list.length, ids: list.map((p) => p.id) })
         for (const p of list) {
           hidden.add(p.id)
           where.set(p.id, [cx, cy])
@@ -342,15 +345,15 @@ export function drawMap(o: DrawMapOptions): string {
         const at: Pt = [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]
         where.set(p.id, at)
         leaders.push(`<path class="map-leader" fill="none" stroke="${th.label}" stroke-width="0.6" d="M${n1(cx)} ${n1(cy)}L${n1(at[0])} ${n1(at[1])}"/>`)
-        leaderBoxes.push([Math.min(cx, at[0]) - 1, Math.min(cy, at[1]) - 1, Math.max(cx, at[0]) + 1, Math.max(cy, at[1]) + 1])
+        // the obstacle is a few small boxes along the line, not its whole bounding box
+        for (const t of [0.34, 0.67, 1]) leaderBoxes.push([cx + (at[0] - cx) * t - 1.5, cy + (at[1] - cy) * t - 1.5, cx + (at[0] - cx) * t + 1.5, cy + (at[1] - cy) * t + 1.5])
       })
     }
   }
 
-  if (o.route !== undefined && o.route.length > 1) {
-    const line = o.route.map((id) => where.get(id)).filter((p): p is Pt => p !== undefined)
-    if (line.length > 1) parts.push(`<path class="map-route" fill="none" stroke="${th.route}" stroke-width="1.6" stroke-dasharray="6 4" d="M${line.map(([x, y]) => `${n1(x)} ${n1(y)}`).join('L')}"/>`)
-  }
+  // the route is drawn after the circles are pushed apart, through their final centers: its place in the image is kept here
+  const routeAt = parts.length
+  parts.push('')
   parts.push(...leaders)
 
   const dot = (p: MapPoint, x: number, y: number): string =>
@@ -376,7 +379,7 @@ export function drawMap(o: DrawMapOptions): string {
       if (c.n === 1) {
         dots.push(dot(c.one, c.x, c.y))
         labelled.push({ p: c.one, at: [c.x, c.y] })
-      } else circles.push({ at: [c.x / c.n, c.y / c.n], n: c.n })
+      } else circles.push({ at: [c.x / c.n, c.y / c.n], n: c.n, ids: [] })
     }
   } else {
     for (const p of drawn) {
@@ -406,9 +409,25 @@ export function drawMap(o: DrawMapOptions): string {
         moved = true
       }
     }
+    // a circle stays inside the frame
+    for (const c of circles) {
+      const x = Math.min(Math.max(c.at[0], CLUSTER), Math.max(CLUSTER, W - CLUSTER))
+      const y = Math.min(Math.max(c.at[1], CLUSTER), Math.max(CLUSTER, H - CLUSTER))
+      if (x !== c.at[0] || y !== c.at[1]) {
+        c.at[0] = x
+        c.at[1] = y
+        moved = true
+      }
+    }
     if (!moved) break
   }
   const clusters: Pt[] = circles.map((c) => c.at)
+  // the markers of a bunch drawn as a circle are at the circle's final center
+  for (const c of circles) for (const id of c.ids) where.set(id, c.at)
+  if (o.route !== undefined && o.route.length > 1) {
+    const line = o.route.map((id) => where.get(id)).filter((p): p is Pt => p !== undefined)
+    if (line.length > 1) parts[routeAt] = `<path class="map-route" fill="none" stroke="${th.route}" stroke-width="1.6" stroke-dasharray="6 4" d="M${line.map(([x, y]) => `${n1(x)} ${n1(y)}`).join('L')}"/>`
+  }
   for (const c of circles) {
     dots.push(`<g class="map-cluster"><circle fill="${th.cluster}" cx="${n1(c.at[0])}" cy="${n1(c.at[1])}" r="${CLUSTER}"/><text fill="${th.clusterText}" x="${n1(c.at[0])}" y="${n1(c.at[1] + 4)}" font-size="${font}" text-anchor="middle">${c.n}</text></g>`)
   }
