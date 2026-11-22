@@ -23,12 +23,14 @@ import { compareCodePoints } from '../../codec/columns'
 import type { CountRows } from '../../codec/counts'
 import { bookNumber, BOOKS, verseId } from '../../ids'
 import type { OrigModel, Relation, Topic, XtopicsCore, XtopicsPart } from '../../model'
-import { type AcaiPerson, joinAcai } from '../../source/acai'
-import type { TheoEvent } from '../../source/theographic'
+import { type AcaiPerson, type AcaiPlace, joinAcai, joinAcaiPlaces } from '../../source/acai'
+import type { ObPlace } from '../../source/openbible'
+import type { TheoBirthDeath, TheoEvent } from '../../source/theographic'
 import type { TipnrRecord, TipnrRelationType } from '../../source/tipnr'
 import { Tally } from '../maps/tally'
 import { versesOf } from '../maps/verses'
 import { BUILDER_EVENTS } from './events'
+import { buildGeo, haversineKm } from './geo'
 import { sectionId } from './outline'
 
 /** The key and release of each source of the common topics. `outlines` is the English tN the sections come from. */
@@ -38,6 +40,7 @@ export type XtopicsSources = {
   obs: [string, string]
   outlines?: [string, string]
   acai?: [string, string]
+  openbible?: [string, string]
 }
 
 /** The key of the builder's list of events (`ids.md`, "Ids of events") and its release. */
@@ -108,6 +111,22 @@ export function chapterLengths(origs: OrigModel[]): (book: string, chapter: numb
   return (book, chapter) => lengths.get(book)?.get(chapter)
 }
 
+/**
+ * What the maps add to the common topics (`ids.md`, "Builder rules: geo", "routes", "births and deaths", "events and places"): the data of OpenBible.info and
+ * the ACAI places for `geo`, the birth and death places of Theographic, and the builder's lists.
+ */
+export type MapsInput = {
+  openbible: ObPlace[]
+  acaiPlaces: AcaiPlace[]
+  birthDeath: TheoBirthDeath[]
+  /** The builder's routes (`routes.json`), in the order they are shown. */
+  routes: { event: string; stops: string[] }[]
+  /** Births and deaths Theographic has wrong (`born-died-exclude.json`): the names are Theographic's. */
+  exclude: { kind: 'born' | 'died'; person: string; place: string }[]
+  /** Theographic place name to `lug:` id, for the names TIPNR does not have (`place-names.json`). */
+  placeNames: Record<string, string>
+}
+
 export function buildXtopics(o: {
   tipnr: TipnrRecord[]
   events: TheoEvent[]
@@ -120,6 +139,8 @@ export function buildXtopics(o: {
   twTitles?: Map<string, string>
   /** The ACAI people ({@link parseAcai}): the `gender` table and the `same-as` of ACAI. Needs `res.acai`. */
   acai?: AcaiPerson[]
+  /** The data of the maps: `geo`, `routes`, `born-in`, `died-in`, the ACAI places. Needs `res.openbible`. Without it the core has none of them. */
+  maps?: MapsInput
 }): { core: XtopicsCore; parts: XtopicsPart[]; report: string[] } {
   const report: string[] = []
   const review = (line: string): void => {
@@ -212,6 +233,58 @@ export function buildXtopics(o: {
     }
   }
 
+  // The maps: the points of the places, from OpenBible.info and TIPNR, and the ACAI places joined to them
+  let geo: XtopicsCore['geo']
+  let acaiByLug = new Map<string, AcaiPlace>()
+  let openbibleUsed = false
+  if (o.maps !== undefined) {
+    const lugOfRef = new Map<string, string>()
+    const lugsOfName = new Map<string, string[]>()
+    for (const [id, t] of [...topics].sort((a, b) => compareCodePoints(a[0], b[0]))) {
+      if (t.kind !== 'place' || !id.startsWith('lug:')) continue
+      if (lugOfRef.has(t.ref)) report.push(`review: acai: ${lugOfRef.get(t.ref)} and ${id} have the same TIPNR name ${t.ref}: ACAI joins ${id}`)
+      lugOfRef.set(t.ref, id)
+      const name = t.ref.split('@')[0].trim()
+      const list = lugsOfName.get(name)
+      if (list === undefined) lugsOfName.set(name, [id])
+      else list.push(id)
+    }
+    acaiByLug = joinAcaiPlaces(o.maps.acaiPlaces, lugOfRef, lugsOfName, report).byLug
+    const built = buildGeo({ topics, records: o.tipnr, openbible: o.maps.openbible, acaiByLug, report })
+    geo = built.geo
+    openbibleUsed = built.fromOpenBible > 0
+  }
+  const pointOfLug = (id: string): { lat: number; lon: number } | undefined => {
+    const g = geo?.[id]
+    return g === undefined || g.sure === 0 ? undefined : { lat: g.lat / 100, lon: g.lon / 100 }
+  }
+  /** Of the records that match a name, the one within 15 km of Theographic's own point of the place, when it is exactly one. */
+  const nearest = (found: TipnrRecord[], point: { lat: number; lon: number } | undefined): TipnrRecord[] => {
+    if (found.length < 2 || point === undefined) return found
+    const near = found.filter((r) => {
+      const at = pointOfLug(r.id)
+      return at !== undefined && haversineKm(at, point) < 15
+    })
+    return near.length === 1 ? near : found
+  }
+  /**
+   * The TIPNR places for the name of a Theographic place, after the name and a verse gave `found`: when they did not give exactly one, the places
+   * of that name, the one within 15 km of Theographic's point if exactly one is; with no place of that name, the one the builder's list names.
+   */
+  const placeFor = (name: string, found: TipnrRecord[], point: { lat: number; lon: number } | undefined): TipnrRecord[] => {
+    if (found.length === 1) return found
+    const named = nameIndex.get(`place\0${name}`) ?? []
+    if (named.length > 1) {
+      const near = nearest(named, point)
+      return near.length === 1 ? near : found
+    }
+    if (named.length === 0) {
+      const eq = o.maps?.placeNames[name]
+      if (eq !== undefined && topics.get(eq)?.kind === 'place') return o.tipnr.filter((r) => r.id === eq)
+    }
+    return found
+  }
+
   // Events: Theographic, then the builder's list
   const theoKey = o.res.theographic[0]
   const eventRanges = new Map<string, Range[]>()
@@ -237,9 +310,10 @@ export function buildXtopics(o: {
     touch(theoKey, e.verses)
     for (const n of e.partOf) relate(e.id, 'part-of', idOfEvent.get(n)!, theoKey, 100)
     for (const n of e.predecessor) relate(e.id, 'follows', idOfEvent.get(n)!, theoKey, 100)
-    const link = (list: { name: string; verses: number[] }[], kind: 'person' | 'place', type: string): void => {
+    const link = (list: { name: string; verses: number[]; point?: { lat: number; lon: number } }[], kind: 'person' | 'place', type: string): void => {
       for (const p of list) {
-        const found = (nameIndex.get(`${kind}\0${p.name}`) ?? []).filter((r) => p.verses.some((v) => versesOfRecord.get(r.id)!.has(v)))
+        let found = (nameIndex.get(`${kind}\0${p.name}`) ?? []).filter((r) => p.verses.some((v) => versesOfRecord.get(r.id)!.has(v)))
+        if (kind === 'place' && o.maps !== undefined) found = placeFor(p.name, found, p.point)
         if (found.length === 1) relate(e.id, type, found[0].id, theoKey, 80)
         else review(`${e.id} ${type} ${JSON.stringify(p.name)}: ${found.length === 0 ? 'no TIPNR record' : `${found.length} TIPNR records (${found.map((r) => r.id).join(', ')})`} with the name and a verse of the event`)
       }
@@ -259,6 +333,31 @@ export function buildXtopics(o: {
     const verses = b.ranges.flatMap((r) => versesIn(b.id, r))
     count(b.id, verses)
     touch(BUILDER_SOURCE[0], verses)
+  }
+
+  // Births and deaths: from the person to the place, only where the name and a verse match exactly one TIPNR record of each
+  if (o.maps !== undefined) {
+    const excluded = new Set(o.maps.exclude.map((x) => `${x.kind}\0${x.person}\0${x.place}`))
+    let made = 0
+    let left = 0
+    for (const b of o.maps.birthDeath) {
+      const label = `${b.kind}-in ${JSON.stringify(b.person.name)} ${JSON.stringify(b.place.name)}`
+      if (excluded.has(`${b.kind}\0${b.person.name}\0${b.place.name}`)) {
+        report.push(`maps: ${label}: on the list of exclusions`)
+        left++
+        continue
+      }
+      const people = (nameIndex.get(`person\0${b.person.name}`) ?? []).filter((r) => b.person.verses.some((v) => versesOfRecord.get(r.id)!.has(v)))
+      const where = placeFor(b.place.name, (nameIndex.get(`place\0${b.place.name}`) ?? []).filter((r) => b.place.verses.some((v) => versesOfRecord.get(r.id)!.has(v))), b.place.point)
+      if (people.length === 1 && where.length === 1) {
+        relate(people[0].id, `${b.kind}-in`, where[0].id, theoKey, 80)
+        made++
+      } else {
+        left++
+        review(`${label}: ${people.length} TIPNR persons and ${where.length} TIPNR places with the name and a verse`)
+      }
+    }
+    report.push(`maps: ${made} born-in and died-in relations made, ${left} left out`)
   }
 
   // Stories and sections, and the events that occur in them
@@ -384,9 +483,58 @@ export function buildXtopics(o: {
     }
   }
 
+  // ACAI places: a same-as from a tW name to a place. A tW article joined to a person may be joined to a place too ("Israel"); one TIPNR
+  // already joined to a place keeps that place alone.
+  if (o.maps !== undefined && acaiByLug.size > 0) {
+    if (o.res.acai === undefined) throw new Error('acai: the places of ACAI need res.acai (its key and release)')
+    if (o.twTitles === undefined) report.push('acai: no tW titles (no map language): no same-as of ACAI for places')
+    else {
+      const placeLinked = new Set(relations.filter((r) => r.type === 'same-as' && r.to.startsWith('lug:')).map((r) => r.from))
+      const byFolded = new Map<string, Set<string>>()
+      const index = (text: string, concept: string): void => {
+        const f = foldTitle(text)
+        if (f === '') return
+        let set = byFolded.get(f)
+        if (set === undefined) byFolded.set(f, (set = new Set()))
+        set.add(concept)
+      }
+      for (const [concept, title] of o.twTitles) {
+        if (!concept.startsWith('tw:names/')) continue
+        index(concept.slice('tw:names/'.length), concept)
+        index(title, concept)
+        for (const piece of title.split(',')) index(piece, concept)
+      }
+      let kept = 0
+      let added = 0
+      for (const [lug, p] of [...acaiByLug].sort((a, b) => compareCodePoints(a[0], b[0]))) {
+        for (const title of p.tw) {
+          const found = [...(byFolded.get(foldTitle(title)) ?? [])].sort(compareCodePoints)
+          if (found.length !== 1) {
+            review(`acai ${p.id} (${lug}) tW ${JSON.stringify(title)}: ${found.length === 0 ? 'no tw:names/ article has that title' : `${found.length} articles (${found.join(', ')})`}`)
+            continue
+          }
+          if (placeLinked.has(found[0])) {
+            if (!relations.some((r) => r.type === 'same-as' && r.from === found[0] && r.to === lug)) review(`acai ${p.id} (${lug}) tW ${found[0]}: the article is joined by TIPNR to another place: kept`)
+            kept++
+            continue
+          }
+          relate(found[0], 'same-as', lug, o.res.acai[0], 75)
+          added++
+          acaiUsed = true
+        }
+      }
+      report.push(`acai: ${added} same-as added from the tW titles of ACAI places, ${kept} left to the TIPNR rule`)
+    }
+  }
+  if (acaiByLug.size > 0) acaiUsed = true
+
   // The core and the parts
   const sources: [string, string][] = [o.res.tipnr, o.res.theographic, o.res.obs]
   if (acaiUsed) sources.push(o.res.acai!)
+  if (openbibleUsed) {
+    if (o.res.openbible === undefined) throw new Error('geo: the points of OpenBible.info need res.openbible (its key and release)')
+    sources.push(o.res.openbible)
+  }
   if (builderUsed) sources.push(BUILDER_SOURCE)
   if (o.res.outlines !== undefined && [...topics.values()].some((t) => t.source === outlineKey)) sources.push(o.res.outlines)
   const res = sources.map(([k, r]) => [k, r] as [string, string]).sort((a, b) => compareCodePoints(a[0], b[0]))
@@ -408,6 +556,17 @@ export function buildXtopics(o: {
   }
   if (relations.length > 0) core.relations = relations
   if (Object.keys(gender).length > 0) core.gender = gender
+  if (geo !== undefined && Object.keys(geo).length > 0) core.geo = geo
+  if (o.maps !== undefined && o.maps.routes.length > 0) {
+    for (const r of o.maps.routes) {
+      if (topics.get(r.event)?.kind !== 'event') throw new Error(`routes: ${JSON.stringify(r.event)} is not an event of the topics`)
+      r.stops.forEach((id, i) => {
+        if (topics.get(id)?.kind !== 'place') throw new Error(`routes: the stop ${JSON.stringify(id)} of ${JSON.stringify(r.event)} is not a place of the topics`)
+        if (i > 0 && r.stops[i - 1] === id) throw new Error(`routes: ${JSON.stringify(r.event)} has the stop ${JSON.stringify(id)} twice in a row`)
+      })
+    }
+    core.routes = o.maps.routes.map((r) => ({ event: r.event, stops: [...r.stops] }))
+  }
   if (Object.keys(strongs).length > 0) core.strongs = strongs
   if (Object.keys(ranges).length > 0) core.ranges = ranges
   const parts: XtopicsPart[] = []

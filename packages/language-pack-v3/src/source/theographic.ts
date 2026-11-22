@@ -17,7 +17,15 @@ export type TheoEvent = {
   partOf: number[]
   predecessor: number[]
   participants: { name: string; verses: number[] }[]
-  places: { name: string; verses: number[] }[]
+  /** `point`: Theographic's own point of the place (OpenBible's, else Recogito's), degrees, when it has one (`ids.md`, "Builder rules: events and places"). */
+  places: { name: string; verses: number[]; point?: { lat: number; lon: number } }[]
+}
+
+/** A person's birth or death place (`born-in`, `died-in`): the names and all the verses of the person and of the place, and the place's point. */
+export type TheoBirthDeath = {
+  kind: 'born' | 'died'
+  person: { name: string; verses: number[] }
+  place: { name: string; verses: number[]; point?: { lat: number; lon: number } }
 }
 
 /** The OSIS book codes of Theographic with the book codes of `ids.ts`. */
@@ -35,7 +43,7 @@ const OSIS_TO_BOOK: ReadonlyMap<string, string> = new Map(
 )
 
 type Rec = { id: string; fields: Record<string, unknown> }
-type Named = Map<string, { name: string; verses: Set<number> }>
+type Named = Map<string, { name: string; verses: Set<number>; point?: { lat: number; lon: number } }>
 
 function records(text: string, what: string, issues: string[]): Rec[] {
   try {
@@ -50,11 +58,10 @@ function records(text: string, what: string, issues: string[]): Rec[] {
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 
-/** Parses the events of Theographic. Anything that cannot be used is described in `issues`. */
-export function parseTheographic(
-  files: { events: string; verses: string; people: string; places: string },
-  issues: string[],
-): TheoEvent[] {
+type TheoFiles = { events: string; verses: string; people: string; places: string }
+
+/** The verse of each verse record, and the people and the places with the verses they have. */
+function load(files: TheoFiles, issues: string[]): { people: Named; places: Named; rawPeople: Rec[]; verseOf: Map<string, number> } {
   // Verse record id -> verse id (OSIS reference, no versification conversion).
   const verseOf = new Map<string, number>()
   for (const r of records(files.verses, 'verses', issues)) {
@@ -85,12 +92,50 @@ export function parseTheographic(
         const id = verseOf.get(v)
         if (id !== undefined) verses.add(id)
       }
-      map.set(r.id, { name, verses })
+      const lat = Number(r.fields.openBibleLat ?? r.fields.latitude)
+      const lon = Number(r.fields.openBibleLong ?? r.fields.longitude)
+      const has = (r.fields.openBibleLat ?? r.fields.latitude) !== undefined && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+      map.set(r.id, has ? { name, verses, point: { lat, lon } } : { name, verses })
     }
     return map
   }
-  const people = named(records(files.people, 'people', issues), 'personID')
-  const places = named(records(files.places, 'places', issues), 'placeID')
+  const rawPeople = records(files.people, 'people', issues)
+  return { people: named(rawPeople, 'personID'), places: named(records(files.places, 'places', issues), 'placeID'), rawPeople, verseOf }
+}
+
+/**
+ * The birth and death places of Theographic's people (`birthPlace`, `deathPlace`), for `born-in` and `died-in`. Anything that cannot be used goes to `issues`.
+ */
+export function parseTheoBirthDeath(files: TheoFiles, issues: string[]): TheoBirthDeath[] {
+  const { people, places, rawPeople } = load(files, issues)
+  const out: TheoBirthDeath[] = []
+  for (const r of rawPeople) {
+    const person = people.get(r.id)
+    if (person === undefined) continue
+    for (const [key, kind] of [['birthPlace', 'born'], ['deathPlace', 'died']] as const) {
+      for (const ref of strings(r.fields?.[key])) {
+        const place = places.get(ref)
+        if (place === undefined) {
+          issues.push(`person ${r.id}: ${key} unknown: ${ref}`)
+          continue
+        }
+        out.push({
+          kind,
+          person: { name: person.name, verses: [...person.verses].sort((a, b) => a - b) },
+          place: { name: place.name, verses: [...place.verses].sort((a, b) => a - b), ...(place.point === undefined ? {} : { point: place.point }) },
+        })
+      }
+    }
+  }
+  return out
+}
+
+/** Parses the events of Theographic. Anything that cannot be used is described in `issues`. */
+export function parseTheographic(
+  files: TheoFiles,
+  issues: string[],
+): TheoEvent[] {
+  const { people, places, verseOf } = load(files, issues)
 
   const raw = records(files.events, 'events', issues)
     .filter((r) => {
@@ -139,7 +184,7 @@ export function parseTheographic(
           issues.push(`event ${eventID}: ${what} unknown: ${ref}`)
           continue
         }
-        out.push({ name: item.name, verses: [...item.verses].filter((v) => verseSet.has(v)).sort((a, b) => a - b) })
+        out.push({ name: item.name, verses: [...item.verses].filter((v) => verseSet.has(v)).sort((a, b) => a - b), ...(item.point === undefined ? {} : { point: item.point }) })
       }
       return out
     }
