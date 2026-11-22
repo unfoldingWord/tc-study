@@ -1,0 +1,42 @@
+{
+  "coverage": {
+    "es-419_gl/es-419/glt": {
+      "whole": [
+        "act"
+      ]
+    }
+  },
+  "h": {
+    "class": "topics",
+    "lang": "es-419",
+    "part": "core",
+    "res": [
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "names": [
+        1,
+        true
+      ],
+      "places": [
+        1,
+        false
+      ]
+    },
+    "v": 1
+  },
+  "id": "be125aa80468e490ec8dc28991dc7b27dac0390fa2a360d39798ed87bb8b46f2",
+  "names": {},
+  "places": {
+    "aliases": {},
+    "names": {},
+    "notes": {}
+  }
+}

@@ -3,13 +3,17 @@
  * {@link Segment} that `readSegment` has accepted, back into the core or the part of a book. They reject the segment with
  * `E_BODY` at the first defect. No Node module is used.
  */
-import { ColumnError, compareCodePoints, decodeUvarints } from '../codec/columns'
+import { ColumnError, compareCodePoints, decodeDeltas, decodeUvarints } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { decodeBookSet, decodeCounts, decodeCoverage, decodeVerseLists } from '../codec/counts'
 import { FormatError } from '../codec/errors'
 import { type CborMap, hasOwn, isMap, put } from '../codec/values'
 import { BOOKS, bookNumber } from '../ids'
 import {
+  type GeoForm,
+  type GeoPoint,
+  type GeoSure,
+  type Route,
   TOPIC_KINDS,
   TOPIC_NAME_SOURCES,
   type Topic,
@@ -32,6 +36,8 @@ export const XTOPICS_TABLES: Record<string, number[]> = {
   chunks: [1],
   'obs-frames': [1],
   gender: [1],
+  geo: [1],
+  routes: [1],
 }
 
 /** The tables the `topics` reader knows. */
@@ -40,10 +46,11 @@ export const TOPICS_TABLES: Record<string, number[]> = {
   local: [1],
   coverage: [1],
   people: [1],
+  places: [1],
 }
 
-const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks', 'obs-frames', 'gender']
-const TOPICS_CORE_ONLY = ['local', 'coverage', 'people'] // "names" is in both: a map in the core, verse lists in a part
+const XTOPICS_CORE_ONLY = ['coverage', 'topics', 'relations', 'strongs', 'ranges', 'chunks', 'obs-frames', 'gender', 'geo', 'routes']
+const TOPICS_CORE_ONLY = ['local', 'coverage', 'people', 'places'] // "names" is in both: a map in the core, verse lists in a part
 
 type Bad = (what: string) => never
 
@@ -250,7 +257,79 @@ function readXCore(seg: Segment): XtopicsCore {
     })
     core.gender = out
   }
+  if (hasOwn(t, 'geo')) core.geo = readGeo(t.geo, topics)
+  if (hasOwn(t, 'routes')) core.routes = readRoutes(t.routes, topics)
   return core
+}
+
+/**
+ * The table `geo` (`xtopics.cddl`): four columns of one value per row of `topics.ids`. Returns the entry of every topic of kind place. Rejects a length other than
+ * that of `topics.ids`; `sure` above 3; a place whose `form` is not 1 to 5; a topic that is not a place with `sure`, `form`, `lat` or `lon` other than 0; `sure` 0 with
+ * `lat` or `lon` other than 0; `sure` above 0 with `lat` outside -9000..9000 or `lon` outside -18000..18000.
+ */
+function readGeo(value: unknown, topics: Map<string, Topic>): Record<string, GeoPoint> {
+  const g = table(value, 'geo', xbad)
+  for (const key of ['lat', 'lon', 'sure', 'form']) if (!hasOwn(g, key)) xbad(`geo has no "${key}"`)
+  const ids = [...topics.keys()]
+  const sure = column(g.sure, 'geo.sure', xbad)
+  const form = column(g.form, 'geo.form', xbad)
+  const lat = deltas(g.lat, 'geo.lat')
+  const lon = deltas(g.lon, 'geo.lon')
+  for (const [name, col] of [['lat', lat], ['lon', lon], ['sure', sure], ['form', form]] as const) {
+    if (col.length !== ids.length) xbad(`geo.${name} has ${col.length} entries and topics.ids ${ids.length}`)
+  }
+  const out: Record<string, GeoPoint> = {}
+  ids.forEach((id, i) => {
+    const where = JSON.stringify(id)
+    if (sure[i] > 3) xbad(`geo.sure of ${where} is ${sure[i]}`)
+    if (topics.get(id)!.kind !== 'place') {
+      if (sure[i] !== 0 || form[i] !== 0 || lat[i] !== 0 || lon[i] !== 0) xbad(`geo has a value for ${where}, which is not a place`)
+      return
+    }
+    if (form[i] < 1 || form[i] > 5) xbad(`geo.form of ${where} is ${form[i]}`)
+    if (sure[i] === 0) {
+      if (lat[i] !== 0 || lon[i] !== 0) xbad(`geo of ${where} has a point and sure 0`)
+    } else if (lat[i] < -9000 || lat[i] > 9000 || lon[i] < -18000 || lon[i] > 18000) {
+      xbad(`geo of ${where} has the point ${lat[i]}, ${lon[i]}, outside the globe`)
+    }
+    put(out, id, { lat: lat[i], lon: lon[i], sure: sure[i] as GeoSure, form: form[i] as GeoForm })
+  })
+  return out
+}
+
+function deltas(value: unknown, what: string): number[] {
+  if (!(value instanceof Uint8Array)) xbad(`${what} is not a byte string`)
+  return decodeDeltas(value)
+}
+
+/**
+ * The table `routes` (`xtopics.cddl`). Rejects `event` and `count` of different lengths; `stops` with other than the sum of `count` entries; a `count` below 2; an `event`
+ * that is not a row of `topics.ids` of kind event, or is repeated; a stop that is not a row of kind place; a stop equal to the one before it in its route.
+ */
+function readRoutes(value: unknown, topics: Map<string, Topic>): Route[] {
+  const r = table(value, 'routes', xbad)
+  for (const key of ['event', 'count', 'stops']) if (!hasOwn(r, key)) xbad(`routes has no "${key}"`)
+  const ids = [...topics.keys()]
+  const event = column(r.event, 'routes.event', xbad)
+  const count = column(r.count, 'routes.count', xbad)
+  const stops = column(r.stops, 'routes.stops', xbad)
+  if (event.length !== count.length) xbad('routes.event and routes.count have different lengths')
+  let total = 0
+  for (const c of count) total += c
+  if (stops.length !== total) xbad(`routes.stops has ${stops.length} entries, and routes.count adds up to ${total}`)
+  let at = 0
+  return event.map((e, i) => {
+    if (e >= ids.length || topics.get(ids[e])!.kind !== 'event') xbad(`routes.event[${i}] is not a topic of kind event`)
+    if (count[i] < 2) xbad(`routes.count[${i}] is ${count[i]}, below 2`)
+    const list: string[] = []
+    for (let k = 0; k < count[i]; k++) {
+      const s = stops[at++]
+      if (s >= ids.length || topics.get(ids[s])!.kind !== 'place') xbad(`routes.stops of the route ${i} has a topic that is not a place`)
+      if (k > 0 && stops[at - 2] === s) xbad(`routes.stops of the route ${i} repeats a stop in a row`)
+      list.push(ids[s])
+    }
+    return { event: ids[e], stops: list }
+  })
 }
 
 /** A frame key of `obs-frames`: story 1 to 50 and frame 1 to 99, decimal, no leading zeros ("1:3"). */
@@ -337,33 +416,37 @@ function readTCore(seg: Segment): TopicsCore {
     }
     core.local = out
   }
-  if (hasOwn(t, 'people')) core.people = readPeople(t.people)
+  if (hasOwn(t, 'people')) core.people = readNamesTable(t.people, 'people', 'per:')
+  if (hasOwn(t, 'places')) core.places = readNamesTable(t.places, 'places', 'lug:')
   return core
 }
 
-/** The table `people` (`topics.cddl`): every id a `per:` id, no empty text, the ids of an alias sorted and not repeated. Other keys are ignored. */
-function readPeople(value: unknown): NonNullable<TopicsCore['people']> {
-  const p = table(value, 'people', tbad)
-  for (const key of ['names', 'notes', 'aliases']) if (!hasOwn(p, key)) tbad(`people has no "${key}"`)
+/**
+ * The tables `people` and `places` (`topics.cddl`), one shape: every id of the prefix (`per:` or `lug:`), no empty text, the ids of an alias sorted and not repeated. Other
+ * keys are ignored.
+ */
+function readNamesTable(value: unknown, name: 'people' | 'places', prefix: 'per:' | 'lug:'): NonNullable<TopicsCore['people']> {
+  const p = table(value, name, tbad)
+  for (const key of ['names', 'notes', 'aliases']) if (!hasOwn(p, key)) tbad(`${name} has no "${key}"`)
   const perId = (id: string, what: string): void => {
-    if (!id.startsWith('per:')) tbad(`${what} ${JSON.stringify(id)}, which is not a per: id`)
+    if (!id.startsWith(prefix)) tbad(`${what} ${JSON.stringify(id)}, which is not a ${prefix} id`)
   }
   const textMap = (key: 'names' | 'notes'): Record<string, string> => {
     const out: Record<string, string> = {}
-    for (const [k, v] of Object.entries(table(p[key], `people.${key}`, tbad))) {
-      perId(k, `people.${key} names`)
-      if (typeof v !== 'string' || v === '') tbad(`people.${key}[${JSON.stringify(k)}] is not a non-empty text`)
+    for (const [k, v] of Object.entries(table(p[key], `${name}.${key}`, tbad))) {
+      perId(k, `${name}.${key} names`)
+      if (typeof v !== 'string' || v === '') tbad(`${name}.${key}[${JSON.stringify(k)}] is not a non-empty text`)
       put(out, k, v)
     }
     return out
   }
   const aliases: Record<string, string[]> = {}
-  for (const [k, v] of Object.entries(table(p.aliases, 'people.aliases', tbad))) {
-    if (k === '') tbad('people.aliases has an empty name')
-    const ids = texts(v, `people.aliases[${JSON.stringify(k)}]`, tbad)
-    if (ids.length === 0) tbad(`people.aliases[${JSON.stringify(k)}] is empty`)
-    for (const id of ids) perId(id, `people.aliases[${JSON.stringify(k)}] names`)
-    sortedUnique(ids, `the ids of people.aliases[${JSON.stringify(k)}]`, tbad)
+  for (const [k, v] of Object.entries(table(p.aliases, `${name}.aliases`, tbad))) {
+    if (k === '') tbad(`${name}.aliases has an empty name`)
+    const ids = texts(v, `${name}.aliases[${JSON.stringify(k)}]`, tbad)
+    if (ids.length === 0) tbad(`${name}.aliases[${JSON.stringify(k)}] is empty`)
+    for (const id of ids) perId(id, `${name}.aliases[${JSON.stringify(k)}] names`)
+    sortedUnique(ids, `the ids of ${name}.aliases[${JSON.stringify(k)}]`, tbad)
     put(aliases, k, [...ids])
   }
   return { names: textMap('names'), notes: textMap('notes'), aliases }

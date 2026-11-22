@@ -1063,6 +1063,56 @@
       "manifestSha256": "9ba49ab18be3a8feb01e467d537d464d7e7bcc4a33a85fe1330f5a58aac38633",
       "sha256": "84d1f2dc8946a80c2d8d1cb9f5f54baf22dba3c38f331c39fed3f1be3f662ff4",
       "target": "acai/people.json"
+    },
+    {
+      "name": "acai-places",
+      "repository": "BibleAquifer/ACAI",
+      "host": "github",
+      "commit": "5375d0d334bb6d635ef1813e4d3df58eb30efcca",
+      "path": "places/json/",
+      "tree": "acai-places",
+      "manifestSha256": "a8d37d54f3e239822f6d6ed7a1e0e7510c9237e0cfb6b057b3e5dab56aad5d66",
+      "sha256": "5a4935ffc8644b0c5ab716f18ea872ae7ef4efda5a8bb42199acc85af55b7913",
+      "target": "acai/places.json"
+    },
+    {
+      "name": "openbible-ancient",
+      "repository": "openbibleinfo/Bible-Geocoding-Data",
+      "host": "github",
+      "commit": "7eb18a5ee62f27b9b93bd6689ea272d76dd23b8f",
+      "path": "data/ancient.jsonl",
+      "sha256": "b8187aa4737e8517ccc090f765d2be11da4c548cd2a59d3cdcb62e952cb8c0f2",
+      "target": "openbible/ancient.jsonl"
+    },
+    {
+      "name": "naturalearth-land",
+      "repository": "naturalearthdata.com",
+      "host": "url",
+      "url": "https://naciscdn.org/naturalearth/10m/physical/ne_10m_land.zip",
+      "commit": "5.1.1",
+      "path": "ne_10m_land.zip",
+      "sha256": "e547d749445eaa0964aba76738090ec88f5e63c4585122170f98c67a7ea922dc",
+      "target": "naturalearth/ne_10m_land.zip"
+    },
+    {
+      "name": "naturalearth-lakes",
+      "repository": "naturalearthdata.com",
+      "host": "url",
+      "url": "https://naciscdn.org/naturalearth/10m/physical/ne_10m_lakes.zip",
+      "commit": "5.0.0",
+      "path": "ne_10m_lakes.zip",
+      "sha256": "0803a06f9c3cb4671d89b68c48b142aad9366ba40f665245e12a913fbc61722a",
+      "target": "naturalearth/ne_10m_lakes.zip"
+    },
+    {
+      "name": "naturalearth-rivers_lake_centerlines",
+      "repository": "naturalearthdata.com",
+      "host": "url",
+      "url": "https://naciscdn.org/naturalearth/10m/physical/ne_10m_rivers_lake_centerlines.zip",
+      "commit": "5.0.0",
+      "path": "ne_10m_rivers_lake_centerlines.zip",
+      "sha256": "ded71b01870855ccfe19b51f2ec14c9bb48fae23c0e9f3c11974d426433b5c38",
+      "target": "naturalearth/ne_10m_rivers_lake_centerlines.zip"
     }
   ]
 }

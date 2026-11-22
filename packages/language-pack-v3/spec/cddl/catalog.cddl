@@ -41,6 +41,8 @@ resource = {
   ? "attribution": tstr,       ; the credit line an app shows
   ? "source": tstr,            ; the aggregator the data came from ("aquifer"): a patch catalog's resource
   ? "review": "none" / "community" / "professional" / "mixed",   ; the review level of the source's articles; "mixed" when they differ
+  ? "audience": "translators" / "readers",   ; who the text is for: a tool for translators, or a version for readers (a Bible text of a patch catalog)
+  ? "style": "literal" / "simple" / "dynamic",   ; how it renders its source: close to the form, clear and simplified, or meaning first
   "books": book-set,           ; the books it has (all zeros for resources without books)
 }
 
@@ -72,4 +74,22 @@ complement = {
   "version": tstr,
   ? "for": tstr,               ; what it works with, e.g. the version of the library's queries
   ? "license": tstr,
+}
+
+; The bytes of a complement whose kind is "basemap" and whose version is "1" (catalog.md, "The basemap complement"): a CBOR map, deflate-raw
+; compressed (the codec of the segments, with no container), at most 4 MiB inflated. The sha256 of the file's bytes as downloaded (compressed) is the complement's "id", as for every complement, so it depends on the
+; compressor; the media type is that of the bytes once inflated. A catalog lists at most one complement of kind "basemap"; a client uses it only when
+; exactly one is listed.
+; A reader rejects it (E_INFLATE for a stream that is not complete deflate or inflates to more, E_LIMIT for CBOR nested more than 64 levels, E_BODY for the rest) when:
+; - a key listed here is missing or of another type; bbox is not four integers, has west after east or south after north, or leaves the
+;   globe (west and east -18000 to 18000, south and north -9000 to 9000); a key not listed here is ignored;
+; - layer and count have different lengths; a layer is 0 (a layer above 3 is skipped, not an error); a count is below 3 on a closed path (layer 1 or 2) or below 2 on an open one (3);
+; - x or y has other than the sum of count values; a point is outside bbox (the edges are inside).
+; A closed path does not repeat its first point at the end (a builder rule, not checked). The paths are in the order the builder writes them (land, lakes, rivers).
+basemap-v1 = {
+  "bbox": [west: int, south: int, east: int, north: int],   ; degrees x 100 (800, 2200, 5200, 4300 for the first map)
+  "layer": uvarints,           ; per path: 1 land (closed), 2 lake (closed), 3 river (open)
+  "count": uvarints,           ; per path: how many points
+  "x": deltas,                 ; the points of all the paths, path after path: longitude x 100; the deltas run across paths
+  "y": deltas,                 ; latitude x 100
 }

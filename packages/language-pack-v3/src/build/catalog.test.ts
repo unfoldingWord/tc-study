@@ -324,6 +324,13 @@ describe('buildCatalog', () => {
     }
   })
 
+  test('a catalog lists at most one complement of kind basemap: a second is an error (a reader does not reject it)', async () => {
+    const basemap = (n: number): Complement => ({ kind: 'basemap', id: bytesOfHex(fingerprint(n)), size: 5, media: 'application/cbor', version: '1' })
+    const one = await build({ about, resources: [resource(TN)], complements: [basemap(30), { kind: 'images', id: bytesOfHex(fingerprint(31)), size: 5, media: 'application/zip', version: '1' }] })
+    expect(catalogView((await readSegment(one.bytes, { known: CATALOG_TABLES })).seg).complements?.map((c) => c.kind)).toEqual(['basemap', 'images'])
+    await expect(build({ about, resources: [resource(TN)], complements: [basemap(30), basemap(32)] })).rejects.toThrow('at most one complement of kind "basemap"')
+  })
+
   test('the common catalog has no lang; a catalog may have no requires and no complements', async () => {
     const orig = (await titus()).built[1]
     const catalog = await buildCatalog({
@@ -531,10 +538,18 @@ describe('patch catalogs', () => {
     expect('source' in view.resources[1] || 'review' in view.resources[1]).toBe(false)
   })
 
+  test('audience and style are written and read back', async () => {
+    const built = await buildCatalog({ about: patchAbout, resources: [aquifer({ audience: 'readers', style: 'dynamic' })], segments: [await bookStub()] })
+    const view = catalogView((await readSegment(built.bytes, { known: CATALOG_TABLES })).seg)
+    expect([view.resources[0].audience, view.resources[0].style]).toEqual(['readers', 'dynamic'])
+  })
+
   test('a review outside the four values, or a source that is not text, is refused', async () => {
     const refuses = (extra: object) => buildCatalog({ about: patchAbout, resources: [aquifer(extra as never)], segments: [] })
     await expect(refuses({ review: 'perfect' })).rejects.toThrow(/review/)
     await expect(refuses({ source: 1 })).rejects.toThrow(/source/)
+    await expect(refuses({ audience: 'everyone' })).rejects.toThrow(/audience/)
+    await expect(refuses({ style: 'free' })).rejects.toThrow(/style/)
     for (const name of ['hi', 'hi-x-aquifer1x', 'hi-x-Aq', 'hi-aquifer', 'pt-x-x-aq', 'pt-br']) {
       await expect(buildCatalog({ about: { ...patchAbout, catalog: name }, resources: [], segments: [], patch: true })).rejects.toThrow(/patch catalog name/)
     }

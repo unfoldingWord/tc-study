@@ -58,7 +58,7 @@ describe('index.ts', () => {
       }
     }
     const resolveSource = (base: string): string => {
-      for (const candidate of [`${base}.ts`, join(base, 'index.ts')]) {
+      for (const candidate of [`${base}.ts`, join(base, 'index.ts'), ...(base.endsWith('.json') ? [base] : [])]) {
         try {
           readFileSync(candidate)
           return candidate

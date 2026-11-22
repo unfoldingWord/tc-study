@@ -1,0 +1,294 @@
+{
+  "coverage": {
+    "STEPBible/STEPBible-Data/TIPNR": {
+      "whole": [
+        "act"
+      ]
+    },
+    "openbibleinfo/Bible-Geocoding-Data": {
+      "whole": []
+    },
+    "robertrouse/theographic-bible-metadata": {
+      "whole": [
+        "act"
+      ]
+    }
+  },
+  "geo": {
+    "lug:abel": {
+      "form": 1,
+      "lat": 0,
+      "lon": 0,
+      "sure": 0
+    },
+    "lug:antioch": {
+      "form": 1,
+      "lat": 3623,
+      "lon": 3617,
+      "sure": 3
+    },
+    "lug:bethel-gen-12-8": {
+      "form": 1,
+      "lat": 3192,
+      "lon": 3524,
+      "sure": 3
+    },
+    "lug:bethel-jos-19-4": {
+      "form": 1,
+      "lat": 3124,
+      "lon": 3484,
+      "sure": 1
+    },
+    "lug:emmaus": {
+      "form": 1,
+      "lat": 3180,
+      "lon": 3500,
+      "sure": 1
+    },
+    "lug:india": {
+      "form": 2,
+      "lat": 2200,
+      "lon": 7700,
+      "sure": 1
+    },
+    "lug:jerusalem": {
+      "form": 1,
+      "lat": 3178,
+      "lon": 3523,
+      "sure": 3
+    },
+    "lug:seleucia": {
+      "form": 5,
+      "lat": 3612,
+      "lon": 3592,
+      "sure": 3
+    },
+    "lug:tarsus": {
+      "form": 1,
+      "lat": 3691,
+      "lon": 3489,
+      "sure": 3
+    }
+  },
+  "h": {
+    "class": "xtopics",
+    "part": "core",
+    "res": [
+      [
+        "STEPBible/STEPBible-Data/TIPNR",
+        "be4191f0"
+      ],
+      [
+        "openbibleinfo/Bible-Geocoding-Data",
+        "7eb18a5e"
+      ],
+      [
+        "robertrouse/theographic-bible-metadata",
+        "744355c7"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "geo": [
+        1,
+        false
+      ],
+      "occurrences": [
+        1,
+        true
+      ],
+      "relations": [
+        1,
+        false
+      ],
+      "routes": [
+        1,
+        false
+      ],
+      "topics": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "4f9f38d0159eea234a5b60c3e862916317ca6b7cd72657582fca013c3895a532",
+  "occurrences": {
+    "rows": {
+      "ev:first-missionary-journey": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:abel": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:antioch": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:bethel-gen-12-8": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:bethel-jos-19-4": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:emmaus": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:india": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:jerusalem": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:seleucia": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "lug:tarsus": {
+        "act": [
+          2,
+          2
+        ]
+      },
+      "per:paul": {
+        "act": [
+          2,
+          2
+        ]
+      }
+    },
+    "unit": "verses"
+  },
+  "relations": [
+    {
+      "confidence": 80,
+      "from": "per:paul",
+      "source": "robertrouse/theographic-bible-metadata",
+      "to": "lug:tarsus",
+      "type": "born-in"
+    }
+  ],
+  "routes": [
+    {
+      "event": "ev:first-missionary-journey",
+      "stops": [
+        "lug:antioch",
+        "lug:seleucia"
+      ]
+    },
+    {
+      "event": "ev:first-missionary-journey",
+      "stops": [
+        "lug:antioch",
+        "lug:jerusalem"
+      ]
+    }
+  ],
+  "topics": {
+    "ev:first-missionary-journey": {
+      "kind": "event",
+      "ref": "1",
+      "source": "robertrouse/theographic-bible-metadata",
+      "title": "First Missionary Journey",
+      "ustrong": ""
+    },
+    "lug:abel": {
+      "kind": "place",
+      "ref": "Abel@1Sa.6.18",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Abel",
+      "ustrong": ""
+    },
+    "lug:antioch": {
+      "kind": "place",
+      "ref": "Antioch@Act.6.5-Gal",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Antioch",
+      "ustrong": ""
+    },
+    "lug:bethel-gen-12-8": {
+      "kind": "place",
+      "ref": "Bethel@Gen.12.8-Zec",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Bethel",
+      "ustrong": ""
+    },
+    "lug:bethel-jos-19-4": {
+      "kind": "place",
+      "ref": "Bethel@Jos.12.16-1Sa",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Bethel",
+      "ustrong": ""
+    },
+    "lug:emmaus": {
+      "kind": "place",
+      "ref": "Emmaus@Luk.24.13",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Emmaus",
+      "ustrong": ""
+    },
+    "lug:india": {
+      "kind": "place",
+      "ref": "India@Est.1.1-Est",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "India",
+      "ustrong": ""
+    },
+    "lug:jerusalem": {
+      "kind": "place",
+      "ref": "Jerusalem@Jos.10.1-Rev",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Jerusalem",
+      "ustrong": ""
+    },
+    "lug:seleucia": {
+      "kind": "place",
+      "ref": "Seleucia@Act.13.4",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Seleucia",
+      "ustrong": ""
+    },
+    "lug:tarsus": {
+      "kind": "place",
+      "ref": "Tarsus@Act.9.11-Act",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Tarsus",
+      "ustrong": ""
+    },
+    "per:paul": {
+      "kind": "person",
+      "ref": "Paul@Act.13.9-Rev",
+      "source": "STEPBible/STEPBible-Data/TIPNR",
+      "title": "Paul",
+      "ustrong": ""
+    }
+  }
+}

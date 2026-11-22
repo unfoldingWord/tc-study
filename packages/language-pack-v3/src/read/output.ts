@@ -20,6 +20,7 @@ import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, 
 import { checkSignatures } from '../sign'
 import { readTransfer } from '../transfer'
 import { ART_TABLES, artView } from './art'
+import { decodeBasemap } from './basemap'
 import { OBSIMG_TABLES, obsimgView } from './obsimg'
 import { BOOK_TABLES, bookView } from './book'
 import { CATALOG_TABLES, catalogView } from './catalog'
@@ -193,6 +194,8 @@ function xtopicsOut(seg: Segment): Record<string, unknown> {
     chunks: c.chunks,
     'obs-frames': c.obsFrames,
     gender: c.gender,
+    geo: c.geo,
+    routes: c.routes,
   }
 }
 
@@ -210,7 +213,7 @@ function topicsOut(seg: Segment): Record<string, unknown> {
   const m = topicsView(seg)
   if (m.part !== 'core') return { names: listsOut((m as TopicsPart).names) }
   const c = m as TopicsCore
-  return { names: c.names, local: c.local, coverage: coverageOut(c.coverage), people: c.people }
+  return { names: c.names, local: c.local, coverage: coverageOut(c.coverage), people: c.people, places: c.places }
 }
 
 /** The `macula` of an original as the reader outputs it (`tests/README.md`): v1 as stored, v2 with its trees and rows decoded. */
@@ -358,6 +361,19 @@ export async function readerOutput(bytes: Uint8Array, options: ReaderOptions = {
   try {
     const { kind } = readHeader(bytes)
     return kind === KIND_TRANSFER ? await transferOutput(bytes, options) : await segmentOutput(bytes, options)
+  } catch (error) {
+    if (error instanceof FormatError) return { error: error.code }
+    throw error
+  }
+}
+
+/**
+ * The reader output of a `basemap` complement file (`catalog.md`, "The basemap complement"; `spec/tests/README.md`, "Reader output"): `{bbox, paths: [{layer, points:
+ * [[x, y], ...]}, ...]}` in degrees x 100, or `{ error: code }` (`E_INFLATE`, `E_LIMIT`, `E_BODY`). The conformance cases name such a file `*.basemap`.
+ */
+export function basemapOutput(bytes: Uint8Array): unknown {
+  try {
+    return sortKeys(decodeBasemap(bytes))
   } catch (error) {
     if (error instanceof FormatError) return { error: error.code }
     throw error

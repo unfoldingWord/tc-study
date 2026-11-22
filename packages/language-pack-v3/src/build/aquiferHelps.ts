@@ -26,7 +26,7 @@ import { uniqueIds } from './bookHelps'
 // Input shapes (the fields of the Aquifer JSON that are read)
 
 type Passage = { start_ref?: string; end_ref?: string }
-type AssociatedResource = { content_id?: string | number; resource_code?: string; label?: string }
+type AssociatedResource = { content_id?: string | number; reference_id?: string | number; resource_code?: string; label?: string }
 /** An article of an Aquifer resource (`{book}.content.json` is an array of them). */
 export type AquiferArticle = {
   content_id: string | number
@@ -44,6 +44,31 @@ export type EnTaTitles = { tag?: string; titles: Record<string, string>; ambiguo
 export const MANUAL_CODE = 'UWTranslationManual'
 
 // The TA map
+
+/**
+ * A stand-in for a Manual Aquifer does not publish in a language (es-419 has none): the Manual articles the notes themselves are associated
+ * with (`associations.resource` with the Manual code), each with its `content_id`, its `reference_id` (the one of its English twin) and its
+ * label as the title. `buildTaMap` takes it as the language's Manual. A `reference_id` that is not all digits (some associations carry text such as
+ * `UW_TXManual_…`) is ignored; a `content_id` seen with several numeric ones keeps the first; a resource with no usable `content_id` or `reference_id`
+ * is left out (its links stay text). {@link STANDIN_EXCLUDED} lists ids whose upstream `reference_id` is known to point at another article.
+ */
+export const STANDIN_EXCLUDED: ReadonlySet<string> = new Set([
+  // es-419 (UWTranslationNotes@603546cd): labelled "Citas y Notas al pie" but with the reference_id of Hendiadys (26694); its one link would go to the wrong article.
+  '33280',
+])
+
+export function taFromNotes(notes: readonly AquiferArticle[]): TaArticle[] {
+  const seen = new Map<string, TaArticle>()
+  for (const note of notes) {
+    for (const r of note.associations?.resource ?? []) {
+      if (r.resource_code !== MANUAL_CODE || r.content_id === undefined || r.reference_id === undefined) continue
+      const id = String(r.content_id)
+      if (STANDIN_EXCLUDED.has(id) || !/^\d+$/.test(String(r.reference_id))) continue
+      if (!seen.has(id)) seen.set(id, { content_id: id, reference_id: r.reference_id, ...(r.label === undefined ? {} : { title: r.label }) })
+    }
+  }
+  return [...seen.values()]
+}
 
 /** Why an article of the Hindi Manual has no `ta:` id. */
 export type TaUnmatched = { contentId: string; title: string; reason: 'no-english-article' | 'no-door43-title' | 'ambiguous-title' }

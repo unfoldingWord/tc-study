@@ -4,13 +4,13 @@
  * No Node module is used.
  */
 import type { CborValue } from '../../codec/cbor'
-import { compareCodePoints, encodeUvarints } from '../../codec/columns'
+import { compareCodePoints, encodeDeltas, encodeUvarints } from '../../codec/columns'
 import type { Segment } from '../../codec/container'
 import { encodeBookSet, encodeCounts, encodeCoverage, encodeVerseLists } from '../../codec/counts'
 import { put } from '../../codec/values'
 import { chunksTable } from './chunks'
 import { OBS_FRAME_KEY } from '../../read/topics'
-import { TOPIC_KINDS, TOPIC_NAME_SOURCES, type TopicsCore, type TopicsPart, type XtopicsCore, type XtopicsPart } from '../../model'
+import { TOPIC_KINDS, TOPIC_NAME_SOURCES, type TopicsCore, type TopicsPart, type TopicsPeople, type XtopicsCore, type XtopicsPart } from '../../model'
 
 type Built = { tables: Record<string, [number, boolean]>; t: Record<string, CborValue> }
 
@@ -158,6 +158,49 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     tables.gender = [1, false]
     t.gender = encodeUvarints(ids.map((id) => m.gender![id] ?? 0))
   }
+  if (m.geo !== undefined) {
+    for (const k of Object.keys(m.geo)) if (!number.has(k)) throw new Error(`geo: ${JSON.stringify(k)} is not a topic`)
+    const sure: number[] = []
+    const form: number[] = []
+    const lat: number[] = []
+    const lon: number[] = []
+    for (const id of ids) {
+      const g = m.geo[id]
+      if (m.topics.get(id)!.kind !== 'place') {
+        if (g !== undefined) throw new Error(`geo: ${JSON.stringify(id)} is not a place`)
+        sure.push(0), form.push(0), lat.push(0), lon.push(0)
+        continue
+      }
+      if (g === undefined) throw new Error(`geo: the place ${JSON.stringify(id)} has no entry`)
+      if (![0, 1, 2, 3].includes(g.sure)) throw new Error(`geo: ${JSON.stringify(id)} has sure ${String(g.sure)}`)
+      if (![1, 2, 3, 4, 5].includes(g.form)) throw new Error(`geo: ${JSON.stringify(id)} has form ${String(g.form)}`)
+      if (!Number.isSafeInteger(g.lat) || !Number.isSafeInteger(g.lon)) throw new Error(`geo: ${JSON.stringify(id)} has a point that is not two integers`)
+      if (g.sure === 0 && (g.lat !== 0 || g.lon !== 0)) throw new Error(`geo: ${JSON.stringify(id)} has a point and sure 0`)
+      if (g.sure > 0 && (g.lat < -9000 || g.lat > 9000 || g.lon < -18000 || g.lon > 18000)) throw new Error(`geo: ${JSON.stringify(id)} is outside the globe`)
+      sure.push(g.sure), form.push(g.form), lat.push(g.lat), lon.push(g.lon)
+    }
+    tables.geo = [1, false]
+    t.geo = { lat: encodeDeltas(lat), lon: encodeDeltas(lon), sure: encodeUvarints(sure), form: encodeUvarints(form) }
+  }
+  if (m.routes !== undefined) {
+    const event: number[] = []
+    const count: number[] = []
+    const stops: number[] = []
+    for (const r of m.routes) {
+      const e = number.get(r.event)
+      if (e === undefined || m.topics.get(r.event)!.kind !== 'event') throw new Error(`routes: ${JSON.stringify(r.event)} is not an event of the topics`)
+      if (r.stops.length < 2) throw new Error(`routes: ${JSON.stringify(r.event)} has fewer than 2 stops`)
+      r.stops.forEach((id, i) => {
+        if (!number.has(id) || m.topics.get(id)!.kind !== 'place') throw new Error(`routes: the stop ${JSON.stringify(id)} of ${JSON.stringify(r.event)} is not a place of the topics`)
+        if (i > 0 && r.stops[i - 1] === id) throw new Error(`routes: ${JSON.stringify(r.event)} has the stop ${JSON.stringify(id)} twice in a row`)
+        stops.push(number.get(id)!)
+      })
+      event.push(e)
+      count.push(r.stops.length)
+    }
+    tables.routes = [1, false]
+    t.routes = { event: encodeUvarints(event), count: encodeUvarints(count), stops: encodeUvarints(stops) }
+  }
   return { tables, t }
 }
 
@@ -173,6 +216,39 @@ export function xtopicsSegment(m: XtopicsCore | XtopicsPart): Segment {
     h: { class: 'xtopics', v: 1, tables: { occurrences: [1, true] }, part: p.part, book: p.part, res: [] },
     t: { occurrences: encodeVerseLists(p.part, p.occurrences) },
   }
+}
+
+/** The table `people` or `places` as written: the shape of {@link TopicsPeople}, every id with `prefix`, no empty text, the ids of an alias sorted. Throws on a defect. */
+function namesTable(m: TopicsPeople, name: 'people' | 'places', prefix: 'per:' | 'lug:'): Record<string, CborValue> {
+  const check = (id: string, what: string): void => {
+    if (!id.startsWith(prefix)) throw new Error(`${name}: ${what} ${JSON.stringify(id)} is not a ${prefix} id`)
+  }
+  const text = (v: string, what: string): string => {
+    if (typeof v !== 'string' || v === '') throw new Error(`${name}: ${what} is empty`)
+    return v
+  }
+  const names: Record<string, string> = {}
+  for (const [k, v] of Object.entries(sortedRecord(m.names))) {
+    check(k, 'the name of')
+    put(names, k, text(v, `the name of ${k}`))
+  }
+  const notes: Record<string, string> = {}
+  for (const [k, v] of Object.entries(sortedRecord(m.notes))) {
+    check(k, 'the note of')
+    put(notes, k, text(v, `the note of ${k}`))
+  }
+  const aliases: Record<string, string[]> = {}
+  for (const [k, v] of Object.entries(sortedRecord(m.aliases))) {
+    text(k, 'an alias')
+    if (v.length === 0) throw new Error(`${name}: the alias ${JSON.stringify(k)} names no one`)
+    const ids = [...v].sort(compareCodePoints)
+    ids.forEach((id, i) => {
+      check(id, `the alias ${JSON.stringify(k)} names`)
+      if (i > 0 && ids[i - 1] === id) throw new Error(`${name}: the alias ${JSON.stringify(k)} names ${id} twice`)
+    })
+    put(aliases, k, ids)
+  }
+  return { names, notes, aliases }
 }
 
 function topicsCoreTables(m: TopicsCore): Built {
@@ -210,36 +286,12 @@ function topicsCoreTables(m: TopicsCore): Built {
     t.local = local
   }
   if (m.people !== undefined) {
-    const per = (id: string, what: string): void => {
-      if (!id.startsWith('per:')) throw new Error(`people: ${what} ${JSON.stringify(id)} is not a per: id`)
-    }
-    const text = (v: string, what: string): string => {
-      if (typeof v !== 'string' || v === '') throw new Error(`people: ${what} is empty`)
-      return v
-    }
-    const names: Record<string, string> = {}
-    for (const [k, v] of Object.entries(sortedRecord(m.people.names))) {
-      per(k, 'the name of')
-      put(names, k, text(v, `the name of ${k}`))
-    }
-    const notes: Record<string, string> = {}
-    for (const [k, v] of Object.entries(sortedRecord(m.people.notes))) {
-      per(k, 'the note of')
-      put(notes, k, text(v, `the note of ${k}`))
-    }
-    const aliases: Record<string, string[]> = {}
-    for (const [k, v] of Object.entries(sortedRecord(m.people.aliases))) {
-      text(k, 'an alias')
-      if (v.length === 0) throw new Error(`people: the alias ${JSON.stringify(k)} names no one`)
-      const ids = [...v].sort(compareCodePoints)
-      ids.forEach((id, i) => {
-        per(id, `the alias ${JSON.stringify(k)} names`)
-        if (i > 0 && ids[i - 1] === id) throw new Error(`people: the alias ${JSON.stringify(k)} names ${id} twice`)
-      })
-      put(aliases, k, ids)
-    }
     tables.people = [1, false]
-    t.people = { names, notes, aliases }
+    t.people = namesTable(m.people, 'people', 'per:')
+  }
+  if (m.places !== undefined) {
+    tables.places = [1, false]
+    t.places = namesTable(m.places, 'places', 'lug:')
   }
   return { tables, t }
 }

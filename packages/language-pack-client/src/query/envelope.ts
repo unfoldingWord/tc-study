@@ -3,7 +3,7 @@
  * answer read (a book of revision 9 under a map of revision 12 says both), the coverage of what was asked, and the units that
  * would have been needed but are not installed, with their size. No Node module here.
  */
-import type { ReviewLevel, State } from '@bt-synergy/language-pack-v3'
+import type { Audience, ReviewLevel, State, Style } from '@bt-synergy/language-pack-v3'
 import type { PackReader } from '../reader'
 
 /** Where a row or a cite from a patch catalog comes from (`patch.ts`): the patch and the provenance of its resource entry. */
@@ -11,6 +11,8 @@ export type PatchMark = {
   patch: string
   source?: string
   review?: ReviewLevel
+  audience?: Audience
+  style?: Style
   license: string
   rights?: string
   attribution?: string
@@ -23,7 +25,7 @@ export type Cite = { res: string; release: string; id?: string; ref?: string; se
 /** The state of a cell of the map: `State` of language-pack-v3 (`Coverage` there is the map's own type). */
 export type CellState = State
 
-export type QueryName = 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy' | 'stories' | 'story' | 'sections' | 'frameVerses' | 'framesAt' | 'family' | 'people'
+export type QueryName = 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy' | 'stories' | 'story' | 'sections' | 'frameVerses' | 'framesAt' | 'family' | 'people' | 'place' | 'placesOf' | 'passagePlaces' | 'route'
 
 export type NotInstalled = { book?: string; unit: string; bytes: number; what?: string }
 
