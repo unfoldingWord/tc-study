@@ -20,6 +20,11 @@
  * install and read both alike (it skips the two optional tables it does not know). PASS = identical `semantic`, which also lists the map
  * units the old client reads (`maps`).
  *   bun packages/language-pack-client/scripts/old-clients.ts --kin [ref ...]
+ *
+ * With `--geo` it checks the maps tables the same way: the "with" sample's common xtopics core has `geo` (and `born-in`), its common catalog lists
+ * the `basemap` complement, and its es-419 topics core has `places` (`buildSample({ geo: true })`); the other is the sample as it is. An old client must
+ * install and read both alike (it skips the optional tables it does not know and ignores the complement). PASS = identical `semantic`.
+ *   bun packages/language-pack-client/scripts/old-clients.ts --geo [ref ...]
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -32,7 +37,8 @@ import { buildSample, type Sample } from '../test/sample'
 
 const frames = process.argv.includes('--frames')
 const kin = process.argv.includes('--kin')
-const given = process.argv.slice(2).filter((a) => a !== '--frames' && a !== '--kin')
+const geo = process.argv.includes('--geo')
+const given = process.argv.slice(2).filter((a) => a !== '--frames' && a !== '--kin' && a !== '--geo')
 const refs = given.length > 0 ? given : ['569b88a6', '302631d4']
 
 function run(cmd: string, args: string[], cwd: string): { code: number; out: string } {
@@ -124,8 +130,22 @@ async function main(): Promise<number> {
   const withDir = join(tmp, 'packs-with')
   const withoutDir = join(tmp, 'packs-without')
   // with --frames: the "with" folder is a sample whose common xtopics core has obs-frames (its own keys)
-  const withSample = frames ? await buildSample({ frames: framesFixture() }) : kin ? await buildSample({ acai: true }) : sample
-  if (kin) {
+  const withSample = frames ? await buildSample({ frames: framesFixture() }) : kin ? await buildSample({ acai: true }) : geo ? await buildSample({ geo: true }) : sample
+  if (geo) {
+    // the control: the "with" sample has geo in the common xtopics core, places in the es-419 topics core and a complement in the common catalog
+    const tablesOf = (smp: Sample): string[] => {
+      const out: string[] = []
+      for (const bytes of smp.segments.values()) {
+        const h = readHeader(bytes).header.h as { class?: unknown; part?: unknown; tables?: Record<string, unknown> }
+        if ((h.class === 'xtopics' || h.class === 'topics') && h.part === 'core') for (const t of ['geo', 'routes', 'places']) if (h.tables?.[t] !== undefined) out.push(`${h.class}.${t}`)
+      }
+      return out.sort()
+    }
+    const [w, wo] = [tablesOf(withSample), tablesOf(sample)]
+    if (w.join() !== 'topics.places,xtopics.geo' || wo.length !== 0 || withSample.complements?.size !== 1) throw new Error(`the samples are not what they should be: ${w.join() || 'none'} and ${wo.join() || 'none'}, ${withSample.complements?.size ?? 0} complements`)
+    console.log(`control: the "with" sample has ${w.join(' and ')} and a basemap complement, the other none`)
+    writePacks(withDir, withSample)
+  } else if (kin) {
     // the control: the "with" sample has gender in the common xtopics core and people in the es-419 topics core, the other has neither
     const tablesOf = (smp: Sample): string[] => {
       const out: string[] = []
@@ -156,7 +176,7 @@ async function main(): Promise<number> {
   }
   else writePacks(withDir, sample, await buildObsimgFixture(sample))
   writePacks(withoutDir, sample)
-  console.log(`packs: ${withDir} (with ${frames ? 'obs-frames' : kin ? 'gender and people' : 'zxx-obsimg'}), ${withoutDir} (without)`)
+  console.log(`packs: ${withDir} (with ${frames ? 'obs-frames' : kin ? 'gender and people' : geo ? 'geo, places and basemap' : 'zxx-obsimg'}), ${withoutDir} (without)`)
 
   let failures = 0
   for (const ref of refs) {
@@ -173,11 +193,11 @@ async function main(): Promise<number> {
         continue
       }
       const semantic = (out: string) => JSON.stringify((JSON.parse(out) as { semantic: unknown }).semantic)
-      if (frames || kin ? semantic(a.out) === semantic(b.out) : a.out === b.out) {
+      if (frames || kin || geo ? semantic(a.out) === semantic(b.out) : a.out === b.out) {
         const d = JSON.parse(a.out) as { state: { units: object }; read: unknown }
         console.log(`  units: ${Object.keys(d.state.units).join(', ')}\n  read: ${JSON.stringify(d.read)}`)
-        if (frames || kin) console.log(`  semantic: ${semantic(a.out).slice(0, 600)}`)
-        console.log(`PASS ${ref}: identical ${frames ? 'reads with and without obs-frames' : kin ? 'reads with and without gender and people' : 'dumps with and without zxx-obsimg'} (${a.out.length} chars)`)
+        if (frames || kin || geo) console.log(`  semantic: ${semantic(a.out).slice(0, 600)}`)
+        console.log(`PASS ${ref}: identical ${frames ? 'reads with and without obs-frames' : kin ? 'reads with and without gender and people' : geo ? 'reads with and without geo, places and the basemap' : 'dumps with and without zxx-obsimg'} (${a.out.length} chars)`)
       } else {
         failures++
         console.log(`FAIL ${ref}: the dumps differ\n--- with:\n${a.out.slice(0, 1500)}\n--- without:\n${b.out.slice(0, 1500)}`)

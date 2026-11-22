@@ -663,7 +663,13 @@ export async function buildCommon(o: {
      * The maps: `openbible` (`openbible/ancient.jsonl`) and `acaiPlaces` (`acai/places.json`, `trimAcaiPlaces`) give `geo`, `routes`, `born-in`, `died-in` and the
      * `same-as` of places; they need `acai`. The three zips of Natural Earth (`basemap`) give the complement `basemap`.
      */
-    maps?: { openbible: string; acaiPlaces: string; basemap?: { land: Uint8Array; lakes: Uint8Array; rivers: Uint8Array } }
+    maps?: {
+      openbible: string
+      acaiPlaces: string
+      basemap?: { land: Uint8Array; lakes: Uint8Array; rivers: Uint8Array }
+      /** The builder's lists in place of the bundled ones (`routes.json`, `born-died-exclude.json`, `place-names.json`): for tests with a subset of the sources. */
+      lists?: Pick<MapsInput, 'routes' | 'exclude' | 'placeNames'>
+    }
   }
 }): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[]; complements: { complement: Complement; bytes: Uint8Array }[] }> {
   const refs = await o.source.resources(ORIGINALS)
@@ -789,9 +795,9 @@ export async function buildCommon(o: {
         openbible: parseOpenBible(t.maps.openbible, issues),
         acaiPlaces: parseAcaiPlaces(t.maps.acaiPlaces).places,
         birthDeath: parseTheoBirthDeath(t.theographic, []),
-        routes: ROUTES,
-        exclude: BORN_DIED_EXCLUDE as MapsInput['exclude'],
-        placeNames: PLACE_NAMES,
+        routes: t.maps.lists?.routes ?? ROUTES,
+        exclude: t.maps.lists?.exclude ?? (BORN_DIED_EXCLUDE as MapsInput['exclude']),
+        placeNames: t.maps.lists?.placeNames ?? PLACE_NAMES,
       }
       res.openbible = [OPENBIBLE_SOURCE.key, OPENBIBLE_SOURCE.release]
     }
@@ -872,7 +878,7 @@ export async function buildCommon(o: {
         : [
             { layer: 'topics', key: `openbible|${sha256Hex(t.maps.openbible)}` },
             { layer: 'topics', key: `acai-places|${sha256Hex(t.maps.acaiPlaces)}` },
-            { layer: 'topics', key: `maps-lists|${sha256Hex(JSON.stringify([ROUTES, BORN_DIED_EXCLUDE, PLACE_NAMES]))}` },
+            { layer: 'topics', key: `maps-lists|${sha256Hex(JSON.stringify([t.maps.lists?.routes ?? ROUTES, t.maps.lists?.exclude ?? BORN_DIED_EXCLUDE, t.maps.lists?.placeNames ?? PLACE_NAMES]))}` },
           ]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))
     // ACAI is read by the core only (gender, same-as): the parts keep the inputs and bytes of a build without it

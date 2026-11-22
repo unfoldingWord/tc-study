@@ -209,3 +209,26 @@ describe('route', () => {
     expect((await route(reader(), 'ev:other')).data).toBeNull()
   })
 })
+
+describe('the sample built with the maps (buildSample({ geo: true }))', () => {
+  test('the common core has geo, born-in and the basemap complement; the es-419 core has places', async () => {
+    const { buildSample } = await import('../../test/sample')
+    const { KNOWN, readHeader, readSegment, topicsView, xtopicsView, decodeBasemap } = await import('@bt-synergy/language-pack-v3')
+    const sample = await buildSample({ geo: true })
+    let x: XtopicsCore | undefined
+    let t: TopicsCore | undefined
+    for (const bytes of sample.segments.values()) {
+      const h = readHeader(bytes).header.h as { class?: string; part?: string }
+      if (h.part !== 'core') continue
+      if (h.class === 'xtopics') x = xtopicsView((await readSegment(bytes, { known: KNOWN.xtopics })).seg) as XtopicsCore
+      if (h.class === 'topics') t = topicsView((await readSegment(bytes, { known: KNOWN.topics })).seg) as TopicsCore
+    }
+    expect(x?.geo?.['lug:jerusalem']).toMatchObject({ sure: 2, form: 1, lat: 3178, lon: 3523 })
+    expect(x?.geo?.['lug:bethlehem-gen-35-16']).toMatchObject({ sure: 3 })
+    expect(x?.geo?.['lug:egypt']).toMatchObject({ sure: 1, form: 2 })
+    expect(x?.geo?.['lug:ur']).toMatchObject({ form: 5 })
+    expect(x?.res.map(([k]) => k)).toContain('openbibleinfo/Bible-Geocoding-Data')
+    expect(Object.keys(t?.places?.names ?? {}).length).toBeGreaterThan(0)
+    expect([...(sample.complements?.values() ?? [])].map((b) => decodeBasemap(b).paths.length)).toEqual([3])
+  })
+});

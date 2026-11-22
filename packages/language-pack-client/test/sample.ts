@@ -7,6 +7,7 @@ import {
   buildLanguage,
   keyId,
   parseAcai,
+  parseAcaiPlaces,
   parseTipnr,
   publicKeyOf,
   signCatalog,
@@ -14,6 +15,7 @@ import {
   type BuiltSegment,
   type RowSource,
 } from '@bt-synergy/language-pack-v3'
+import { naturalEarthFixture } from '../../language-pack-v3/spec/tests/data/topics/natural-earth-fixture'
 import { partsSource } from '../../language-pack-v3/src/node/partsSource'
 import type { ResourceRef, Row, RowFilter } from '../../language-pack-v3/src/source/rows'
 import type { XtopicsCore } from '../../language-pack-v3/src/model'
@@ -24,6 +26,8 @@ export type Sample = {
   commonCatalog: Uint8Array
   /** `publicKey` is lowercase hex of the 32 raw bytes; `privateKey` is the PKCS#8 form, made at run time. */
   keys: { keyId: string; publicKey: string; privateKey: Uint8Array }
+  /** The complements of the common catalog (the `basemap` of a `geo` sample), by the hex of their sha256. */
+  complements?: Map<string, Uint8Array>
 }
 
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
@@ -143,12 +147,14 @@ let memo: Promise<Built> | undefined
  * catalog only (same key, same common catalog); `commonRevision` builds a common catalog of another id (the language catalog
  * still requires the first one). `books` builds the language catalog with those books only (`[]`: none).
  */
-export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean; books?: string[]; frames?: Map<string, string>; acai?: boolean } = {}): Promise<Sample> {
+export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean; books?: string[]; frames?: Map<string, string>; acai?: boolean; geo?: boolean } = {}): Promise<Sample> {
   // `frames` (bible-story-builder's OBS files): another sample, built afresh, whose common xtopics core has the obs-frames table
   if (o.frames !== undefined) return (await make(o.frames)).sample
   // `acai`: another sample, built afresh with the ACAI fixture (`data/topics/acai-people.json`): `gender` and the ACAI same-as in the
   // common xtopics core, `people` in the es-419 topics core
   if (o.acai === true) return (await make(undefined, true)).sample
+  // `geo`: the same with the maps (`geo`, `routes`, `born-in` in the common xtopics core, `places` in the es-419 topics core, and the `basemap` complement)
+  if (o.geo === true) return (await make(undefined, true, true)).sample
   memo ??= make()
   const base = await memo
   if (o.revision === undefined && o.tweak === undefined && o.commonRevision === undefined && o.books === undefined) return base.sample
@@ -178,7 +184,7 @@ export async function buildSample(o: { revision?: number; tweak?: Tweak; commonR
   return { ...base.sample, segments, langCatalog, commonCatalog }
 }
 
-async function make(frames?: Map<string, string>, withAcai = false): Promise<Built> {
+async function make(frames?: Map<string, string>, withAcai = false, withGeo = false): Promise<Built> {
   const parts = join(DATA, 'parts')
   const originals = join(DATA, 'originals', 'list.json')
   const source = async (lang: string) => {
@@ -211,18 +217,20 @@ async function make(frames?: Map<string, string>, withAcai = false): Promise<Bui
       obs,
       ...(frames !== undefined ? { frames } : {}),
       ...(withAcai ? { acai: read('acai-people.json') } : {}),
+      ...(withGeo ? { maps: { openbible: read('openbible-subset.jsonl'), acaiPlaces: read('acai-places.json'), basemap: naturalEarthFixture(), lists: { routes: [], exclude: [], placeNames: {} } } } : {}),
     },
   })
   const core = xtopicsView(common.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!.seg) as XtopicsCore
   const records = parseTipnr(tipnr, [])
   const acai = withAcai ? parseAcai(read('acai-people.json')) : undefined
+  const places = withGeo ? parseAcaiPlaces(read('acai-places.json')).places : undefined
   const lang = await buildLanguage({
     source: await source(ES),
     lang: ES,
     registry: {},
     about,
     requires: [['common', about.revision, common.catalog.id]],
-    topics: { xtopics: core, records, ...(acai === undefined ? {} : { acai: { people: acai.people, release: acai.commit.slice(0, 8) } }) },
+    topics: { xtopics: core, records, ...(acai === undefined ? {} : { acai: { people: acai.people, ...(places === undefined ? {} : { places }), release: acai.commit.slice(0, 8) } }) },
     aligned: true,
   })
 
@@ -237,6 +245,7 @@ async function make(frames?: Map<string, string>, withAcai = false): Promise<Bui
     langCatalog: await signCatalog(lang.catalog.bytes, pkcs8),
     commonCatalog: await signCatalog(common.catalog.bytes, pkcs8),
     keys: { keyId: keyId(publicKey), publicKey: hex(publicKey), privateKey: pkcs8 },
+    ...(common.complements.length === 0 ? {} : { complements: new Map(common.complements.map((c) => [hex(c.complement.id), c.bytes])) }),
   }
   return { sample, common, source, pkcs8, core, records }
 }
