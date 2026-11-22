@@ -220,6 +220,31 @@ describe('build-patch-v3', () => {
     expect(JSON.parse(r.out[r.out.length - 1]).books).toEqual({ tn: [], tq: ['phm'] })
   })
 
+  test('a language with a region, no questions and no Manual of its own (es-419): the Manual stands in from the notes', async () => {
+    const { args } = await inputs()
+    const out = temp()
+    const full = args(out).map((a) => (a === 'hi' ? 'es-419' : a))
+    const without = (flag: string): string[] => full.filter((_, i) => full[i] !== flag && full[i - 1] !== flag)
+    const argv = without('--tq').filter((a, i, all) => a !== '--ta' && all[i - 1] !== '--ta')
+    const r = await run(argv)
+    expect(r.err).toEqual([])
+    expect(r.code).toBe(0)
+    const summary = JSON.parse(r.out[r.out.length - 1])
+    expect(summary.books).toEqual({ tn: ['tit'], tq: [] })
+    const catalog = catalogView((await readSegment(read(join(out, 'catalog-es-419-x-aquifer.seg')), { known: KNOWN.catalog, expectedClass: 'catalog' })).seg)
+    expect(catalog.about.catalog).toBe('es-419-x-aquifer')
+    const report = readFileSync(join(out, 'report.txt'), 'utf8')
+    expect(report).toContain('tq: 0 books')
+    // The stand-in Manual from the notes' own associations resolved at least one article (an empty one would match none).
+    expect(report).toMatch(/ta map: [1-9]d* articles matched/)
+  })
+
+  test('--lang takes a tag with a region but never a private-use subtag', () => {
+    const base = ['--source', 'aquifer', '--tn', '/x']
+    for (const lang of ['es-419', 'pt-br', 'hi']) expect(() => optionsFromArgs(['--lang', lang, ...base])).not.toThrow(/language tag/)
+    for (const lang of ['es-x-aquifer', 'es-x', 'es-419-x', 'ES', 'e', '-419']) expect(() => optionsFromArgs(['--lang', lang, ...base])).toThrow(/language tag/)
+  })
+
   test('a build with nothing to add is an error, and a missing flag a usage error', async () => {
     const { args, root } = await inputs()
     write(join(root, 'base.json'), { tn: ['tit', 'phm'], tq: ['tit', 'phm'] })
@@ -392,7 +417,7 @@ describe('door43-books', () => {
       return page(url)
     }) as unknown as typeof fetch
     expect(await door43Books('hi', fetcher, 'http://x')).toEqual({ lang: 'hi', tn: ['act'], tq: ['gen', 'rut'] })
-    expect(urls).toEqual(['http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=1', 'http://x/api/v1/catalog/search?lang=hi&stage=prod&limit=100&page=2'])
+    expect(urls).toEqual(['http://x/api/v1/catalog/search?lang=hi&stage=prod&topic=tc-ready&limit=100&page=1', 'http://x/api/v1/catalog/search?lang=hi&stage=prod&topic=tc-ready&limit=100&page=2'])
   })
 
   test('follows the pages until an empty one, when the server caps a page at 50', async () => {

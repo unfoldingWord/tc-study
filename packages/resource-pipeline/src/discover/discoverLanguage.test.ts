@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { CatalogManager } from '@bt-synergy/catalog-manager/core'
-import { discoverLanguage, obsOwnHelpsSubjects } from './discoverLanguage'
+import { compareLiteralCandidates, discoverLanguage, obsOwnHelpsSubjects } from './discoverLanguage'
 import { createHeadlessResourceTypeRegistry } from './resourceTypeRegistry'
 
 function memoryStore() {
@@ -93,6 +93,38 @@ describe('discoverLanguage', () => {
     // The OBS stories search (subject Open Bible Stories, no topic) is the one non-"OBS" subject, for the owner pick.
     expect(obsSubjects).toContain('Open Bible Stories')
     expect(obsSubjects.every((s) => /\bOBS\b/.test(String(s)) || s === 'Open Bible Stories')).toBe(true)
+  })
+
+  test('a language with no tc-ready literal aligned text takes its literal aligned Bible without the topic, marked; one that has it does not', async () => {
+    const make = (tcReady: unknown[]) => {
+      const door43 = fakeDoor43((p) => {
+        if (p.topic === 'tc-ready') return tcReady
+        if (!p.topic && p.subject === 'Aligned Bible') {
+          return [hit('ru_gt', 'ru', 'ru_glt', 'Aligned Bible'), hit('ru_x', 'ru', 'ru_rob', 'Aligned Bible'), hit('es-419_obt', 'es-419', 'es-419_glt', 'Aligned Bible')]
+        }
+        return []
+      })
+      const catalogManager = new CatalogManager({ catalogAdapter: memoryStore() as never, cacheAdapter: memoryStore() as never, door43Client: door43 as never } as never)
+      return { door43, catalogManager }
+    }
+    const ru = make([hit('ru_gt', 'ru', 'ru_tn', 'TSV Translation Notes')])
+    const found = await discoverLanguage({ language: 'ru', door43Client: ru.door43 as never, catalogManager: ru.catalogManager, resourceTypeRegistry: createHeadlessResourceTypeRegistry(ru.catalogManager) })
+    expect(found.withoutTcReady).toEqual(['ru_gt/ru/glt'])
+    expect(found.resources.find((r) => r.resourceKey === 'ru_gt/ru/glt')?.withoutTcReady).toBe(true)
+    expect(found.resources.map((r) => r.resourceKey)).not.toContain('ru_x/ru/rob')
+    expect(found.resources.find((r) => r.resourceKey === 'ru_gt/ru/tn')?.withoutTcReady).toBeUndefined()
+
+    const es = make([hit('es-419_gl', 'es-419', 'es-419_glt', 'Aligned Bible')])
+    const withIt = await discoverLanguage({ language: 'es-419', door43Client: es.door43 as never, catalogManager: es.catalogManager, resourceTypeRegistry: createHeadlessResourceTypeRegistry(es.catalogManager) })
+    expect(withIt.withoutTcReady).toEqual([])
+    expect(es.door43.calls.some((c) => !c.topic && c.subject === 'Aligned Bible')).toBe(false)
+  })
+
+  test('the fallback picks the ULT/GLT with the most files, never by owner name', () => {
+    const withFiles = (owner: string, name: string, n: number) => ({ ...hit(owner, 'ru', name, 'Aligned Bible'), ingredients: Array.from({ length: n }, () => ({})) })
+    const list = [withFiles('a_fork', 'ru_glt', 3), withFiles('ru_gt', 'ru_glt', 66), withFiles('a_other', 'ru_bolt', 66)]
+    const sorted = [...list].sort(compareLiteralCandidates('ru')).map((e) => (e as { owner: string }).owner)
+    expect(sorted).toEqual(['ru_gt', 'a_fork', 'a_other'])
   })
 
   test('obsOwnHelpsSubjects keeps only OBS subjects', () => {

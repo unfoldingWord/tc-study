@@ -45,6 +45,16 @@ export async function searchObsStories(client: CatalogSearchClient, languageCode
   return ((await client.searchCatalog(params)) ?? []) as CatalogEntry[]
 }
 
+/** The language's Aligned Bibles at `stage=prod`, any owner, no topic: the fallback when `tc-ready` has no literal aligned text. */
+export async function searchAlignedBibles(client: CatalogSearchClient, languageCode: string): Promise<CatalogEntry[]> {
+  const params: CatalogSearchParams = {
+    language: door43LanguageQueryCode(languageCode),
+    subject: 'Aligned Bible',
+    ...OBS_HELPS_FILTER,
+  }
+  return ((await client.searchCatalog(params)) ?? []) as CatalogEntry[]
+}
+
 function isObsScope(navigationScope: string): boolean {
   return navigationScope === 'obs'
 }

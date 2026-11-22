@@ -296,6 +296,12 @@ export type About = {
 
 export const REVIEW_LEVELS = ['none', 'community', 'professional', 'mixed'] as const
 export type ReviewLevel = (typeof REVIEW_LEVELS)[number]
+/** Who a text is for (`catalog.md`, "Patch catalogs"): `translators` (a tool for translating) or `readers` (a version to read). */
+export const AUDIENCES = ['translators', 'readers'] as const
+export type Audience = (typeof AUDIENCES)[number]
+/** How a text renders its source: `literal` (close to the form), `simple` (clear, simplified wording) or `dynamic` (meaning first). */
+export const STYLES = ['literal', 'simple', 'dynamic'] as const
+export type Style = (typeof STYLES)[number]
 
 /** A resource a catalog lists (`catalog.cddl`, `resource`). `books` is the 9-byte book set (`ids.ts`, `bookSet`): all zeros for a resource without books. */
 export type CatalogResource = {
@@ -310,6 +316,9 @@ export type CatalogResource = {
   source?: string
   /** The `review_level` of the source's articles; `"mixed"` when they differ. */
   review?: ReviewLevel
+  /** Who the text is for, with `style` (a Bible text of a patch catalog). */
+  audience?: Audience
+  style?: Style
   books: Uint8Array
 }
 

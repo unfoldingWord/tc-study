@@ -41,6 +41,8 @@ resource = {
   ? "attribution": tstr,       ; the credit line an app shows
   ? "source": tstr,            ; the aggregator the data came from ("aquifer"): a patch catalog's resource
   ? "review": "none" / "community" / "professional" / "mixed",   ; the review level of the source's articles; "mixed" when they differ
+  ? "audience": "translators" / "readers",   ; who the text is for: a tool for translators, or a version for readers (a Bible text of a patch catalog)
+  ? "style": "literal" / "simple" / "dynamic",   ; how it renders its source: close to the form, clear and simplified, or meaning first
   "books": book-set,           ; the books it has (all zeros for resources without books)
 }
 
