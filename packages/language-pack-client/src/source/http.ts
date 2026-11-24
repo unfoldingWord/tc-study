@@ -4,9 +4,11 @@ import { ClientError } from '../errors'
 export interface PackSource {
   catalog(name: string, o?: { etag?: string; signal?: AbortSignal }): Promise<{ bytes: Uint8Array; etag?: string } | 'not-modified'>
   segment(id: string, signal?: AbortSignal): Promise<Uint8Array>
+  /** A complement by the sha256 of the file (`GET /v3/packs/complement/{id}`). Optional: a source without it cannot fetch complements. */
+  complement?(id: string, o?: { signal?: AbortSignal }): Promise<Uint8Array>
 }
 
-/** The packs Worker over HTTP (`spec/serving.md`): `/v3/packs/{lang}/catalog`, `/v3/packs/common/catalog`, `/v3/packs/seg/{id}`. */
+/** The packs Worker over HTTP (`spec/serving.md`): `/v3/packs/{lang}/catalog`, `/v3/packs/common/catalog`, `/v3/packs/seg/{id}`, `/v3/packs/complement/{id}`. */
 export function httpSource(o: { base: string; fetch?: typeof fetch }): PackSource {
   const base = o.base.replace(/\/+$/, '')
   const doFetch: typeof fetch = o.fetch ?? ((input, init) => fetch(input, init))
@@ -63,6 +65,11 @@ export function httpSource(o: { base: string; fetch?: typeof fetch }): PackSourc
       const res = await get(`/v3/packs/seg/${encodeURIComponent(id)}`, {}, signal)
       if (!res.ok) return fail(res, false)
       return body(res, signal)
+    },
+    async complement(id, opts = {}) {
+      const res = await get(`/v3/packs/complement/${encodeURIComponent(id)}`, {}, opts.signal)
+      if (!res.ok) return fail(res, false)
+      return body(res, opts.signal)
     },
   }
 }

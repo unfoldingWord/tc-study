@@ -4,6 +4,7 @@ export const CLIENT_ERROR_CODES = [
   'E_NO_BASE',
   'E_NO_PACK',
   'E_NETWORK',
+  'E_ID',
   'E_STORE',
   'E_NOT_INSTALLED',
   'E_ARG',
