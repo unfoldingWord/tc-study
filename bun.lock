@@ -499,6 +499,19 @@
         "typescript": "^5.3.3",
       },
     },
+    "packages/language-pack-assistant": {
+      "name": "@bt-synergy/language-pack-assistant",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/language-pack-client": "workspace:*",
+        "@bt-synergy/language-pack-v3": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^20.10.0",
+        "cldr-rbnf": "49.0.0",
+        "typescript": "^5.3.3",
+      },
+    },
     "packages/language-pack-client": {
       "name": "@bt-synergy/language-pack-client",
       "version": "0.1.0",
@@ -1306,6 +1319,8 @@
     "@bt-synergy/door43-api": ["@bt-synergy/door43-api@workspace:packages/door43-api"],
 
     "@bt-synergy/language-pack": ["@bt-synergy/language-pack@workspace:packages/language-pack"],
+
+    "@bt-synergy/language-pack-assistant": ["@bt-synergy/language-pack-assistant@workspace:packages/language-pack-assistant"],
 
     "@bt-synergy/language-pack-client": ["@bt-synergy/language-pack-client@workspace:packages/language-pack-client"],
 
@@ -2214,6 +2229,8 @@
     "chromium-edge-launcher": ["chromium-edge-launcher@0.2.0", "", { "dependencies": { "@types/node": "*", "escape-string-regexp": "^4.0.0", "is-wsl": "^2.2.0", "lighthouse-logger": "^1.0.0", "mkdirp": "^1.0.4", "rimraf": "^3.0.2" } }, "sha512-JfJjUnq25y9yg4FABRRVPmBGWPZZi+AQXT4mxupb67766/0UlhG8PAZCz6xzEMXTbW3CsSoE8PcCWA49n35mKg=="],
 
     "ci-info": ["ci-info@3.9.0", "", {}, "sha512-NIxF55hv4nSqQswkAeiOi1r83xy8JldOFDTWiug55KBu9Jnblncd2U6ViHmYgHf01TPZS77NJBhBMKdWj9HQMQ=="],
+
+    "cldr-rbnf": ["cldr-rbnf@49.0.0", "", {}, "sha512-oymusxbr2jj1tdAtnguxdd0ZqNuDPA8R7wB7dH3QEq6RiJjtK3CuxH6rrEf6DizU+wzJa5Ks59ckgr3DWeqIEQ=="],
 
     "cli-cursor": ["cli-cursor@5.0.0", "", { "dependencies": { "restore-cursor": "^5.0.0" } }, "sha512-aCj4O5wKyszjMmDT4tZj93kxyydN/K5zPWSCe6/0AV/AA1pqe5ZBIw0a2ZfPQV7lL5/yb5HsUreJ6UFAF1tEQw=="],
 

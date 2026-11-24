@@ -1,0 +1,100 @@
+{"q":"Tito 2:11","expect":{"call":{"query":"passage","args":{"ref":"tit 2:11"}}},"pieces":[]}
+{"q":"Muéstrame Juan 3:16","expect":{"call":{"query":"passage","args":{"ref":"jhn 3:16"}}},"pieces":[]}
+{"q":"¿Qué dicen las notas de Rut 1:16?","expect":{"call":{"query":"passage","args":{"ref":"rut 1:16"}}},"pieces":[]}
+{"q":"ayudas para Mateo 5:3","expect":{"call":{"query":"passage","args":{"ref":"mat 5:3"}}},"pieces":[]}
+{"q":"Salmo 23:1","expect":{"call":{"query":"passage","args":{"ref":"psa 23:1"}}},"pieces":[]}
+{"q":"tito dos once","expect":{"call":{"query":"passage","args":{"ref":"tit 2:11"}}},"pieces":[]}
+{"q":"Génesis 12, versículo 1","expect":{"call":{"query":"passage","args":{"ref":"gen 12:1"}}},"pieces":[]}
+{"q":"Quiero ver Romanos 8:28 con sus notas","expect":{"call":{"query":"passage","args":{"ref":"rom 8:28"}}},"pieces":[]}
+{"q":"Éx 7:14","expect":{"call":{"query":"passage","args":{"ref":"exo 7:14"}}},"pieces":[]}
+{"q":"¿Cómo traduzco Hebreos 11:1?","expect":{"call":{"query":"passage","args":{"ref":"heb 11:1"}}},"pieces":[]}
+{"q":"1 Juan 4:8","expect":{"call":{"query":"passage","args":{"ref":"1jn 4:8"}}},"pieces":[]}
+{"q":"Lucas capítulo 15 versículo 11","expect":{"call":{"query":"passage","args":{"ref":"luk 15:11"}}},"pieces":[]}
+{"q":"notas de Filipenses 4:13","expect":{"call":{"query":"passage","args":{"ref":"php 4:13"}}},"pieces":[]}
+{"q":"Sal 119:105","expect":{"call":{"query":"passage","args":{"ref":"psa 119:105"}}},"pieces":[]}
+{"q":"Hechos 2:38","expect":{"call":{"query":"passage","args":{"ref":"act 2:38"}}},"pieces":[]}
+{"q":"Rut uno dieciséis","expect":{"call":{"query":"passage","args":{"ref":"rut 1:16"}}},"pieces":[]}
+{"q":"¿Qué significa Juan 1:1?","expect":{"call":{"query":"passage","args":{"ref":"jhn 1:1"}}},"pieces":[]}
+{"q":"Mt 28:19-20","expect":{"call":{"query":"passage","args":{"ref":"mat 28:19-20"}}},"pieces":[]}
+{"q":"Apocalipsis 21:4","expect":{"call":{"query":"passage","args":{"ref":"rev 21:4"}}},"pieces":[]}
+{"q":"Isaías 53:5","expect":{"call":{"query":"passage","args":{"ref":"isa 53:5"}}},"pieces":[]}
+{"q":"¿Qué es la gracia?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/grace"}}},"pieces":[]}
+{"q":"¿Qué significa redimir?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/redeem"}}},"pieces":[]}
+{"q":"¿Quién fue Abraham?","expect":{"call":{"query":"concept","args":{"id":"tw:names/abraham"}}},"pieces":[]}
+{"q":"Háblame de Abram","expect":{"call":{"query":"concept","args":{"id":"tw:names/abraham"}}},"pieces":[]}
+{"q":"¿Qué es un pacto?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/covenant"}}},"pieces":[]}
+{"q":"definición de justificar","expect":{"call":{"query":"concept","args":{"id":"tw:kt/justice"}}},"pieces":[]}
+{"q":"¿Qué quiere decir santo?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/holy"}}},"pieces":[]}
+{"q":"explícame la palabra pecado","expect":{"call":{"query":"concept","args":{"id":"tw:kt/sin"}}},"pieces":[]}
+{"q":"¿Quién era Moisés?","expect":{"call":{"query":"concept","args":{"id":"tw:names/moses"}}},"pieces":[]}
+{"q":"¿Qué era Egipto?","expect":{"call":{"query":"concept","args":{"id":"tw:names/egypt"}}},"pieces":[]}
+{"q":"información sobre Jerusalén","expect":{"call":{"query":"concept","args":{"id":"tw:names/jerusalem"}}},"pieces":[]}
+{"q":"¿Qué significa arrepentirse?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/repent"}}},"pieces":[]}
+{"q":"¿qué es la salvación?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/save"}}},"pieces":[]}
+{"q":"¿Quién fue Booz?","expect":{"call":{"query":"concept","args":{"id":"tw:names/boaz"}}},"pieces":[]}
+{"q":"el reino de Dios, ¿qué es?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/kingdomofgod"}}},"pieces":[]}
+{"q":"¿Qué es el templo?","expect":{"call":{"query":"concept","args":{"id":"tw:kt/temple"}}},"pieces":[]}
+{"q":"¿Quién era el faraón?","expect":{"call":{"query":"concept","args":{"id":"tw:names/pharaoh"}}},"pieces":[]}
+{"q":"significado de esperanza","expect":{"call":{"query":"concept","args":{"id":"tw:kt/hope"}}},"pieces":[]}
+{"q":"¿Qué es una metáfora?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metaphor"}}},"pieces":[]}
+{"q":"¿Cómo traduzco una pregunta retórica?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-rquestion"}}},"pieces":[]}
+{"q":"artículo de Academia sobre la hipérbole","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-hyperbole"}}},"pieces":[]}
+{"q":"sugerencias de traducción para la metonimia","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metonymy"}}},"pieces":[]}
+{"q":"¿Qué es un símil?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-simile"}}},"pieces":[]}
+{"q":"explícame la voz activa o pasiva","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-activepassive"}}},"pieces":[]}
+{"q":"¿cómo se traducen los nombres propios?","expect":{"call":{"query":"article","args":{"id":"ta:translate/translate-names"}}},"pieces":[]}
+{"q":"¿Qué es una expresión idiomática?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-idiom"}}},"pieces":[]}
+{"q":"doblete, ¿qué es?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-doublet"}}},"pieces":[]}
+{"q":"¿Qué son los sustantivos abstractos?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-abstractnouns"}}},"pieces":[]}
+{"q":"nosotros inclusivo y exclusivo","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-exclusive"}}},"pieces":[]}
+{"q":"¿Qué es la elipsis?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-ellipsis"}}},"pieces":[]}
+{"q":"¿Cómo traducir un eufemismo?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-euphemism"}}},"pieces":[]}
+{"q":"lee el artículo de metáfora","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metaphor"}}},"pieces":[]}
+{"q":"¿Cómo se tradujo gracia?","expect":{"choose":[{"query":"renderings","args":{"strong":"H2580"}},{"query":"renderings","args":{"strong":"G54850"}},{"query":"renderings","args":{"strong":"H2587"}}]},"pieces":[]}
+{"q":"¿Cómo traducen los textos la palabra pacto?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3772"}},{"query":"renderings","args":{"strong":"H1285"}},{"query":"renderings","args":{"strong":"G12420"}}]},"pieces":[]}
+{"q":"¿Cómo se ha traducido G5485?","expect":{"call":{"query":"renderings","args":{"strong":"G5485"}}},"pieces":[]}
+{"q":"compara cómo se tradujo redimir en cada libro","expect":{"choose":[{"query":"renderings","args":{"strong":"G00590"}},{"query":"renderings","args":{"strong":"G06290"}},{"query":"renderings","args":{"strong":"G18050"}}]},"pieces":[]}
+{"q":"¿De qué maneras se tradujo fe?","expect":{"choose":[{"query":"renderings","args":{"strong":"G36400"}},{"query":"renderings","args":{"strong":"G41020"}},{"query":"renderings","args":{"strong":"H3689"}}]},"pieces":[]}
+{"q":"traducciones de H2617","expect":{"call":{"query":"renderings","args":{"strong":"H2617"}}},"pieces":[]}
+{"q":"¿Cómo tradujeron santo en el texto literal?","expect":{"choose":[{"query":"renderings","args":{"strong":"H1320"}},{"query":"renderings","args":{"strong":"H6942"}},{"query":"renderings","args":{"strong":"G00370"}}]},"pieces":[]}
+{"q":"¿Qué palabras usan para pecado?","expect":{"choose":[{"query":"renderings","args":{"strong":"G40120"}},{"query":"renderings","args":{"strong":"G02660"}},{"query":"renderings","args":{"strong":"G02680"}}]},"pieces":[]}
+{"q":"usos de la palabra amor en las traducciones","expect":{"choose":[{"query":"renderings","args":{"strong":"G00260"}},{"query":"renderings","args":{"strong":"H0160"}},{"query":"renderings","args":{"strong":"G00250"}}]},"pieces":[]}
+{"q":"¿cómo se traduce cordero?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3629"}},{"query":"renderings","args":{"strong":"G07210"}},{"query":"renderings","args":{"strong":"H3532"}}]},"pieces":[]}
+{"q":"¿Cómo vertieron perdonar los traductores?","expect":{"choose":[{"query":"renderings","args":{"strong":"H5545"}},{"query":"renderings","args":{"strong":"G54830"}},{"query":"renderings","args":{"strong":"G08590"}}]},"pieces":[]}
+{"q":"compara las traducciones de G26","expect":{"call":{"query":"renderings","args":{"strong":"G26"}}},"pieces":[]}
+{"q":"¿Cómo se tradujo bendecir en Rut?","expect":{"choose":[{"query":"renderings","args":{"strong":"H1293"}},{"query":"renderings","args":{"strong":"G31070"}},{"query":"renderings","args":{"strong":"G21270"}}]},"pieces":[]}
+{"q":"¿con qué palabras se traduce espíritu?","expect":{"choose":[{"query":"renderings","args":{"strong":"H6921"}},{"query":"renderings","args":{"strong":"G41520"}},{"query":"renderings","args":{"strong":"H5397"}}]},"pieces":[]}
+{"q":"¿En qué libros hay metáforas?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-metaphor"}}},"pieces":[]}
+{"q":"¿Cuántas veces aparece Abraham en la Biblia?","expect":{"call":{"query":"books","args":{"article":"tw:names/abraham"}}},"pieces":[]}
+{"q":"¿Dónde aparece G5485?","expect":{"call":{"query":"books","args":{"concept":"G5485"}}},"pieces":[]}
+{"q":"¿En qué libros se habla del pacto?","expect":{"call":{"query":"books","args":{"article":"tw:kt/covenant"}}},"pieces":[]}
+{"q":"¿En qué libros hay preguntas retóricas y cuántas?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-rquestion"}}},"pieces":[]}
+{"q":"¿dónde se menciona a Moisés?","expect":{"call":{"query":"books","args":{"article":"tw:names/moses"}}},"pieces":[]}
+{"q":"¿Cuántas hipérboles hay en Mateo?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-hyperbole"}}},"pieces":[]}
+{"q":"libros donde aparece la palabra gracia","expect":{"call":{"query":"books","args":{"article":"tw:kt/grace"}}},"pieces":[]}
+{"q":"¿Dónde más aparece Booz?","expect":{"call":{"query":"books","args":{"article":"tw:names/boaz"}}},"pieces":[]}
+{"q":"¿En qué partes de la Biblia aparece Egipto?","expect":{"call":{"query":"books","args":{"article":"tw:names/egypt"}}},"pieces":[]}
+{"q":"¿en qué libros se usan símiles?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-simile"}}},"pieces":[]}
+{"q":"¿Cuántas veces sale redimir?","expect":{"call":{"query":"books","args":{"article":"tw:kt/redeem"}}},"pieces":[]}
+{"q":"¿Dónde aparece H2617 en el Antiguo Testamento?","expect":{"call":{"query":"books","args":{"concept":"H2617"}}},"pieces":[]}
+{"q":"¿qué libros tienen metonimias?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-metonymy"}}},"pieces":[]}
+{"q":"¿En cuántos libros aparece Jerusalén?","expect":{"call":{"query":"books","args":{"article":"tw:names/jerusalem"}}},"pieces":[]}
+{"q":"¿Dónde se usa la palabra arrepentirse?","expect":{"call":{"query":"books","args":{"article":"tw:kt/repent"}}},"pieces":[]}
+{"q":"¿Qué personas hay en la Biblia?","expect":{"call":{"query":"topics","args":{"category":"person"}}},"pieces":[]}
+{"q":"lista de lugares","expect":{"call":{"query":"topics","args":{"category":"place"}}},"pieces":[]}
+{"q":"¿Qué eventos importantes hay?","expect":{"call":{"query":"topics","args":{"category":"event"}}},"pieces":[]}
+{"q":"muéstrame los temas","expect":{"call":{"query":"topics","args":{"category":"topic"}}},"pieces":[]}
+{"q":"¿Qué personajes aparecen en Rut?","expect":{"call":{"query":"topics","args":{"book":"rut"}}},"pieces":[]}
+{"q":"¿Qué lugares se mencionan en Tito?","expect":{"call":{"query":"topics","args":{"book":"tit"}}},"pieces":[]}
+{"q":"acontecimientos del Éxodo","expect":{"call":{"query":"topics","args":{"book":"exo"}}},"pieces":[]}
+{"q":"temas principales de Romanos","expect":{"call":{"query":"topics","args":{"book":"rom"}}},"pieces":[]}
+{"q":"pasajes sobre la viuda que dio dos moneditas","expect":{"search":true},"pieces":[]}
+{"q":"el versículo de no preocuparse por el mañana","expect":{"search":true},"pieces":[]}
+{"q":"¿Dónde dice que el amor es paciente?","expect":{"search":true},"pieces":[]}
+{"q":"algo sobre la oveja perdida","expect":{"search":true},"pieces":[]}
+{"q":"¿qué dice la Biblia de los extranjeros?","expect":{"search":true},"pieces":[]}
+{"q":"el hijo pródigo","expect":{"search":true},"pieces":[]}
+{"q":"versículos donde Jesús llora","expect":{"search":true},"pieces":[]}
+{"q":"Juan","expect":{"choose":[{"query":"passage","args":{"ref":"jhn front:intro"}},{"query":"concept","args":{"id":"tw:names/johntheapostle"}},{"query":"concept","args":{"id":"tw:names/johnthebaptist"}}]},"pieces":[]}
+{"q":"Jonás","expect":{"choose":[{"query":"passage","args":{"ref":"jon front:intro"}},{"query":"concept","args":{"id":"tw:names/jonah"}}]},"pieces":[]}
+{"q":"háblame de Rut","expect":{"choose":[{"query":"passage","args":{"ref":"rut front:intro"}},{"query":"concept","args":{"id":"tw:names/ruth"}}]},"pieces":[]}

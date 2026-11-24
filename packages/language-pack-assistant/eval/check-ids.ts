@@ -1,0 +1,229 @@
+/**
+ * Checks that the fragment ids of a question file (`pieces`) and the ids in the `expect` calls exist in the installed packs.
+ * Eval only (Node and Bun). `bun eval/check-ids.ts --lang es-419 --file eval/questions/es-tune.jsonl` (with `LP3_STAGING=1` the first time).
+ *
+ * The id grammar (spec part 2): `verse:<res> <book> <c>:<v>`, `note:<book>/<rowid>`, `question:<book>/<rowid>`, `link:<book>/<rowid>`,
+ * `section:<article id>#<sid>`, `concept:<id>`, `rendering:<strong>/<form>`, `book:<code>`, `topic:<id>`; OBS: `frame:obs NN:FF`,
+ * `obsnote:NN:FF/<rowid>`, `obsquestion:NN:FF/<rowid>`, `story:obs NN` and `book:obs`.
+ * `<res>` is the resource key (`es-419_gl/es-419/glt`) or its last part (`glt`).
+ */
+import { readFileSync } from 'node:fs'
+import { namesById, parsePassage, type PackReader } from '@bt-synergy/language-pack-client'
+import { BOOKS, verseId } from '@bt-synergy/language-pack-v3'
+import type { Call } from '../src/decision'
+import { installPacks } from './packs'
+
+/** The chain's own helper (`src/strongs.ts`), re-exported for the eval. */
+export { strongsOf } from '../src/strongs'
+
+export type IdCheck = { id: string; ok: boolean; why?: string }
+
+type Events = [number, string, string][]
+const CATEGORIES = ['person', 'place', 'event', 'topic', 'story', 'section']
+const isBook = (b: unknown): b is string => typeof b === 'string' && (BOOKS as readonly string[]).includes(b)
+const lastPart = (key: string): string => key.slice(key.lastIndexOf('/') + 1)
+
+/** The verse ids a text has, from its chapter and verse events (`1-2` has both; chapter `c` has verse 0). */
+function verseSet(book: string, events: Events): Set<number> {
+  const out = new Set<number>()
+  let chapter = 0
+  for (const [, kind, arg] of events) {
+    const m = /^(\d+)(?:-(\d+))?/.exec(arg)
+    if (m === null) continue
+    if (kind === 'chapter') {
+      chapter = Number(m[1])
+      out.add(verseId(book, chapter, 0))
+    } else if (kind === 'verse') {
+      for (let v = Number(m[1]); v <= Number(m[2] ?? m[1]); v++) out.add(verseId(book, chapter, v))
+    }
+  }
+  return out
+}
+
+/** The last verse of a chapter in the installed texts of a book, or `undefined` when no text has the chapter. */
+export async function lastVerse(reader: PackReader, book: string, chapter: number): Promise<number | undefined> {
+  const model = await reader.book(book)
+  let last: number | undefined
+  for (const t of model?.texts ?? []) {
+    const set = verseSet(book, t.events as Events)
+    for (let v = 176; v >= 1; v--) {
+      if (set.has(verseId(book, chapter, v))) {
+        last = Math.max(last ?? 0, v)
+        break
+      }
+    }
+  }
+  return last
+}
+
+export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> {
+  const verses = new Map<string, Promise<Map<string, Set<number>> | undefined>>()
+  const versesOf = (book: string) => {
+    if (!verses.has(book)) {
+      verses.set(
+        book,
+        reader.book(book).then((m) => (m === undefined ? undefined : new Map(m.texts.map((t) => [t.res, verseSet(book, t.events as Events)] as const)))),
+      )
+    }
+    return verses.get(book)!
+  }
+  let names: Promise<Map<string, string[]>> | undefined
+  const known = () => (names ??= reader.maps().then(namesById))
+  let topicIds: Promise<Set<string>> | undefined
+  const topics = () =>
+    (topicIds ??= reader.mapsOf(['xtopics'], { coreOnly: true }).then((m) => new Set((m.xtopics?.core as { topics?: Map<string, unknown> } | undefined)?.topics?.keys() ?? [])))
+
+  async function one(id: string): Promise<IdCheck> {
+    const bad = (why: string): IdCheck => ({ id, ok: false, why })
+    const good: IdCheck = { id, ok: true }
+    const colon = id.indexOf(':')
+    const kind = colon < 0 ? '' : id.slice(0, colon)
+    const rest = id.slice(colon + 1)
+    switch (kind) {
+      case 'verse': {
+        const m = /^(\S+) ([a-z0-9]{3}) (\d+):(\d+)$/.exec(rest)
+        if (m === null) return bad('not a verse id')
+        const [, res, book, c, v] = m
+        if (!isBook(book)) return bad(`not a book: ${book}`)
+        const texts = await versesOf(book)
+        if (texts === undefined) return bad(`book ${book} is not installed`)
+        const key = [...texts.keys()].find((k) => k === res || lastPart(k) === res)
+        if (key === undefined) return bad(`no text ${res} in ${book} (has ${[...texts.keys()].join(', ')})`)
+        return texts.get(key)!.has(verseId(book, Number(c), Number(v))) ? good : bad(`${book} ${c}:${v} is not in ${key}`)
+      }
+      case 'note':
+      case 'question':
+      case 'link': {
+        const m = /^([a-z0-9]{3})\/(.+)$/.exec(rest)
+        if (m === null) return bad(`not a ${kind} id`)
+        const model = await reader.book(m[1]!)
+        if (model === undefined) return bad(`book ${m[1]} is not installed`)
+        const table = kind === 'note' ? model.notes : kind === 'question' ? model.questions : model.links
+        if (table === undefined) return bad(`${m[1]} has no ${kind} table`)
+        return table.rows.some((r) => r.id === m[2]) ? good : bad(`no row ${m[2]} in the ${kind} table of ${m[1]}`)
+      }
+      case 'section': {
+        const hash = rest.lastIndexOf('#')
+        if (hash < 0) return bad('no # in a section id')
+        const a = await reader.article(rest.slice(0, hash), 'all')
+        if (a.data === null) return bad(`no article ${rest.slice(0, hash)}`)
+        return a.data.sections.some((s) => s.sid === rest.slice(hash + 1)) ? good : bad(`no section ${rest.slice(hash + 1)} in ${rest.slice(0, hash)}`)
+      }
+      case 'concept':
+        return (await known()).has(rest) ? good : bad(`the maps do not name ${rest}`)
+      case 'rendering': {
+        const slash = rest.indexOf('/')
+        if (slash < 0) return bad('not a rendering id')
+        const a = await reader.renderings({ strong: rest.slice(0, slash) })
+        if (a.data === null) return bad(`no renderings for ${rest.slice(0, slash)}`)
+        return a.data.renderings.some((r) => r.text === rest.slice(slash + 1)) ? good : bad(`${rest.slice(0, slash)} has no rendering ${rest.slice(slash + 1)}`)
+      }
+      case 'book':
+        return isBook(rest) || rest === 'obs' ? good : bad(`not a book code: ${rest}`)
+      case 'frame':
+      case 'story': {
+        const m = kind === 'frame' ? /^obs (\d+):(\d+)$/.exec(rest) : /^obs (\d+)$/.exec(rest)
+        if (m === null) return bad(`not a ${kind} id`)
+        const model = await reader.obs()
+        if (model === undefined) return bad('obs is not installed')
+        const story = model.stories.find((s) => s.n === Number(m[1]))
+        if (story === undefined) return bad(`no story ${m[1]}`)
+        if (kind === 'story') return good
+        return story.frames.some((f) => f.n === Number(m[2])) ? good : bad(`no frame ${m[2]} in story ${m[1]}`)
+      }
+      case 'obsnote':
+      case 'obsquestion': {
+        const m = /^(\d+):(\d+)\/(.+)$/.exec(rest)
+        if (m === null) return bad(`not an ${kind} id`)
+        const model = await reader.obs()
+        if (model === undefined) return bad('obs is not installed')
+        const table = kind === 'obsnote' ? model.notes : model.questions
+        if (table === undefined) return bad(`obs has no ${kind === 'obsnote' ? 'note' : 'question'} table`)
+        const frame = Number(m[1]) * 100 + Number(m[2])
+        return table.rows.some((r) => r.id === m[3] && r.frame === frame) ? good : bad(`no row ${m[3]} at ${m[1]}:${m[2]} in the obs ${kind}s`)
+      }
+      case 'topic':
+        return (await topics()).has(rest) ? good : bad(`no topic ${rest} in xtopics`)
+      default:
+        return bad('unknown id kind')
+    }
+  }
+  return Promise.all(ids.map(one))
+}
+
+/** Whether the args of a call parse and name things that exist: passage refs with `parsePassage`, concept and article ids in the maps and articles. */
+export async function checkCall(reader: PackReader, call: Call): Promise<IdCheck[]> {
+  const label = `${call.query} ${JSON.stringify(call.args)}`
+  const ok: IdCheck[] = [{ id: label, ok: true }]
+  const fail = (why: string): IdCheck[] => [{ id: label, ok: false, why }]
+  const a = call.args
+  switch (call.query) {
+    case 'passage':
+    case 'context': {
+      try {
+        parsePassage(String(a.ref))
+      } catch {
+        return fail(`not a reference: ${String(a.ref)}`)
+      }
+      return ok
+    }
+    case 'concept':
+      return (await checkIds(reader, [`concept:${String(a.id)}`])).map((c) => ({ ...c, id: label }))
+    case 'article': {
+      const r = await reader.article(String(a.id), 'all')
+      if (r.data === null) return fail(`no article ${String(a.id)}`)
+      return a.section === undefined || r.data.sections.some((s) => s.sid === a.section) ? ok : fail(`no section ${String(a.section)}`)
+    }
+    case 'renderings':
+      if (typeof a.strong === 'string') return /^[GH]\d{1,5}[a-z]?$/.test(a.strong) ? ok : fail('not a Strong number')
+      return isBook(a.book) && Number.isInteger(a.word) ? ok : fail('renderings needs {strong} or {book, word}')
+    case 'search':
+      return typeof a.text === 'string' && a.text.trim() !== '' ? ok : fail('search needs text')
+    case 'topics':
+      if (a.category !== undefined && !CATEGORIES.includes(String(a.category))) return fail(`not a category: ${String(a.category)}`)
+      if (a.book !== undefined && !isBook(a.book)) return fail(`not a book: ${String(a.book)}`)
+      return ok
+    case 'books': {
+      // R32: the client's books query also takes a Strong key as `{ strong }`.
+      const given = [a.article, a.concept, a.strong].filter((x) => x !== undefined)
+      if (given.length !== 1) return fail('books needs exactly one of article, concept and strong')
+      if (a.strong !== undefined) return typeof a.strong === 'string' && /^[GH]\d{1,5}[a-z]?$/.test(a.strong) ? ok : fail('not a Strong number')
+      const id = a.article ?? a.concept
+      if (typeof id !== 'string') return fail('books needs exactly one of article, concept and strong')
+      if (a.concept !== undefined && /^[GH]\d{1,5}[a-z]?$/.test(id)) return ok
+      return (await checkIds(reader, [`concept:${id}`])).map((c) => ({ ...c, id: label }))
+    }
+    default:
+      return fail('unknown query')
+  }
+}
+
+/** Every id of a question file: its pieces, and the calls its `expect` holds. */
+export async function checkFile(reader: PackReader, text: string): Promise<{ line: number; q: string; check: IdCheck }[]> {
+  const out: { line: number; q: string; check: IdCheck }[] = []
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '')
+  for (const [i, l] of lines.entries()) {
+    const item = JSON.parse(l) as { q: string; expect?: { call?: Call; choose?: Call[]; search?: true }; pieces?: string[] }
+    if (item.expect === undefined || (item.expect.call === undefined && item.expect.choose === undefined && item.expect.search !== true)) {
+      out.push({ line: i + 1, q: item.q, check: { id: 'expect', ok: false, why: 'expect has none of call, choose and search' } })
+      continue
+    }
+    const calls = item.expect.call !== undefined ? [item.expect.call] : (item.expect.choose ?? [])
+    const checks = [...(await checkIds(reader, item.pieces ?? [])), ...(await Promise.all(calls.map((c) => checkCall(reader, c)))).flat()]
+    for (const check of checks) out.push({ line: i + 1, q: item.q, check })
+  }
+  return out
+}
+
+if (process.argv[1]?.endsWith('check-ids.ts')) {
+  const arg = (name: string): string | undefined => process.argv[process.argv.indexOf(`--${name}`) + 1]
+  const lang = arg('lang')
+  const file = arg('file')
+  if (lang === undefined || file === undefined) throw new Error('usage: bun eval/check-ids.ts --lang es-419 --file <jsonl>')
+  const { reader } = await installPacks(lang)
+  const results = await checkFile(reader, readFileSync(file, 'utf8'))
+  const failed = results.filter((r) => !r.check.ok)
+  for (const r of failed) console.log(`line ${r.line} (${r.q}): ${r.check.id}: ${r.check.why}`)
+  console.log(`${results.length} ids checked, ${failed.length} failed`)
+  process.exitCode = failed.length === 0 ? 0 : 1
+}

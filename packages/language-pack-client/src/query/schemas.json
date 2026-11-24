@@ -1,6 +1,6 @@
 {
   "sections": {
-    "label": { "es": "Secciones: los rangos de versículos en que el ULT en inglés divide un libro" },
+    "label": { "es": "Secciones: los rangos de versículos en que el ULT en inglés divide un libro", "pt": "Seções: os intervalos de versículos em que o ULT em inglês divide um livro", "en": "Sections: the verse ranges into which the English ULT divides a book" },
     "description": "The sections of a book in the English ULT, each with its first and last verse, in order.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -11,7 +11,7 @@
     }
   },
   "passage": {
-    "label": { "es": "Pasaje: el texto de un versículo o rango con sus notas, preguntas y enlaces de palabras" },
+    "label": { "es": "Pasaje: el texto de un versículo o rango con sus notas, preguntas y enlaces de palabras", "pt": "Passagem: o texto de um versículo ou intervalo, com suas notas, perguntas e links de palavras", "en": "Passage: the text of a verse or range with its notes, questions and word links" },
     "description": "The texts of a verse range with the notes, questions and word links in range.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -22,7 +22,7 @@
     }
   },
   "concept": {
-    "label": { "es": "Concepto: qué es, sus nombres, sus relaciones y los libros donde aparece" },
+    "label": { "es": "Concepto: qué es, sus nombres, sus relaciones y los libros donde aparece", "pt": "Conceito: o que é, seus nomes, suas relações e os livros em que aparece", "en": "Concept: what it is, its names, its relations and the books where it appears" },
     "description": "A concept of the translation helps with its names and relations, and the installed books that use it. With the obs unit installed, a tW or tA article also lists the Open Bible Stories that use it (obs.stories, with frames or a count of notes); a person, place or event lists the stories that overlap its verses, from the topics alone.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -33,7 +33,7 @@
     }
   },
   "article": {
-    "label": { "es": "Artículo: las secciones de un artículo de tA o tW" },
+    "label": { "es": "Artículo: las secciones de un artículo de tA o tW", "pt": "Artigo: as seções de um artigo de tA ou tW", "en": "Article: the sections of a tA or tW article" },
     "description": "The default sections of a translation academy or translation words article, or the ones asked for. A translation academy article also lists its related articles, with their titles.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -54,7 +54,7 @@
     }
   },
   "renderings": {
-    "label": { "es": "Traducciones: cómo se vierte una palabra del original en los libros instalados" },
+    "label": { "es": "Traducciones: cómo se vierte una palabra del original en los libros instalados", "pt": "Traduções: como uma palavra do original é traduzida nos livros instalados", "en": "Renderings: how an original-language word is rendered in the installed books" },
     "description": "How the installed texts render the original words with one Strong number, with counts and references.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -70,15 +70,15 @@
     }
   },
   "search": {
-    "label": { "es": "Búsqueda: texto en los recursos instalados" },
-    "description": "A full-text search over the installed resources.",
+    "label": { "es": "Búsqueda: texto en los recursos instalados", "pt": "Busca: texto nos recursos instalados", "en": "Search: text in the installed resources" },
+    "description": "A full-text search over the installed resources. Section rows (articles) have book '' and no reference, so a books filter leaves them out.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "text": { "type": "string", "description": "The words to look for." },
-        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes), or 'obs' for the Open Bible Stories." },
-        "kinds": { "type": "array", "items": { "enum": ["text", "note", "question", "link", "title"] }, "description": "Only these kinds of result." },
+        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes), or 'obs' for the Open Bible Stories. Section rows have book '', so a books filter leaves them out." },
+        "kinds": { "type": "array", "items": { "enum": ["text", "note", "question", "link", "title", "section"] }, "description": "Only these kinds of result." },
         "limit": { "type": "integer", "minimum": 1, "description": "The most results to return (20 when absent)." }
       },
       "required": ["text"],
@@ -86,7 +86,7 @@
     }
   },
   "topics": {
-    "label": { "es": "Temas: personas, lugares, eventos y más, por categoría o por libro" },
+    "label": { "es": "Temas: personas, lugares, eventos y más, por categoría o por libro", "pt": "Temas: pessoas, lugares, eventos e mais, por categoria ou por livro", "en": "Topics: people, places, events and more, by category or by book" },
     "description": "The topics of a category or of a book, or the categories with their counts; installed is false without the topics module.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -101,22 +101,23 @@
     }
   },
   "books": {
-    "label": { "es": "Libros: dónde se usa un artículo o concepto, y si el libro está instalado" },
-    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, state none with installed false when the obs unit is not installed (not looked at, the unit is not installed; it is then listed in notInstalled).",
+    "label": { "es": "Libros: dónde se usa un artículo, concepto o clave Strong, y si el libro está instalado", "pt": "Livros: onde se usa um artigo, conceito ou chave Strong, e se o livro está instalado", "en": "Books: where an article, concept or Strong key is used, and whether the book is installed" },
+    "description": "For each book, how often an article, a concept or a Strong key is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, state none with installed false when the obs unit is not installed (not looked at, the unit is not installed; it is then listed in notInstalled).",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "article": { "type": "string", "description": "A tA or tW article id (\"ta:...\", \"tw:...\")." },
-        "concept": { "type": "string", "description": "Any concept id, such as \"per:abraham\"." }
+        "concept": { "type": "string", "description": "Any concept id, such as \"per:abraham\"." },
+        "strong": { "type": "string", "description": "A Strong key such as \"G26\" or \"H2617a\": the occurrences of the original word, per book." }
       },
       "required": [],
-      "oneOf": [{ "required": ["article"] }, { "required": ["concept"] }],
+      "oneOf": [{ "required": ["article"] }, { "required": ["concept"] }, { "required": ["strong"] }],
       "additionalProperties": false
     }
   },
   "context": {
-    "label": { "es": "Contexto: un pasaje con los artículos que sus notas y enlaces nombran" },
+    "label": { "es": "Contexto: un pasaje con los artículos que sus notas y enlaces nombran", "pt": "Contexto: uma passagem com os artigos que suas notas e links citam", "en": "Context: a passage with the articles its notes and links name" },
     "description": "A passage together with the default sections of the articles its notes and word links name.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -127,7 +128,7 @@
     }
   },
   "lookup": {
-    "label": { "es": "Buscar por nombre: las claves de los términos, artículos, personas y lugares que se llaman así" },
+    "label": { "es": "Buscar por nombre: las claves de los términos, artículos, personas y lugares que se llaman así", "pt": "Buscar por nome: as chaves dos termos, artigos, pessoas e lugares que têm esse nome", "en": "Look up by name: the keys of the terms, articles, people and places with that name" },
     "description": "The ids of key terms, Academy articles, people, places and events whose name contains a word, in this language or in English, exact names first. A query with no words (only punctuation) returns no matches. It reads the maps only.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -141,7 +142,7 @@
     }
   },
   "academy": {
-    "label": { "es": "Academia: los artículos de tA que citan las notas de un libro, del más citado al menos" },
+    "label": { "es": "Academia: los artículos de tA que citan las notas de un libro, del más citado al menos", "pt": "Academia: os artigos de tA citados pelas notas de um livro, do mais citado ao menos", "en": "Academy: the tA articles the notes of a book cite, most cited first" },
     "description": "The Academy articles the translation notes of a book cite, with how many notes cite each, most cited first. `covered` is false when the language has no own tN, or one that does not cover the book; `articles` is then empty because there is no source, not because nothing is cited. It reads the language map; for English it also reads the notes of the xmap.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -152,7 +153,7 @@
     }
   },
   "stories": {
-    "label": { "es": "Historias: las historias bíblicas (OBS) de un pasaje, o todas" },
+    "label": { "es": "Historias: las historias bíblicas (OBS) de un pasaje, o todas", "pt": "Histórias: as histórias bíblicas (OBS) de uma passagem, ou todas", "en": "Stories: the Bible stories (OBS) of a passage, or all of them" },
     "description": "The Open Bible Stories whose ranges meet a passage or a whole chapter, or all of them in order.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -163,7 +164,7 @@
     }
   },
   "story": {
-    "label": { "es": "Historia: una historia bíblica (OBS) con sus cuadros, notas, preguntas y enlaces" },
+    "label": { "es": "Historia: una historia bíblica (OBS) con sus cuadros, notas, preguntas y enlaces", "pt": "História: uma história bíblica (OBS) com seus quadros, notas, perguntas e links", "en": "Story: a Bible story (OBS) with its frames, notes, questions and links" },
     "description": "One Open Bible Story with its frames and, per frame, the notes, questions and word links, when the stories are installed.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",

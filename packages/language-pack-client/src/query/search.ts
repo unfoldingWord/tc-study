@@ -5,6 +5,11 @@ import { type Answer, missingUnit, newAnswer, releaseOf, usedUnit } from './enve
 
 /** The unit a hit comes from: the `obs` unit for book `obs`, else the book's. */
 const unitOf = (book: string): string => (book === 'obs' ? 'obs' : `book:${book}`)
+/** The `art:` unit of a section hit: its id `tw:kt/grace#definicion` names the article `tw:kt/grace`. */
+const unitOfHit = (reader: PackReader, id = ''): string => {
+  const art = id.split('#')[0]!
+  return reader.unitOf('art', art) ?? `art:${art.includes('/') ? art.slice(0, art.lastIndexOf('/')) : art}`
+}
 
 export async function searchQuery(
   reader: PackReader,
@@ -15,10 +20,17 @@ export async function searchQuery(
 ): Promise<Answer<Hit[]>> {
   const out = newAnswer<Hit[]>(reader, 'search')
   // The index may hold books this reader does not have active (a shared index, a book removed since): those hits are left out.
-  const hits = (await index.search(reader.lang, text, filters)).filter((h) => reader.installed(unitOf(h.book)))
+  const hits = (await index.search(reader.lang, text, filters)).filter((h) => (h.kind === 'section' ? reader.installed(unitOfHit(reader, h.id)) : reader.installed(unitOf(h.book))))
   out.data = hits
   const releases = new Map<string, readonly (readonly [string, string])[] | undefined>()
   for (const h of hits) {
+    if (h.kind === 'section') {
+      const unit = unitOfHit(reader, h.id)
+      if (!releases.has(unit)) releases.set(unit, (await reader.segments(unit))?.[0]?.h.res)
+      usedUnit(out, reader, unit)
+      out.cites.push({ res: h.res, release: releaseOf(releases.get(unit), h.res), ...(h.id !== undefined ? { id: h.id } : {}) })
+      continue
+    }
     if (!releases.has(h.book)) {
       const unit = unitOf(h.book)
       releases.set(h.book, h.book === 'obs' ? (await reader.obs())?.res : (await reader.book(h.book))?.res)

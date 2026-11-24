@@ -123,7 +123,7 @@ export interface PackReader {
   context(ref: string): Promise<Answer<ContextData>>
   concept(id: string): Promise<Answer<unknown>>
   topics(q?: { category?: string; book?: string }): Promise<Answer<unknown>>
-  books(q: { article: string } | { concept: string }): Promise<Answer<BooksData>>
+  books(q: { article: string } | { concept: string } | { strong: string }): Promise<Answer<BooksData>>
   /** The ids whose names contain a word ("gracia", "grace", "metaphor", "Pablo"), from the maps alone: exact names first. */
   lookup(name: string, limit?: number): Promise<Answer<LookupData>>
   renderings(q: { strong: string } | { book: string; word: number }): Promise<Answer<RenderingsData>>
@@ -443,6 +443,12 @@ export function makeReader(o: ReaderInput): PackReader {
   async function fillMemory(): Promise<SearchIndex> {
     const index = memoryIndex()
     for (const unit of activeIds.keys()) {
+      if (unit.startsWith('art:') && reader.installed(unit)) {
+        const articles = await reader.articles(unit.slice('art:'.length))
+        const aid = activeIds.get(unit)![0]
+        if (articles !== undefined && aid !== undefined) await index.addArticles(o.lang, articles, aid)
+        continue
+      }
       if (!unit.startsWith('book:') || !reader.installed(unit)) continue
       const model = await reader.book(unit.slice('book:'.length))
       const id = activeIds.get(unit)![0]

@@ -1,0 +1,4091 @@
+{
+ "summary": {
+  "lang": "es",
+  "set": "test",
+  "n": 150,
+  "callsCorrect": 90,
+  "accepted": 104,
+  "correctAccepted": 74,
+  "acceptedWithSearch": 114,
+  "correctAcceptedWithSearch": 76,
+  "top3": {
+   "hit": 77,
+   "of": 126
+  },
+  "cardMs": {
+   "median": 4.6,
+   "p95": 363.9,
+   "over300": 9
+  },
+  "steps": {
+   "rule": 87,
+   "classifier": 17,
+   "choose": 36,
+   "search": 10
+  }
+ },
+ "questions": [
+  {
+   "q": "Rut 1:16",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 1:16"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 1:16"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 1:16",
+   "top3": [
+    "verse:glt rut 1:16",
+    "note:rut/z5ug",
+    "note:rut/b518"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 17.2
+  },
+  {
+   "q": "que dice tito 2:11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 2:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 2:11"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 2:11",
+   "top3": [
+    "verse:glt tit 2:11",
+    "note:tit/y44u",
+    "note:tit/gp2z"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 6.3
+  },
+  {
+   "q": "Jonás 3:5-10",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 3:5-10"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 3:5-10"
+   },
+   "interpretation": "Pasaje: Jonás 3:5-10",
+   "top3": [
+    "verse:glt jon 3:5-10",
+    "note:jon/ab90",
+    "note:jon/e5lm"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 6.8
+  },
+  {
+   "q": "rut 3 9",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 3:9"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 3:9"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 3:9",
+   "top3": [
+    "verse:glt rut 3:9",
+    "note:rut/wj9e",
+    "note:rut/xp1b"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "quiero ver Tito 3:4-7",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 3:4-7"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 3:4-7"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 3:4-7",
+   "top3": [
+    "verse:glt tit 3:4-7",
+    "note:tit/xy28",
+    "note:tit/ba5a"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 6.5
+  },
+  {
+   "q": "Jonás 2:1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 2:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 2:1"
+   },
+   "interpretation": "Pasaje: Jonás 2:1",
+   "top3": [
+    "verse:glt jon 2:1",
+    "note:jon/ae4k",
+    "note:jon/alr2"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.7
+  },
+  {
+   "q": "muéstrame Rut 4:13-17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 4:13-17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 4:13-17"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 4:13-17",
+   "top3": [
+    "verse:glt rut 4:13-17",
+    "note:rut/abcc",
+    "note:rut/u21g"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 7
+  },
+  {
+   "q": "Nehemías 1:1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Nehemías 1:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Búsqueda: Nehemías 1:1"
+   },
+   "interpretation": "Búsqueda: Nehemías 1:1",
+   "top3": [
+    "section:tw:kt/trust#bible-references",
+    "section:tw:kt/brother#bible-references",
+    "section:tw:other/livestock#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 776.2
+  },
+  {
+   "q": "Ester 8:17",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "est 8:17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El libro de Ester 8:17"
+   },
+   "interpretation": "Pasaje: El libro de Ester 8:17",
+   "top3": [
+    "verse:glt est 8:17"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.5
+  },
+  {
+   "q": "3 Juan 1:3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "3 Juan 1:3"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Búsqueda: 3 Juan 1:3"
+   },
+   "interpretation": "Búsqueda: 3 Juan 1:3",
+   "top3": [
+    "section:tw:kt/christ#bible-references",
+    "section:tw:kt/bornagain#bible-references",
+    "section:tw:kt/godthefather#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 210.5
+  },
+  {
+   "q": "texto de Rut 2:10",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 2:10"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 2:10"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 2:10",
+   "top3": [
+    "verse:glt rut 2:10",
+    "note:rut/az6y",
+    "note:rut/ab12"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.6
+  },
+  {
+   "q": "Tito 1:6",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 1:6"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 1:6"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 1:6",
+   "top3": [
+    "verse:glt tit 1:6",
+    "note:tit/wja4",
+    "note:tit/ab70"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.1
+  },
+  {
+   "q": "jonas 4:2 por favor",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 4:2"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 4:2"
+   },
+   "interpretation": "Pasaje: Jonás 4:2",
+   "top3": [
+    "verse:glt jon 4:2",
+    "note:jon/q6bb",
+    "note:jon/k24b"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.4
+  },
+  {
+   "q": "Rut 1:1-5",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 1:1-5"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 1:1-5"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 1:1-5",
+   "top3": [
+    "verse:glt rut 1:1-5",
+    "note:rut/f68r",
+    "note:rut/irf4"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.5
+  },
+  {
+   "q": "como dice tito 2:1?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 2:1"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 2:1"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 2:1",
+   "top3": [
+    "verse:glt tit 2:1",
+    "note:tit/h3il",
+    "note:tit/lfu1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.8
+  },
+  {
+   "q": "Jonás 1:1-3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 1:1-3"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 1:1-3"
+   },
+   "interpretation": "Pasaje: Jonás 1:1-3",
+   "top3": [
+    "verse:glt jon 1:1-3",
+    "note:jon/hk4p",
+    "note:jon/xvp2"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "tito 2:6",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 2:6"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 2:6"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 2:6",
+   "top3": [
+    "verse:glt tit 2:6",
+    "note:tit/i3hv",
+    "link:tit/ge2q"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "Ester 4:16",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "est 4:16"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El libro de Ester 4:16"
+   },
+   "interpretation": "Pasaje: El libro de Ester 4:16",
+   "top3": [
+    "verse:glt est 4:16"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.4
+  },
+  {
+   "q": "rut 3:11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 3:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 3:11"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 3:11",
+   "top3": [
+    "verse:glt rut 3:11",
+    "note:rut/jdr6",
+    "note:rut/ei93"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.3
+  },
+  {
+   "q": "Tito 3:15",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 3:15"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 3:15"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 3:15",
+   "top3": [
+    "verse:glt tit 3:15",
+    "note:tit/j3y2",
+    "note:tit/abci"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.6
+  },
+  {
+   "q": "Tit 3:5",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 3:5"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 3:5"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 3:5",
+   "top3": [
+    "verse:glt tit 3:5",
+    "note:tit/n4ug",
+    "note:tit/k1a6"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "Est 4:14",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "est 4:14"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El libro de Ester 4:14"
+   },
+   "interpretation": "Pasaje: El libro de Ester 4:14",
+   "top3": [
+    "verse:glt est 4:14"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.9
+  },
+  {
+   "q": "3 Jn 4",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "3jn 4:1-999"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La tercera carta de Juan 4:1-999"
+   },
+   "interpretation": "Pasaje: La tercera carta de Juan 4:1-999",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2.1
+  },
+  {
+   "q": "Jon 4:11",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 4:11"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 4:11"
+   },
+   "interpretation": "Pasaje: Jonás 4:11",
+   "top3": [
+    "verse:glt jon 4:11",
+    "note:jon/jdr0",
+    "note:jon/ecl1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.3
+  },
+  {
+   "q": "Jonás uno diecisiete",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 1:17"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 1:17"
+   },
+   "interpretation": "Pasaje: Jonás 1:17",
+   "top3": [
+    "verse:glt jon 1:17",
+    "note:jon/q87y",
+    "note:jon/jdr4"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.5
+  },
+  {
+   "q": "Tito capítulo dos versículo doce",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 2:12"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 2:12"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 2:12",
+   "top3": [
+    "verse:glt tit 2:12",
+    "note:tit/qy8k",
+    "note:tit/abce"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.1
+  },
+  {
+   "q": "Rut cuatro catorce",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 4:14"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 4:14"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 4:14",
+   "top3": [
+    "verse:glt rut 4:14",
+    "note:rut/ab46",
+    "note:rut/ab47"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "Tercera de Juan versículo ocho",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "3jn 8:1-999"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La tercera carta de Juan 8:1-999"
+   },
+   "interpretation": "Pasaje: La tercera carta de Juan 8:1-999",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "Jonás 2",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 2:1-10"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 2:1-10"
+   },
+   "interpretation": "Pasaje: Jonás 2:1-10",
+   "top3": [
+    "verse:glt jon 2:1-10",
+    "note:jon/ae4k",
+    "note:jon/alr2"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.3
+  },
+  {
+   "q": "que dice Tito capitulo 3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 3:1-15"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 3:1-15"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 3:1-15",
+   "top3": [
+    "verse:glt tit 3:1-15",
+    "note:tit/zh6x",
+    "note:tit/y9tr"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 27
+  },
+  {
+   "q": "¿quién es Booz?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/boaz"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Booz"
+   },
+   "interpretation": "Concepto: Booz",
+   "top3": [
+    "concept:tw:names/boaz",
+    "section:tw:names/boaz#facts",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 58.7
+  },
+  {
+   "q": "quien fue Mardoqueo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/mordecai"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Mardoqueo"
+   },
+   "interpretation": "Concepto: Mardoqueo",
+   "top3": [
+    "concept:tw:names/mordecai",
+    "section:tw:names/mordecai#definition",
+    "book:est"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.2
+  },
+  {
+   "q": "el rey Asuero, quien era",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/ahasuerus"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Asuero"
+   },
+   "interpretation": "Concepto: Asuero",
+   "top3": [
+    "concept:tw:names/ahasuerus",
+    "section:tw:names/ahasuerus#definition",
+    "book:est"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.1
+  },
+  {
+   "q": "donde queda Moab",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/moab"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:moab"
+      }
+     }
+    ],
+    "interpretation": "¿Libros: Moab, o Libros: de Moab?"
+   },
+   "interpretation": "¿Libros: Moab, o Libros: de Moab?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 14.8
+  },
+  {
+   "q": "¿qué era Nínive?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/nineveh"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Nínive"
+   },
+   "interpretation": "Concepto: Nínive",
+   "top3": [
+    "concept:tw:names/nineveh",
+    "section:tw:names/nineveh#description",
+    "book:jon"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 6.8
+  },
+  {
+   "q": "que es Belén",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/bethlehem"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Belén"
+   },
+   "interpretation": "Concepto: Belén",
+   "top3": [
+    "concept:tw:names/bethlehem",
+    "section:tw:names/bethlehem#facts",
+    "book:jdg"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4
+  },
+  {
+   "q": "Creta, el lugar",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/crete"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Creta"
+   },
+   "interpretation": "Concepto: Creta",
+   "top3": [
+    "concept:tw:names/crete",
+    "section:tw:names/crete#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 7.6
+  },
+  {
+   "q": "¿quién era Apolos?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/apollos"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Apolos"
+   },
+   "interpretation": "Concepto: Apolos",
+   "top3": [
+    "concept:tw:names/apollos",
+    "section:tw:names/apollos#definition",
+    "book:1co"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "Tíquico quien es",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/tychicus"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Tíquico"
+   },
+   "interpretation": "Concepto: Tíquico",
+   "top3": [
+    "concept:tw:names/tychicus",
+    "section:tw:names/tychicus#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "Vasti la reina",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/vashti"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Vasti"
+   },
+   "interpretation": "Concepto: Vasti",
+   "top3": [
+    "concept:tw:names/vashti",
+    "section:tw:names/vashti#definition",
+    "book:est"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.9
+  },
+  {
+   "q": "¿qué significa gracia?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/grace"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: gracia"
+   },
+   "interpretation": "Concepto: gracia",
+   "top3": [
+    "concept:tw:kt/grace",
+    "section:tw:kt/grace#definition",
+    "book:psa"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 9.6
+  },
+  {
+   "q": "definicion de fe",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "definicion de fe"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: definicion de fe"
+   },
+   "interpretation": "Búsqueda: definicion de fe",
+   "top3": [
+    "section:tw:kt/faith#definition",
+    "note:tit/abc1",
+    "note:3jn/b4zh"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": true
+   },
+   "ms": 143.2
+  },
+  {
+   "q": "¿qué es un pacto?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/covenant"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: pacto"
+   },
+   "interpretation": "Concepto: pacto",
+   "top3": [
+    "concept:tw:kt/covenant",
+    "section:tw:kt/covenant#definition",
+    "book:gen"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.1
+  },
+  {
+   "q": "significado de expiación",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/atonement"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Expiación"
+   },
+   "interpretation": "Concepto: Expiación",
+   "top3": [
+    "concept:tw:kt/atonement",
+    "section:tw:kt/atonement#definition",
+    "book:lev"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "que quiere decir redimir",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/redeem"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: redimir"
+   },
+   "interpretation": "Concepto: redimir",
+   "top3": [
+    "concept:tw:kt/redeem",
+    "section:tw:kt/redeem#definition",
+    "book:lev"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "bautizar, definicion",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/baptize"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: bautizar"
+   },
+   "interpretation": "Concepto: bautizar",
+   "top3": [
+    "concept:tw:kt/baptize",
+    "section:tw:kt/baptize#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.2
+  },
+  {
+   "q": "¿qué es un apóstol?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/philiptheapostle"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/apostle"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Felipe, o Concepto: apóstol?"
+   },
+   "interpretation": "¿Concepto: Felipe, o Concepto: apóstol?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "sumo sacerdote que significa",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/highpriest"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Sumo sacerdote"
+   },
+   "interpretation": "Concepto: Sumo sacerdote",
+   "top3": [
+    "concept:tw:kt/highpriest",
+    "section:tw:kt/highpriest#definition",
+    "book:mat"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "que es la pascua",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/passover"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Pascua"
+   },
+   "interpretation": "Concepto: Pascua",
+   "top3": [
+    "concept:tw:kt/passover",
+    "section:tw:kt/passover#definition",
+    "book:jhn"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.1
+  },
+  {
+   "q": "¿quién es el Espíritu Santo?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/holyspirit"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Espíritu Santo"
+   },
+   "interpretation": "Concepto: Espíritu Santo",
+   "top3": [
+    "concept:tw:kt/holyspirit",
+    "section:tw:kt/holyspirit#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "arrepentimiento, qué es",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/repent"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: arrepentirse"
+   },
+   "interpretation": "Concepto: arrepentirse",
+   "top3": [
+    "concept:tw:kt/repent",
+    "section:tw:kt/repent#definition",
+    "book:luk"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 8.6
+  },
+  {
+   "q": "diacono que es",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/deacon"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: Diácono"
+   },
+   "interpretation": "Concepto: Diácono",
+   "top3": [
+    "concept:tw:kt/deacon",
+    "section:tw:kt/deacon#definition",
+    "book:1ti"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.6
+  },
+  {
+   "q": "¿qué es un anciano en la iglesia?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:other/elder"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: anciano"
+   },
+   "interpretation": "Concepto: anciano",
+   "top3": [
+    "concept:tw:other/elder",
+    "section:tw:other/elder#definition",
+    "book:deu"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 16.2
+  },
+  {
+   "q": "obispo o supervisor, que significa",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:other/overseer"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Concepto: supervisar"
+   },
+   "interpretation": "Concepto: supervisar",
+   "top3": [
+    "concept:tw:other/overseer",
+    "section:tw:other/overseer#definition",
+    "book:neh"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "qué es el cilicio",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/cilicia"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/sackcloth"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "lug:cilicia"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Cilicia, Concepto: cilicio, o Concepto: Cilicia?"
+   },
+   "interpretation": "¿Concepto: Cilicia, Concepto: cilicio, o Concepto: Cilicia?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.1
+  },
+  {
+   "q": "¿cómo traduzco una metáfora?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Metáfora"
+   },
+   "interpretation": "Artículo: Metáfora",
+   "top3": [
+    "section:ta:translate/figs-metaphor#description",
+    "section:ta:translate/figs-metaphor#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 15.3
+  },
+  {
+   "q": "como traducir nombres",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/translate-names"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Cómo Traducir Nombres"
+   },
+   "interpretation": "Artículo: Cómo Traducir Nombres",
+   "top3": [
+    "section:ta:translate/translate-names#description",
+    "section:ta:translate/translate-names#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.6
+  },
+  {
+   "q": "¿cómo traduzco palabras desconocidas?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H0859a"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H3046"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G11070"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: H0859a, H3046, G1107…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: H0859a, H3046, G1107…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 19.8
+  },
+  {
+   "q": "preguntas retóricas, que hago",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-rquestion"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Pregunta retórica"
+   },
+   "interpretation": "Artículo: Pregunta retórica",
+   "top3": [
+    "section:ta:translate/figs-rquestion#description",
+    "section:ta:translate/figs-rquestion#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.5
+  },
+  {
+   "q": "cómo traducir la ironía",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-irony"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Ironía"
+   },
+   "interpretation": "Artículo: Ironía",
+   "top3": [
+    "section:ta:translate/figs-irony#description",
+    "section:ta:translate/figs-irony#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "“nosotros” inclusivo y exclusivo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-inclusive"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: “Nosotros” Inclusivo y Exclusivo"
+   },
+   "interpretation": "Artículo: “Nosotros” Inclusivo y Exclusivo",
+   "top3": [
+    "section:ta:translate/figs-inclusive#description"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 2.8
+  },
+  {
+   "q": "formas de tú en la traducción",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-you"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Formas de tú"
+   },
+   "interpretation": "Artículo: Formas de tú",
+   "top3": [
+    "section:ta:translate/figs-you#s1"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.2
+  },
+  {
+   "q": "que hacer con los dobles negativos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-doublenegatives"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Dobles negativos"
+   },
+   "interpretation": "Artículo: Dobles negativos",
+   "top3": [
+    "section:ta:translate/figs-doublenegatives#description",
+    "section:ta:translate/figs-doublenegatives#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "¿cómo traduzco una hipérbole?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-hyperbole"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Hipérbole"
+   },
+   "interpretation": "Artículo: Hipérbole",
+   "top3": [
+    "section:ta:translate/figs-hyperbole#description",
+    "section:ta:translate/figs-hyperbole#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "sustantivos abstractos, como los traduzco",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-abstractnouns"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Sustantivos abstractos"
+   },
+   "interpretation": "Artículo: Sustantivos abstractos",
+   "top3": [
+    "section:ta:translate/figs-abstractnouns#description",
+    "section:ta:translate/figs-abstractnouns#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.7
+  },
+  {
+   "q": "activo o pasivo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-activepassive"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Activo o pasivo"
+   },
+   "interpretation": "Artículo: Activo o pasivo",
+   "top3": [
+    "section:ta:translate/figs-activepassive#description",
+    "section:ta:translate/figs-activepassive#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 1.5
+  },
+  {
+   "q": "como traducir un simil",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/figs-simile"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Símil"
+   },
+   "interpretation": "Artículo: Símil",
+   "top3": [
+    "section:ta:translate/figs-simile#description",
+    "section:ta:translate/figs-simile#reason"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4
+  },
+  {
+   "q": "puentes de versículos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "article",
+     "args": {
+      "id": "ta:translate/translate-versebridge"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Artículo: Puentes de versículos"
+   },
+   "interpretation": "Artículo: Puentes de versículos",
+   "top3": [
+    "section:ta:translate/translate-versebridge#description"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 57.3
+  },
+  {
+   "q": "conocimiento asumido e información implícita",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/doctrine"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/know"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: doctrina, o Concepto: conocer?"
+   },
+   "interpretation": "¿Concepto: doctrina, o Concepto: conocer?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 1.8
+  },
+  {
+   "q": "¿cómo traduzco los proverbios?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G38500"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H4912"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G39420"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: G3850, H4912, G3942…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: G3850, H4912, G3942…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "como se tradujo G5485",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G5485"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traducciones: G5485"
+   },
+   "interpretation": "Traducciones: G5485",
+   "top3": [
+    "rendering:G5485/gracia",
+    "rendering:G5485/gracia",
+    "rendering:G5485/que dios siga favoreciendolos"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 363.9
+  },
+  {
+   "q": "G4102 en las traducciones",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G4102"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traducciones: G4102"
+   },
+   "interpretation": "Traducciones: G4102",
+   "top3": [
+    "rendering:G4102/fe",
+    "rendering:G4102/a la fe",
+    "rendering:G4102/como hermanos creyentes"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 33.6
+  },
+  {
+   "q": "H8179 ¿cómo quedó traducido?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "H8179"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Traducciones: H8179"
+   },
+   "interpretation": "Traducciones: H8179",
+   "top3": [
+    "rendering:H8179/a la puerta del",
+    "rendering:H8179/la puerta del",
+    "rendering:H8179/a la puerta"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 57
+  },
+  {
+   "q": "¿cómo se tradujo iglesia en los libros que hay?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G15770"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traducciones: G1577"
+   },
+   "interpretation": "Traducciones: G1577",
+   "top3": [
+    "rendering:G1577/iglesia",
+    "rendering:G1577/a tu congregacion",
+    "rendering:G1577/congregacion"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 10.6
+  },
+  {
+   "q": "traducciones de conciencia",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G48930"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traducciones: G4893"
+   },
+   "interpretation": "Traducciones: G4893",
+   "top3": [
+    "rendering:G4893/se sienten culpables cuando hacen lo que es malo",
+    "rendering:G4893/sus conciencias"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 23
+  },
+  {
+   "q": "como quedó traducido derramamiento de sangre",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/blood"
+      }
+     },
+     {
+      "query": "search",
+      "args": {
+       "text": "como quedó traducido derramamiento de sangre"
+      }
+     }
+    ],
+    "interpretation": "¿El artículo sobre sangre, o buscar «como quedó traducido derramamiento de sangre»?"
+   },
+   "interpretation": "¿El artículo sobre sangre, o buscar «como quedó traducido derramamiento de sangre»?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "¿cómo tradujeron Mardoqueo?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "H4782"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Traducciones: H4782"
+   },
+   "interpretation": "Traducciones: H4782",
+   "top3": [
+    "rendering:H4782/mardoqueo",
+    "rendering:H4782/a mardoqueo",
+    "rendering:H4782/para mardoqueo"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 28.8
+  },
+  {
+   "q": "¿cómo se tradujo gracia?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2580"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G54850"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2587"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: H2580, G5485, H2587…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: H2580, G5485, H2587…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "como se tradujo salvador",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G49900"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H3467"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H6403"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: G4990, H3467, H6403…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: G4990, H3467, H6403…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.7
+  },
+  {
+   "q": "cilicio, cómo lo tradujeron",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "renderings",
+     "args": {
+      "strong": "G27910"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Traducciones: G2791"
+   },
+   "interpretation": "Traducciones: G2791",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 32.8
+  },
+  {
+   "q": "traducciones de anciano",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G42450"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2205"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H7868"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: G4245, H2205, H7868…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: G4245, H2205, H7868…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.3
+  },
+  {
+   "q": "como se tradujo amor",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00260"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H0160"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G00250"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: G0026, H0160, G0025…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: G0026, H0160, G0025…?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.7
+  },
+  {
+   "q": "¿cómo se tradujo verdad?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/true"
+      }
+     },
+     {
+      "query": "search",
+      "args": {
+       "text": "¿cómo se tradujo verdad?"
+      }
+     }
+    ],
+    "interpretation": "¿El artículo sobre verdadero, o buscar «¿cómo se tradujo verdad?»?"
+   },
+   "interpretation": "¿El artículo sobre verdadero, o buscar «¿cómo se tradujo verdad?»?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 11.6
+  },
+  {
+   "q": "como tradujeron vida",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/life"
+      }
+     },
+     {
+      "query": "search",
+      "args": {
+       "text": "como tradujeron vida"
+      }
+     }
+    ],
+    "interpretation": "¿El artículo sobre vida, o buscar «como tradujeron vida»?"
+   },
+   "interpretation": "¿El artículo sobre vida, o buscar «como tradujeron vida»?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "¿cómo se tradujo ídolo?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H0312"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H1544"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H0457"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: H0312, H1544, H0457…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: H0312, H1544, H0457…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.7
+  },
+  {
+   "q": "¿en qué libros aparece gracia?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/grace"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: gracia"
+   },
+   "interpretation": "Libros: gracia",
+   "top3": [
+    "book:psa",
+    "book:rom",
+    "book:2co"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.3
+  },
+  {
+   "q": "donde se habla de la fe",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "donde se habla de la fe"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: donde se habla de la fe"
+   },
+   "interpretation": "Búsqueda: donde se habla de la fe",
+   "top3": [
+    "section:tw:kt/faith#definition",
+    "note:tit/abc1",
+    "note:3jn/b4zh"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 56.3
+  },
+  {
+   "q": "libros donde sale la iglesia",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/church"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: Iglesia"
+   },
+   "interpretation": "Libros: Iglesia",
+   "top3": [
+    "book:1co",
+    "book:rev",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.8
+  },
+  {
+   "q": "en que libros esta pacto",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/covenant"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: pacto"
+   },
+   "interpretation": "Libros: pacto",
+   "top3": [
+    "book:gen",
+    "book:deu",
+    "book:psa"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "¿en qué libros se menciona a los apóstoles?",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/philiptheapostle"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:kt/apostle"
+      }
+     }
+    ],
+    "interpretation": "¿Libros: Felipe, o Libros: apóstol?"
+   },
+   "interpretation": "¿Libros: Felipe, o Libros: apóstol?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 4.2
+  },
+  {
+   "q": "Booz, en que libros aparece",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/boaz"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: Booz"
+   },
+   "interpretation": "Libros: Booz",
+   "top3": [
+    "book:rut",
+    "book:mat",
+    "book:1ki"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.6
+  },
+  {
+   "q": "libros que hablan de Moab",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/moab"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "concept": "lug:moab"
+      }
+     }
+    ],
+    "interpretation": "¿Libros: Moab, o Libros: de Moab?"
+   },
+   "interpretation": "¿Libros: Moab, o Libros: de Moab?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 19.5
+  },
+  {
+   "q": "¿dónde se menciona Creta?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:names/crete"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: Creta"
+   },
+   "interpretation": "Libros: Creta",
+   "top3": [
+    "book:act",
+    "book:tit"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.7
+  },
+  {
+   "q": "supervisor u obispo, en qué libros",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:other/overseer"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: supervisar"
+   },
+   "interpretation": "Libros: supervisar",
+   "top3": [
+    "book:neh",
+    "book:2ki",
+    "book:est"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.5
+  },
+  {
+   "q": "cuales libros mencionan a los profetas",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "tw:kt/prophet"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Libros: profeta"
+   },
+   "interpretation": "Libros: profeta",
+   "top3": [
+    "book:1ki",
+    "book:mat",
+    "book:2ki"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.7
+  },
+  {
+   "q": "¿en qué libros hay metáforas?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-metaphor"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: Metáfora"
+   },
+   "interpretation": "Libros: Metáfora",
+   "top3": [
+    "book:tit",
+    "book:jon",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "libros con modismos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "libros con modismos"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: libros con modismos"
+   },
+   "interpretation": "Búsqueda: libros con modismos",
+   "top3": [
+    "note:3jn/oj5h",
+    "note:3jn/f8i3",
+    "note:3jn/r8i4"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 71.4
+  },
+  {
+   "q": "donde hay informacion implicita",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "donde hay informacion implicita"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: donde hay informacion implicita"
+   },
+   "interpretation": "Búsqueda: donde hay informacion implicita",
+   "top3": [
+    "section:ta:translate/figs-extrainfo#description",
+    "section:ta:translate/figs-extrainfo#strategies",
+    "section:ta:translate/figs-extrainfo#examples-2"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 752.2
+  },
+  {
+   "q": "en qué libros salen sustantivos abstractos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "books",
+     "args": {
+      "article": "ta:translate/figs-abstractnouns"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Libros: Sustantivos abstractos"
+   },
+   "interpretation": "Libros: Sustantivos abstractos",
+   "top3": [
+    "book:tit",
+    "book:3jn",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 2.9
+  },
+  {
+   "q": "¿en qué libros hay nosotros exclusivo?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "¿en qué libros hay nosotros exclusivo?"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: ¿en qué libros hay nosotros exclusivo?"
+   },
+   "interpretation": "Búsqueda: ¿en qué libros hay nosotros exclusivo?",
+   "top3": [
+    "section:ta:translate/figs-pronouns#s2",
+    "section:ta:translate/figs-inclusive#s1",
+    "section:ta:translate/figs-inclusive#s3"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 117.5
+  },
+  {
+   "q": "¿qué personas y lugares hay en Rut?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "rut"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: El Libro de Rut"
+   },
+   "interpretation": "Temas: El Libro de Rut",
+   "top3": [
+    "topic:lug:bethlehem-gen-35-16",
+    "topic:lug:moab",
+    "topic:per:amminadab-exo-6-23"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 12.3
+  },
+  {
+   "q": "temas de Jonás",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "jon"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: Jonás"
+   },
+   "interpretation": "Temas: Jonás",
+   "top3": [
+    "topic:ev:prophecies-of-jonah",
+    "topic:lug:joppa",
+    "topic:lug:nineveh"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 3.8
+  },
+  {
+   "q": "personajes de Tito",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "tit"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: La carta de Pablo a Tito"
+   },
+   "interpretation": "Temas: La carta de Pablo a Tito",
+   "top3": [
+    "topic:lug:caphtor",
+    "topic:lug:macedonia",
+    "topic:lug:nicopolis"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 3.4
+  },
+  {
+   "q": "lista de personas y lugares de Nehemías",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "person"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Temas: person"
+   },
+   "interpretation": "Temas: person",
+   "top3": [
+    "topic:per:aaron",
+    "topic:per:abagtha",
+    "topic:per:abda"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 578.8
+  },
+  {
+   "q": "que nombres aparecen en 3 Juan",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/johntheapostle"
+      }
+     },
+     {
+      "query": "books",
+      "args": {
+       "article": "tw:names/johnthebaptist"
+      }
+     }
+    ],
+    "interpretation": "¿Libros: Juan (el apóstol), o Libros: Juan (el Bautista)?"
+   },
+   "interpretation": "¿Libros: Juan (el apóstol), o Libros: Juan (el Bautista)?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 4.6
+  },
+  {
+   "q": "historias biblicas para traducir",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "historias biblicas para traducir"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: historias biblicas para traducir"
+   },
+   "interpretation": "Búsqueda: historias biblicas para traducir",
+   "top3": [
+    "section:tw:other/chariot#examples",
+    "section:tw:kt/circumcise#examples",
+    "section:tw:names/ishmael#examples"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 320.3
+  },
+  {
+   "q": "que personajes salen en Ester",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "book": "est"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: El libro de Ester"
+   },
+   "interpretation": "Temas: El libro de Ester",
+   "top3": [
+    "topic:lug:babylon",
+    "topic:lug:cush",
+    "topic:lug:india"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 8.3
+  },
+  {
+   "q": "¿qué eventos hay en la Biblia?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "event"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: event"
+   },
+   "interpretation": "Temas: event",
+   "top3": [
+    "topic:ev:2nd-rejection-at-nazareth",
+    "topic:ev:3rd-tour-of-galilee",
+    "topic:ev:7-years-of-famine"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 28.3
+  },
+  {
+   "q": "lugares de la Biblia",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "place"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: place"
+   },
+   "interpretation": "Temas: place",
+   "top3": [
+    "topic:lug:abana",
+    "topic:lug:abdon",
+    "topic:lug:abel"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 71.9
+  },
+  {
+   "q": "todos los personajes biblicos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "person"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Temas: person"
+   },
+   "interpretation": "Temas: person",
+   "top3": [
+    "topic:per:aaron",
+    "topic:per:abagtha",
+    "topic:per:abda"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 476.5
+  },
+  {
+   "q": "contexto de Rut 2:12",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "context",
+     "args": {
+      "ref": "rut 2:12"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Contexto: El Libro de Rut 2:12"
+   },
+   "interpretation": "Contexto: El Libro de Rut 2:12",
+   "top3": [
+    "verse:glt rut 2:12",
+    "note:rut/x5ct",
+    "note:rut/s2vm"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 37.9
+  },
+  {
+   "q": "que hay antes y despues de Jonás 3:3",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "jon 3:3"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: Jonás 3:3"
+   },
+   "interpretation": "Pasaje: Jonás 3:3",
+   "top3": [
+    "verse:glt jon 3:3",
+    "note:jon/k7k9",
+    "note:jon/g4nk"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 5.9
+  },
+  {
+   "q": "Tito 1:12 en su contexto",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "tit 1:12"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: La carta de Pablo a Tito 1:12"
+   },
+   "interpretation": "Pasaje: La carta de Pablo a Tito 1:12",
+   "top3": [
+    "verse:glt tit 1:12",
+    "note:tit/tr1j",
+    "note:tit/y3zb"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 11.6
+  },
+  {
+   "q": "contexto 3 Juan 9",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "contexto 3 Juan 9"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: contexto 3 Juan 9"
+   },
+   "interpretation": "Búsqueda: contexto 3 Juan 9",
+   "top3": [
+    "section:tw:kt/christ#bible-references",
+    "question:3jn/vbfz",
+    "question:3jn/hkjx"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 14247.2
+  },
+  {
+   "q": "ver Rut 4:10 con su contexto",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "passage",
+     "args": {
+      "ref": "rut 4:10"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Pasaje: El Libro de Rut 4:10"
+   },
+   "interpretation": "Pasaje: El Libro de Rut 4:10",
+   "top3": [
+    "verse:glt rut 4:10",
+    "note:rut/jdr0",
+    "note:rut/nm32"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": true
+   },
+   "ms": 4.6
+  },
+  {
+   "q": "el pez grande que se tragó a Jonás",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jon front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jonah"
+      }
+     }
+    ],
+    "interpretation": "¿Jonás, el libro, o Concepto: Jonás?"
+   },
+   "interpretation": "¿Jonás, el libro, o Concepto: Jonás?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 5.6
+  },
+  {
+   "q": "la planta de Jonás",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jon front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jonah"
+      }
+     }
+    ],
+    "interpretation": "¿Jonás, el libro, o Concepto: Jonás?"
+   },
+   "interpretation": "¿Jonás, el libro, o Concepto: Jonás?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2
+  },
+  {
+   "q": "ninivitas cilicio",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/nineveh"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Nínive"
+   },
+   "interpretation": "Concepto: Nínive",
+   "top3": [
+    "concept:tw:names/nineveh",
+    "section:tw:names/nineveh#description",
+    "book:jon"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.9
+  },
+  {
+   "q": "Rut recogiendo espigas en el campo",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/ruth"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Rut"
+   },
+   "interpretation": "Concepto: Rut",
+   "top3": [
+    "concept:tw:names/ruth",
+    "section:tw:names/ruth#facts",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 7.3
+  },
+  {
+   "q": "Booz y el pariente redentor",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/boaz"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Booz"
+   },
+   "interpretation": "Concepto: Booz",
+   "top3": [
+    "concept:tw:names/boaz",
+    "section:tw:names/boaz#facts",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.3
+  },
+  {
+   "q": "Noemí regresa a Belén",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/bethlehem"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Belén"
+   },
+   "interpretation": "Concepto: Belén",
+   "top3": [
+    "concept:tw:names/bethlehem",
+    "section:tw:names/bethlehem#facts",
+    "book:jdg"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 6.3
+  },
+  {
+   "q": "Ester ante el rey",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/esther"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Ester"
+   },
+   "interpretation": "Concepto: Ester",
+   "top3": [
+    "concept:tw:names/esther",
+    "section:tw:names/esther#definition",
+    "book:est"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 11.7
+  },
+  {
+   "q": "la reina Vasti",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/vashti"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Vasti"
+   },
+   "interpretation": "Concepto: Vasti",
+   "top3": [
+    "concept:tw:names/vashti",
+    "section:tw:names/vashti#definition",
+    "book:est"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.9
+  },
+  {
+   "q": "Rut le dijo a Noemí",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/ruth"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Rut"
+   },
+   "interpretation": "Concepto: Rut",
+   "top3": [
+    "concept:tw:names/ruth",
+    "section:tw:names/ruth#facts",
+    "book:rut"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 5.3
+  },
+  {
+   "q": "los cretenses siempre mentirosos",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/crete"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Creta"
+   },
+   "interpretation": "Concepto: Creta",
+   "top3": [
+    "concept:tw:names/crete",
+    "section:tw:names/crete#definition",
+    "book:act"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 4.9
+  },
+  {
+   "q": "esposo de una sola mujer",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "esposo de una sola mujer"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: esposo de una sola mujer"
+   },
+   "interpretation": "Búsqueda: esposo de una sola mujer",
+   "top3": [
+    "verse:glt tit 1:6",
+    "note:tit/q6uy",
+    "note:rut/f68r"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": true
+   },
+   "ms": 150.4
+  },
+  {
+   "q": "sana doctrina",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/heal"
+      }
+     },
+     {
+      "query": "search",
+      "args": {
+       "text": "sana doctrina"
+      }
+     }
+    ],
+    "interpretation": "¿El artículo sobre sanar, o buscar «sana doctrina»?"
+   },
+   "interpretation": "¿El artículo sobre sanar, o buscar «sana doctrina»?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 2.9
+  },
+  {
+   "q": "Diótrefes y los hermanos",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/brother"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/sister"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: hermano, o Concepto: Hermana?"
+   },
+   "interpretation": "¿Concepto: hermano, o Concepto: Hermana?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 9.2
+  },
+  {
+   "q": "hospitalidad",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "hospitalidad"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: hospitalidad"
+   },
+   "interpretation": "Búsqueda: hospitalidad",
+   "top3": [
+    "note:rut/xc6u",
+    "note:3jn/kwv9"
+   ],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": true
+   },
+   "ms": 47.2
+  },
+  {
+   "q": "las ancianas enseñen a las jóvenes",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/elder"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G42450"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2205"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: anciano, Traducciones: G4245, o Traducciones: H2205?"
+   },
+   "interpretation": "¿Concepto: anciano, Traducciones: G4245, o Traducciones: H2205?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 4.8
+  },
+  {
+   "q": "el hijo pródigo",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/son"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/sonofgod"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/offspring"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: hijo, Concepto: Hijo de Dios, o Concepto: Hijos?"
+   },
+   "interpretation": "¿Concepto: hijo, Concepto: Hijo de Dios, o Concepto: Hijos?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.6
+  },
+  {
+   "q": "tu pueblo será mi pueblo",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:kt/peopleofgod"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:other/peoplegroup"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Pueblo de Dios, o Concepto: pueblo?"
+   },
+   "interpretation": "¿Concepto: Pueblo de Dios, o Concepto: pueblo?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 4.5
+  },
+  {
+   "q": "nacidos de nuevo por el Espíritu",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:kt/bornagain"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: nacido de nuevo"
+   },
+   "interpretation": "Concepto: nacido de nuevo",
+   "top3": [
+    "concept:tw:kt/bornagain",
+    "section:tw:kt/bornagain#definition",
+    "book:1jn"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": false
+   },
+   "ms": 34.9
+  },
+  {
+   "q": "los marineros echaron suertes",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H1486"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G29750"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H5307"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: H1486, G2975, H5307…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: H1486, G2975, H5307…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 3.3
+  },
+  {
+   "q": "compasivo y misericordioso",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H2550"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G46970"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G46980"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: H2550, G4697, G4698…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: H2550, G4697, G4698…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": false
+   },
+   "ms": 4.2
+  },
+  {
+   "q": "Rut",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "rut front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/ruth"
+      }
+     }
+    ],
+    "interpretation": "¿El Libro de Rut, el libro, o Concepto: Rut?"
+   },
+   "interpretation": "¿El Libro de Rut, el libro, o Concepto: Rut?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.6
+  },
+  {
+   "q": "jonas",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "jon front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jonah"
+      }
+     }
+    ],
+    "interpretation": "¿Jonás, el libro, o Concepto: Jonás?"
+   },
+   "interpretation": "¿Jonás, el libro, o Concepto: Jonás?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.3
+  },
+  {
+   "q": "Tito",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "tit front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/titus"
+      }
+     }
+    ],
+    "interpretation": "¿La carta de Pablo a Tito, el libro, o Concepto: Tito?"
+   },
+   "interpretation": "¿La carta de Pablo a Tito, el libro, o Concepto: Tito?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 1.2
+  },
+  {
+   "q": "Nehemias",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "concept",
+     "args": {
+      "id": "tw:names/nehemiah"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Concepto: Nehemías"
+   },
+   "interpretation": "Concepto: Nehemías",
+   "top3": [
+    "concept:tw:names/nehemiah",
+    "section:tw:names/nehemiah#definition",
+    "book:neh"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 4.4
+  },
+  {
+   "q": "info de Ester",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "passage",
+      "args": {
+       "ref": "est front:intro"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/esther"
+      }
+     }
+    ],
+    "interpretation": "¿El libro de Ester, el libro, o Concepto: Ester?"
+   },
+   "interpretation": "¿El libro de Ester, el libro, o Concepto: Ester?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.6
+  },
+  {
+   "q": "Juan",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/johntheapostle"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/johnthebaptist"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Juan (el apóstol), o Concepto: Juan (el Bautista)?"
+   },
+   "interpretation": "¿Concepto: Juan (el apóstol), o Concepto: Juan (el Bautista)?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 5.9
+  },
+  {
+   "q": "Santiago",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jamesbrotherofjesus"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jamessonofalphaeus"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/jamessonofzebedee"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Santiago (hermano de Jesús), Concepto: Santiago (hijo de Alfeo), o Concepto: Santiago (hijo de Zebedeo)?"
+   },
+   "interpretation": "¿Concepto: Santiago (hermano de Jesús), Concepto: Santiago (hijo de Alfeo), o Concepto: Santiago (hijo de Zebedeo)?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.3
+  },
+  {
+   "q": "maria",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/mary"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/marysisterofmartha"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: María, o Concepto: María (Hermana de Marta)?"
+   },
+   "interpretation": "¿Concepto: María, o Concepto: María (Hermana de Marta)?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 2.5
+  },
+  {
+   "q": "Herodes",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:herod-act-12-1"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:herod-mat-14-1"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "per:herod-mat-2-1"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Herod, Concepto: Herod, o Concepto: Herod?"
+   },
+   "interpretation": "¿Concepto: Herod, Concepto: Herod, o Concepto: Herod?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 5.4
+  },
+  {
+   "q": "Zacarías",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/zechariahnt"
+      }
+     },
+     {
+      "query": "concept",
+      "args": {
+       "id": "tw:names/zechariahot"
+      }
+     }
+    ],
+    "interpretation": "¿Concepto: Zacarías (Nuevo Testamento), o Concepto: Zacarías (Antiguo Testamento)?"
+   },
+   "interpretation": "¿Concepto: Zacarías (Nuevo Testamento), o Concepto: Zacarías (Antiguo Testamento)?",
+   "top3": [],
+   "score": {
+    "callCorrect": true,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 3.9
+  },
+  {
+   "q": "Juan 3:16",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Juan 3:16"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Búsqueda: Juan 3:16"
+   },
+   "interpretation": "Búsqueda: Juan 3:16",
+   "top3": [
+    "section:tw:kt/christ#bible-references",
+    "section:tw:names/lazarus#bible-references",
+    "section:tw:kt/godthefather#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 136.8
+  },
+  {
+   "q": "Romanos 8:28",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Romanos 8:28"
+     }
+    },
+    "via": "rule",
+    "interpretation": "Búsqueda: Romanos 8:28"
+   },
+   "interpretation": "Búsqueda: Romanos 8:28",
+   "top3": [
+    "section:tw:kt/save#bible-references",
+    "section:tw:kt/command#bible-references",
+    "section:tw:kt/holy#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 149
+  },
+  {
+   "q": "Génesis 1",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "search",
+     "args": {
+      "text": "Génesis 1"
+     }
+    },
+    "via": "search",
+    "interpretation": "Búsqueda: Génesis 1"
+   },
+   "interpretation": "Búsqueda: Génesis 1",
+   "top3": [
+    "section:tw:names/josephot#bible-references",
+    "section:tw:names/ishmael#bible-references",
+    "section:tw:names/isaac#bible-references"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 676.7
+  },
+  {
+   "q": "¿qué personas aparecen en Salmos?",
+   "decision": {
+    "kind": "call",
+    "call": {
+     "query": "topics",
+     "args": {
+      "category": "person"
+     }
+    },
+    "via": "classifier",
+    "interpretation": "Temas: person"
+   },
+   "interpretation": "Temas: person",
+   "top3": [
+    "topic:per:aaron",
+    "topic:per:abagtha",
+    "topic:per:abda"
+   ],
+   "score": {
+    "callCorrect": false,
+    "accepted": true,
+    "top3": null
+   },
+   "ms": 502.8
+  },
+  {
+   "q": "Salmo 23",
+   "decision": {
+    "kind": "choose",
+    "options": [
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H4210"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "G55680"
+      }
+     },
+     {
+      "query": "renderings",
+      "args": {
+       "strong": "H8416"
+      }
+     }
+    ],
+    "interpretation": "¿Cuál de estas palabras del original: H4210, G5568, H8416…?"
+   },
+   "interpretation": "¿Cuál de estas palabras del original: H4210, G5568, H8416…?",
+   "top3": [],
+   "score": {
+    "callCorrect": false,
+    "accepted": false,
+    "top3": null
+   },
+   "ms": 4.4
+  }
+ ]
+}

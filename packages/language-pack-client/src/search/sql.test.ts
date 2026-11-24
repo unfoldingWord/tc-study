@@ -4,7 +4,7 @@ import { createClient, type LanguagePackClient } from '../client'
 import { httpSource } from '../source/http'
 import { memoryStore } from '../store/memory'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
-import { buildSample, rewordTitusNote, type Sample } from '../../test/sample'
+import { buildSample, retitleTw, rewordTitusNote, type Sample } from '../../test/sample'
 import type { TrustPolicy } from '../verify'
 import { memoryIndex } from './memory'
 import { type SqlDriver, sqlIndex } from './sql'
@@ -260,5 +260,166 @@ describe('OBS in the search index', () => {
     await ix.removeSegment('o1')
     expect(await ix.has('o1')).toBe(false)
     expect(await ix.search('xx', 'creación')).toEqual([])
+  })
+})
+
+describe('article sections in the index', () => {
+  test('installing an art: unit adds its segment, section hits cite it, and prune removes it', async () => {
+    const index = sqlIndex(bunDriver())
+    const client = setup(sample, index)
+    await client.install('es-419', { books: ['tit'] })
+    const reader = await client.open('es-419')
+    const arts = (await reader.articles('tw:kt'))!
+    const art = arts.find((a) => a.sections.some((x) => x.md.trim() !== ''))!
+    const sec = art.sections.find((x) => x.md.trim() !== '')!
+    const word = /[\p{L}]{6,}/u.exec(sec.md)![0]
+    const r = await reader.search(word, { kinds: ['section'], limit: 100 })
+    const hit = r.data!.find((h) => h.id === `${art.id}#${sec.sid}`)!
+    expect(hit).toMatchObject({ kind: 'section', book: '', ref: '', res: art.res })
+    expect(r.cites.find((c) => c.id === hit.id)).toMatchObject({ res: art.res, release: expect.any(String) })
+    expect('ref' in r.cites.find((c) => c.id === hit.id)!).toBe(false)
+    const artSeg = (await client.status('es-419')).units.find((u) => u.key === 'es-419/art:tw:kt')
+    expect(artSeg?.installed).toBe(true)
+    const mem = setup(sample)
+    await mem.install('es-419', { books: ['tit'] })
+    const m = await (await mem.open('es-419')).search(word, { kinds: ['section'], limit: 100 })
+    expect(m.data!.map((h) => h.id).sort()).toEqual(r.data!.map((h) => h.id).sort())
+  })
+  test('a section hit whose art: unit is not installed is left out of search', async () => {
+    const index = sqlIndex(bunDriver())
+    const full = setup(sample, index)
+    await full.install('es-419', { books: ['tit'] })
+    const art = (await (await full.open('es-419')).articles('tw:kt'))!.find((a) => a.sections.some((x) => x.md.trim() !== ''))!
+    const word = /[\p{L}]{6,}/u.exec(art.sections.find((x) => x.md.trim() !== '')!.md)![0]
+    expect((await index.search('es-419', word, { kinds: ['section'] })).length).toBeGreaterThan(0)
+    const bare = setup(sample, index)
+    await bare.refresh('es-419')
+    const r = await (await bare.open('es-419')).search(word, { kinds: ['section'] })
+    expect(r.data).toEqual([])
+  })
+  test('the index has the art: segment while installed and not after the unit is gone', async () => {
+    const real = sqlIndex(bunDriver())
+    const added: string[] = []
+    const index = { ...real, addArticles: (l: string, a: Parameters<typeof real.addArticles>[1], id: string) => (added.push(id), real.addArticles(l, a, id)) }
+    const client = setup(sample, index)
+    await client.install('es-419', { books: ['tit'] })
+    await client.open('es-419')
+    expect(added.length).toBeGreaterThan(0)
+    for (const id of added) expect(await index.has(id)).toBe(true)
+    // A new revision of the articles replaces the segment: the old one leaves the index, the new one is in it.
+    const store = memoryStore()
+    const seen: string[] = []
+    const real2 = sqlIndex(bunDriver())
+    const spy = { ...real2, addArticles: (l: string, a: Parameters<typeof real.addArticles>[1], id: string) => (seen.push(id), real2.addArticles(l, a, id)) }
+    await setup(sample, spy, store).install('es-419', { books: ['tit'] })
+    const c3 = setup(await buildSample({ revision: 3, tweak: retitleTw() }), spy, store)
+    await c3.refresh('es-419')
+    await c3.install('es-419', { books: ['tit'] })
+    await c3.prune()
+    const fresh = seen.filter((id) => !added.includes(id))
+    expect(seen.filter((id) => added.includes(id)).length).toBeGreaterThan(0)
+    expect(fresh.length).toBeGreaterThan(0)
+    for (const id of fresh) expect(await real2.has(id)).toBe(true)
+    for (const id of added) expect(await real2.has(id)).toBe(false)
+  })
+})
+
+describe('sqlIndex stems', () => {
+  const mk = (lang: string, text: string): import('@bt-synergy/language-pack-v3').BookModel => ({
+    lang,
+    book: 'rut',
+    orig: ['o', 'v1'],
+    res: [['r/t', 'v1']],
+    texts: [{ res: 'r/t', pieces: [[text, false]], events: [[0, 'chapter', '1'], [0, 'verse', '1']] }],
+  })
+  test('stems match other forms; the snippet marks the original word; fr only exact', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addBook('es-419', mk('es-419', 'Las gracias de Dios'), 's1')
+    await ix.addBook('en', mk('en', 'he blessed them'), 's2')
+    await ix.addBook('fr', mk('fr', 'les graces et les gracias'), 's3')
+    const es = await ix.search('es-419', 'gracia')
+    expect(es.length).toBe(1)
+    expect(es[0]!.snippet).toContain('«gracias»')
+    expect((await ix.search('en', 'bless')).length).toBe(1)
+    expect(await ix.search('fr', 'gracia')).toEqual([])
+    expect((await ix.search('fr', 'gracias')).length).toBe(1)
+  })
+  test('a version 1 database is rebuilt by init', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE VIRTUAL TABLE pieces USING fts5(body, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED);
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('s1', 'es', 'rut');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('s1')).toBe(false)
+    await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
+    expect((await ix.search('es', 'gracia')).length).toBe(1)
+    await ix.init()
+    expect(await ix.has('s1')).toBe(true)
+  })
+  test('a version 2 database (no role column) is rebuilt by init', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT); INSERT INTO meta VALUES ('version', '2');
+      CREATE VIRTUAL TABLE pieces USING fts5(body, stems, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED);
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('s1', 'es', 'rut');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('s1')).toBe(false)
+    await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
+    expect((await ix.search('es', 'gracia')).length).toBe(1)
+  })
+  test('an OBS-era database (no meta, no stems, OBS rows) is rebuilt by init, and OBS rows then have stems', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE VIRTUAL TABLE pieces USING fts5(body, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED, tokenize = 'unicode61 remove_diacritics 2');
+      INSERT INTO pieces VALUES ('Las gracias de Dios', 'text', 'es', 'obs', '01:01', 'r/obs', '', 'o1');
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('o1', 'es', 'obs');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('o1')).toBe(false)
+    expect(await ix.search('es', 'gracias')).toEqual([])
+    await ix.addObs('es', { lang: 'es', res: [['r/obs', 'v1']], stories: [{ res: 'r/obs', n: 1, title: 'La creación', frames: [{ n: 1, text: 'Las gracias de Dios' }] }] }, 'o1')
+    const hits = await ix.search('es', 'gracia')
+    expect(hits.map((h) => [h.kind, h.book, h.ref])).toEqual([['text', 'obs', '01:01']])
+    expect(hits[0]!.snippet).toContain('«gracias»')
+    await ix.init()
+    expect(await ix.has('o1')).toBe(true)
+  })
+  test('a version 3 database (C2 without OBS) is rebuilt by init', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT); INSERT INTO meta VALUES ('version', '3');
+      CREATE VIRTUAL TABLE pieces USING fts5(body, stems, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, role UNINDEXED, seg UNINDEXED);
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('s1', 'es', 'rut');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('s1')).toBe(false)
+  })
+  test('section hits carry their role; other hits have none', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addArticles(
+      'es-419',
+      [{ id: 'tw:kt/grace', res: 'r/tw', title: 'Gracia', sections: [{ sid: 'definicion', level: 2, role: 'definition', title: 'Definición', lang: 'es-419', md: 'El favor inmerecido.' }] }] as never,
+      'a1',
+    )
+    await ix.addBook('es-419', mk('es-419', 'Las gracias de Dios'), 's1')
+    const hits = await ix.search('es-419', 'gracia')
+    expect(hits.find((h) => h.kind === 'section')).toMatchObject({ id: 'tw:kt/grace#definicion', role: 'definition' })
+    expect(hits.find((h) => h.kind === 'text')!.role).toBeUndefined()
+  })
+  test('a language with no stemmer writes empty stems and matches the exact word only', async () => {
+    const db = new Database(':memory:')
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    await ix.addBook('fr', mk('fr', 'les graces et les gracias'), 's3')
+    expect(db.query('SELECT stems FROM pieces').all()).toEqual([{ stems: '' }])
+    expect((await ix.search('fr', 'gracias')).length).toBe(1)
+    expect(await ix.search('fr', 'gracia')).toEqual([])
+  })
+  test('user text with quotes is never FTS5 syntax', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
+    expect(await ix.search('es', 'gracia" OR x')).toEqual([])
+    expect((await ix.search('es', 'gracia" dios')).length).toBe(1)
   })
 })

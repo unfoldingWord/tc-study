@@ -1,5 +1,5 @@
 /** `concept`, `topics` and `books`: answers from the maps (`answer` of language-pack-v3), in the envelope of the queries. No Node module here. */
-import { answer, BOOKS, type Cell, type MapSet, type ObsModel, TN, TWL } from '@bt-synergy/language-pack-v3'
+import { answer, BOOKS, type Cell, type MapSet, type ObsModel, strongKey, TN, TWL } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
 import { refOf, type StoryRef, storyIndex } from './stories'
@@ -149,10 +149,40 @@ async function addObs(out: Answer<unknown>, reader: PackReader, m: MapSet, id: s
   if (use !== undefined) data.obs = use
 }
 
-export async function booksQuery(reader: PackReader, q: { article: string } | { concept: string }): Promise<Answer<BooksData>> {
+/** The per-book occurrences of a Strong key, from the `xmap` table (the same cells as the usage of an article). */
+async function strongBooks(reader: PackReader, key: unknown): Promise<Answer<BooksData>> {
+  if (typeof key !== 'string' || key === '') throw new ClientError('E_ARG', 'books needs a Strong key')
+  const out = newAnswer<BooksData>(reader, 'books')
+  const m = await usedMaps(out, reader)
+  if (!haveMap(out, reader, m, 'xmap')) {
+    out.data = { installed: false, books: {} }
+    return out
+  }
+  // `G26` and `g3972` are the keys `G0026` and `G3972` of the table: upper-case the letter and pad the digits to four before the lookup.
+  const parts = /^([GH])(\d{1,4})([a-z]?)$/i.exec(key.trim())
+  const padded = parts === null ? key : `${parts[1]!.toUpperCase()}${parts[2]!.padStart(4, '0')}${parts[3]!.toLowerCase()}`
+  const cells = (answer(m, { kind: 'strong', key: strongKey(padded) }) as { books: Record<string, Cell> }).books
+  const books: Record<string, BookCell> = {}
+  for (const book of BOOKS) {
+    const c = cells[book] ?? { state: 'none' as const }
+    const unit = `book:${book}`
+    const installed = reader.installed(unit)
+    const cell: BookCell = { state: c.state, installed }
+    if (c.count !== undefined) cell.count = c.count
+    if (c.verses !== undefined) cell.verses = c.verses
+    if (!installed && reader.listed(unit)) cell.bytes = reader.size(unit)
+    books[book] = cell
+  }
+  out.data = { books }
+  return out
+}
+
+export async function booksQuery(reader: PackReader, q: { article: string } | { concept: string } | { strong: string }): Promise<Answer<BooksData>> {
   const article = (q as { article?: unknown } | null)?.article
   const concept = (q as { concept?: unknown } | null)?.concept
-  if ((article === undefined) === (concept === undefined)) throw new ClientError('E_ARG', 'books needs exactly one of article and concept')
+  const strong = (q as { strong?: unknown } | null)?.strong
+  if ([article, concept, strong].filter((x) => x !== undefined).length !== 1) throw new ClientError('E_ARG', 'books needs exactly one of article, concept and strong')
+  if (strong !== undefined) return strongBooks(reader, strong)
   const id = article ?? concept
   if (typeof id !== 'string' || id === '') throw new ClientError('E_ARG', 'books needs an id')
   if (article !== undefined && !id.startsWith('ta:') && !id.startsWith('tw:')) throw new ClientError('E_ARG', `not an article id: ${JSON.stringify(id)}`)

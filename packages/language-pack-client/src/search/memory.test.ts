@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
-import { memoryIndex } from './memory'
+import { memoryIndex, tokenizer } from './memory'
 
 const book = (name: string, text: string): BookModel => ({
   lang: 'xx',
@@ -67,5 +67,66 @@ describe('memoryIndex with OBS', () => {
     await ix.removeSegment('o1')
     expect(await ix.has('o1')).toBe(false)
     expect(await ix.search('xx', 'creación')).toEqual([])
+  })
+})
+
+describe('memoryIndex stems', () => {
+  test('OBS rows match by stem too', async () => {
+    const ix = memoryIndex()
+    await ix.addObs('es', { lang: 'es', res: [['r/obs', 'v1']], stories: [{ res: 'r/obs', n: 1, title: 'La creación', frames: [{ n: 1, text: 'Las gracias de Dios' }] }] }, 'o1')
+    const hits = await ix.search('es', 'gracia')
+    expect(hits.map((h) => [h.kind, h.book, h.ref])).toEqual([['text', 'obs', '01:01']])
+    expect(hits[0]!.snippet).toContain('«gracias»')
+  })
+  test('a stem finds other forms; the snippet marks the original word; other languages need the exact word', async () => {
+    const ix = memoryIndex()
+    await ix.addBook('es-419', book('rut', 'Las gracias de Dios'), 's1')
+    await ix.addBook('en', book('rut', 'he blessed them'), 's2')
+    await ix.addBook('fr', book('rut', 'les graces et les gracias'), 's3')
+    const es = await ix.search('es-419', 'gracia')
+    expect(es.length).toBeGreaterThan(0)
+    expect(es[0]!.snippet).toContain('«gracias»')
+    expect((await ix.search('en', 'bless')).length).toBeGreaterThan(0)
+    expect(await ix.search('fr', 'gracia')).toEqual([])
+    expect((await ix.search('fr', 'GRACIAS')).length).toBeGreaterThan(0)
+  })
+  test('article sections are rows of kind section', async () => {
+    const ix = memoryIndex()
+    await ix.addArticles(
+      'es-419',
+      [
+        {
+          id: 'tw:kt/grace',
+          res: 'r/tw',
+          title: 'Gracia',
+          sections: [
+            { sid: 'definicion', level: 2, role: 'definition', title: 'Definición', lang: 'es-419', md: 'El favor inmerecido de Dios.' },
+            { sid: 'sugerencias', level: 2, role: 'translation', lang: 'es-419', md: 'Se puede traducir así.' },
+            { sid: 'vacio', level: 2, role: 'other', lang: 'es-419', md: '  ' },
+          ],
+        },
+      ],
+      'a1',
+    )
+    const hits = await ix.search('es-419', 'gracia', { kinds: ['section'] })
+    expect(hits.map((h) => h.id).sort()).toEqual(['tw:kt/grace#definicion', 'tw:kt/grace#sugerencias'])
+    expect(hits[0]).toMatchObject({ kind: 'section', book: '', ref: '', res: 'r/tw' })
+    expect(hits.map((h) => h.role).sort()).toEqual(['definition', 'translation'])
+    expect(await ix.search('es-419', 'inmerecido', { kinds: ['note'] })).toEqual([])
+    await ix.removeSegment('a1')
+    expect(await ix.search('es-419', 'gracia')).toEqual([])
+  })
+})
+
+describe('memoryIndex interning', () => {
+  test('two tokens with the same word in the same language share the same stem array; another language does not', () => {
+    const tok = tokenizer()
+    const a = tok('Las gracias de Dios', 'es-419')
+    const b = tok('la gracia y gracias', 'es-419')
+    const c = tok('gracias', 'en')
+    const x = a.find((t) => t.t === 'gracias')!
+    const y = b.find((t) => t.t === 'gracias')!
+    expect(x.s).toBe(y.s)
+    expect(c[0]!.s).not.toBe(x.s)
   })
 })
