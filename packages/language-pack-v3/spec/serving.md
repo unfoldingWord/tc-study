@@ -3,8 +3,8 @@
 Status: **contract fixed for phase 3** (2026-11-03). The packs Worker of translation-helps-mcp serves it next to format 2.0; the
 client library (C1) and its fake server follow it. A change to anything below is a spec change with its own commit.
 
-Format 3 needs only two kinds of download: a **catalog** (the one segment that changes in place) and a **segment** (immutable,
-named by its id). Everything else a device needs (which segments make a unit, which units a book needs, which revision it has)
+Format 3 needs only three kinds of download: a **catalog** (the one segment that changes in place), a **segment** (immutable,
+named by its id) and a **complement** (immutable, named by its id; a reader that does not use the kind a catalog lists never downloads it). Everything else a device needs (which segments make a unit, which units a book needs, which revision it has)
 is inside the catalog.
 
 ## URLs
@@ -16,6 +16,7 @@ The base is the packs Worker's origin, for example `https://<worker host>`. Path
 | `GET /v3/packs/{lang}/catalog` | the language catalog of `{lang}` (a catalog segment whose `about.catalog` is the language tag) |
 | `GET /v3/packs/common/catalog` | the common catalog (`about.catalog` is `"common"`) |
 | `GET /v3/packs/seg/{id}` | the segment file whose id is `{id}` |
+| `GET /v3/packs/complement/{id}` | the complement file whose id is `{id}` (`catalog.md`, "Complements") |
 
 - `{lang}` is a BCP 47 tag. The Worker lowercases it and applies the same aliases as `/v2/packs` (today `es` → `es-419`),
   then checks it against `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. The answer for an alias is the catalog of the tag it maps to.
@@ -27,6 +28,7 @@ The base is the packs Worker's origin, for example `https://<worker host>`. Path
 - A trailing slash, a query string other than one the Worker ignores, a third path element, or any other path under `/v3/packs/`
   is a bad path (400).
 - The segment route is shared by every language and by the common catalog: the same id is the same bytes.
+- A complement's `{id}` is the sha256 of the file **as downloaded** (`catalog.md`: for a complement, the id is of the bytes on the wire, not of an inflated body), in 64 lowercase hex digits. The path is `/v3/packs/complement/{id}` (uppercase hex is a bad path, 400, as for a segment): like `seg`, a path whose first element is `complement` is a complement only when the second is 64 lowercase hex, and otherwise it is a bad path (400): `complement` is not a language tag (a tag has 2 or 3 letters before any hyphen), so unlike `seg` it is not also a language. A complement and a segment never share a route.
 
 ## Answers
 
@@ -54,6 +56,8 @@ Methods: `GET`, `HEAD` and `OPTIONS` (204, CORS only). Anything else is 405 with
 - No `Content-Encoding`: the bytes on the wire are the file bytes. A client checks a segment by reading its header and hashing its
   decompressed body (`container.md`), and a catalog entry's `size` equals the file's length.
 
+**200 or 206, a complement**: as a segment (same headers, caching, `ETag`, `If-None-Match` and `Range`; the rate limit is the one of segments). The bucket keeps it under the key `v3/complement/{id}`, with no extension. A client checks the length (the `size` of the catalog entry) and the sha256 of the bytes it got against the entry's `id` before it reads anything.
+
 **HEAD** gives the headers of the GET it stands for, with no body.
 
 **CORS**, on every answer including errors and 304:
@@ -71,9 +75,10 @@ Every error body is JSON (`Content-Type: application/json`), with `Cache-Control
 
 | Status | Body | When |
 | --- | --- | --- |
-| 400 | `{"error":"bad pack path"}` | the path is not one of the three forms |
+| 400 | `{"error":"bad pack path"}` | the path is not one of the four forms |
 | 404 | `{"error":"catalog not found"}` | no catalog is published for that language (or no common catalog) |
 | 404 | `{"error":"segment not found"}` | no segment with that id |
+| 404 | `{"error":"complement not found"}` | no complement with that id |
 | 404 | `{"state":"unavailable","reason":"v3-off"}` | format 3 is switched off on this Worker (`PACKS_V3` is not `on`) |
 | 405 | `{"error":"method not allowed"}` | a method other than GET, HEAD, OPTIONS |
 | 416 | `{"error":"range not satisfiable"}` | see above |
@@ -98,6 +103,10 @@ Not part of the Worker's contract, written here so the fake server and the Worke
    same way. Signing a catalog again changes its file bytes and its ETag but not its id.
 3. `GET` each segment the chosen units name, verify it, and activate a unit only when it and its `needs` are complete
    (`catalog.md`).
+4. A complement is optional (`catalog.md`: a reader is not obliged to read one). `GET /v3/packs/complement/{id}` only when the app uses its
+   kind, and check its length and sha256 against the catalog entry. Failing to get or to verify one (a 400 or 404 from a Worker that does not
+   serve the route yet, a timeout, a wrong hash) never blocks installing a catalog or activating a unit: the app goes without it and may try
+   again later.
 
 A catalog's `about.revision` only grows; a client does not install a lower revision of the same publisher and catalog without
 the person's confirmation (`catalog.md`).
@@ -109,10 +118,11 @@ The packs bucket (R2) holds format 3 under its own prefix, so the format 2.0 cle
 | Key | Content | Written |
 | --- | --- | --- |
 | `v3/seg/{id}.seg` | a segment file | before any catalog that names it; never rewritten |
-| `v3/catalog/{lang}.seg` | the language catalog | last, after every segment it and the common catalog name exists, and after the registry |
+| `v3/complement/{id}` | a complement file (`catalog.md`), the bytes the catalog's entry names | before any catalog that lists it; never rewritten |
+| `v3/catalog/{lang}.seg` | the language catalog | last, after every segment and every complement it and the common catalog name exists, and after the registry |
 | `v3/catalog/common.seg` | the common catalog | only by the run of the map language (`en`), before that language's catalog |
 | `v3/registry/{lang}.json` | the section registry of the language's builds (`ids.md`) | after the segments and before any catalog (a catalog that is visible always has its registry); never served. A catalog with no linguistic content has no registry entry |
 
-Uploads use `Cache-Control: public, max-age=31536000, immutable` for segments and `no-cache` for catalogs; the Worker sets its own
+Uploads use `Cache-Control: public, max-age=31536000, immutable` for segments and complements and `no-cache` for catalogs; the Worker sets its own
 headers anyway. Nothing else is written under `v3/`; a catalog with no linguistic content (`catalog.md`) writes only its segments, then its catalog. Source files the builders read (TIPNR, Theographic, OBS) are never uploaded
-(`fuentes.md`). Segments no catalog names are not deleted in phase 3.
+(`fuentes.md`). Segments and complements no catalog names are not deleted in phase 3.

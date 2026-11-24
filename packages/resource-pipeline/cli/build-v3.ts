@@ -659,7 +659,10 @@ async function build(o: Options, io: Io, deps?: ObsImagesDeps): Promise<void> {
   await rm(join(o.out, 'complements'), { recursive: true, force: true })
   if (common.complements !== undefined && common.complements.length > 0) {
     await mkdir(join(o.out, 'complements'), { recursive: true })
-    for (const c of common.complements) await writeFile(join(o.out, 'complements', `${hex(c.complement.id)}.${c.complement.kind}`), c.bytes)
+    for (const c of common.complements) {
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.complement.kind)) throw new Error(`The complement kind ${JSON.stringify(c.complement.kind)} is not a file extension (lowercase letters, digits and hyphens): the publishers keep it as complements/<id>.<kind>`)
+      await writeFile(join(o.out, 'complements', `${hex(c.complement.id)}.${c.complement.kind}`), c.bytes)
+    }
   }
   await writeFile(join(o.out, `catalog-${lang}.seg`), built.catalog.bytes)
   await writeFile(join(o.out, 'report.txt'), `${report.join('\n')}\n`)

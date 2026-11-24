@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { catalogView, hex, KNOWN, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
@@ -6,6 +7,8 @@ import { IMMUTABLE, NO_CACHE, type PackBucket } from './publishLanguage'
 /** The only keys format 3 writes (`spec/serving.md`). */
 export const V3_KEYS = {
   seg: (id: string) => `v3/seg/${id}.seg`,
+  /** A complement, under the sha256 (hex) of its bytes as downloaded (`spec/serving.md`). */
+  complement: (id: string) => `v3/complement/${id}`,
   catalog: (name: string) => `v3/catalog/${name}.seg`,
   registry: (lang: string) => `v3/registry/${lang}.json`,
 }
@@ -76,7 +79,49 @@ export async function sameAsPublished(published: Uint8Array, built: Uint8Array, 
 
 type Planned = { name: string; bytes: Uint8Array; model: Model; id: string }
 
-/** Uploads the folder `build-v3` wrote: segments first, then the registry, then the catalogs (common before the language); nothing outside the three key shapes. */
+/** A complement `kind` is a file extension in the build folder (`complements/<id>.<kind>`): a name that cannot leave that folder. */
+const KIND = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/**
+ * The complements the catalogs `models` list, put to `v3/complement/<id>` when the bucket lacks them (the same id is put once). The file is
+ * `<outDir>/complements/<id>.<kind>`, where the builder wrote it; its length must be the `size` the catalog says and its sha256 the `id`,
+ * and a file that is not is never uploaded. Returns the keys put and the keys that were already there, each in id order.
+ */
+export async function putComplements(o: { bucket: PackBucket; outDir: string; models: Model[]; log: (line: string) => void }): Promise<{ uploaded: string[]; skipped: string[] }> {
+  const wanted = new Map<string, { kind: string; size: number }>()
+  for (const model of o.models) {
+    for (const c of model.complements ?? []) {
+      const id = hex(c.id)
+      const before = wanted.get(id)
+      if (before !== undefined && (before.kind !== c.kind || before.size !== c.size)) throw new Error(`The complement ${id} is listed with two kinds or sizes`)
+      wanted.set(id, { kind: c.kind, size: c.size })
+    }
+  }
+  const uploaded: string[] = []
+  const skipped: string[] = []
+  for (const id of [...wanted.keys()].sort()) {
+    const key = V3_KEYS.complement(id)
+    if (await o.bucket.has(key)) {
+      skipped.push(key)
+      continue
+    }
+    const { kind, size } = wanted.get(id)!
+    if (!KIND.test(kind)) throw new Error(`The complement ${id} has the kind ${JSON.stringify(kind)}, which is not a file extension`)
+    const file = join(o.outDir, 'complements', `${id}.${kind}`)
+    if (!existsSync(file)) throw new Error(`The complement ${id} is named by a catalog and is neither in the bucket nor at ${file}; the catalog that lists it (the common catalog, when it is not the one built here) was published without it: build and publish that catalog again`)
+    const bytes = new Uint8Array(readFileSync(file))
+    if (bytes.length !== size) throw new Error(`${file} has ${bytes.length} bytes and the catalog says the complement ${id} has ${size}`)
+    // The id of a complement is the sha256 of its file as downloaded (catalog.md): a file that does not hash to its name is never uploaded.
+    if (createHash('sha256').update(bytes).digest('hex') !== id) throw new Error(`${file} does not hash to the id ${id}`)
+    await o.bucket.put(key, bytes, { contentType: 'application/octet-stream', cacheControl: IMMUTABLE })
+    if (!(await o.bucket.has(key))) throw new Error(`The complement ${id} is not in the bucket after its upload`)
+    uploaded.push(key)
+  }
+  if (wanted.size > 0) o.log(`complements: ${uploaded.length} uploaded, ${skipped.length} already there`)
+  return { uploaded, skipped }
+}
+
+/** Uploads the folder `build-v3` wrote: segments first, then the registry, then the catalogs (common before the language); nothing outside the key shapes of `V3_KEYS`. */
 export async function publishV3(o: {
   bucket: PackBucket
   outDir: string
@@ -95,6 +140,7 @@ export async function publishV3(o: {
 
   const published = await readPublishedV3(bucket, lang)
   const planned: Planned[] = []
+  const unchangedModels: Model[] = []
   for (const name of o.publishCommon ? ['common', lang] : [lang]) {
     const path = `catalog-${name}.seg`
     if (!existsSync(file(path))) {
@@ -105,6 +151,7 @@ export async function publishV3(o: {
     const before = name === 'common' ? published.common : published.lang
     if (before !== undefined && (await sameAsPublished(before.bytes, bytes, o.signer))) {
       log(`catalog ${name}: unchanged (revision ${before.revision})`)
+      unchangedModels.push((await readCatalog(before.bytes)).model)
       continue
     }
     if (o.signer !== undefined && !(await signedBy(bytes, o.signer))) {
@@ -121,7 +168,11 @@ export async function publishV3(o: {
     else log(`registry ${lang}: unchanged`)
   }
 
-  if (planned.length === 0 && registry === undefined) return { outcome: 'unchanged', uploaded, skipped }
+  if (planned.length === 0 && registry === undefined) {
+    // A catalog an older publisher put may list complements the bucket lacks: they are put now (the files are in the build folder), so "unchanged" never leaves a catalog that points nowhere.
+    const repaired = await putComplements({ bucket, outDir, models: unchangedModels, log })
+    return { outcome: 'unchanged', uploaded: repaired.uploaded, skipped: repaired.skipped }
+  }
 
   // The segments the catalogs to put name, in id order.
   const classes = new Map<string, string>()
@@ -161,6 +212,12 @@ export async function publishV3(o: {
     uploaded.push(key)
   }
   log(`segments: ${uploaded.length} uploaded, ${skipped.length} already there`)
+
+  // The complements the catalogs to put list (a language catalog over the published common catalog stands on that one's too), before any catalog.
+  const publishedCommon = language !== undefined && !planned.some(({ name }) => name === 'common') ? [(await readCatalog(published.common!.bytes)).model] : []
+  const complements = await putComplements({ bucket, outDir, models: [...planned.map(({ model }) => model), ...unchangedModels, ...publishedCommon], log })
+  uploaded.push(...complements.uploaded)
+  skipped.push(...complements.skipped)
 
   // A catalog is only put when every segment it names is in the bucket (a lost write must not leave a catalog that points nowhere).
   for (const id of [...ids, ...commonIds]) {
@@ -214,7 +271,8 @@ export async function publishStandalone(o: {
   const before = await publishedCatalog(bucket, name)
   if (before !== undefined && (await sameAsPublished(before.bytes, bytes, o.signer))) {
     log(`catalog ${name}: unchanged (revision ${before.revision})`)
-    return { outcome: 'unchanged', uploaded, skipped }
+    const repaired = await putComplements({ bucket, outDir, models: [model], log })
+    return { outcome: 'unchanged', uploaded: repaired.uploaded, skipped: repaired.skipped }
   }
   if (o.signer !== undefined && !(await signedBy(bytes, o.signer))) {
     throw new Error(`The catalog ${name} in ${outDir} does not verify against the signing key ${o.signer.keyId}: nothing was uploaded`)
@@ -238,6 +296,9 @@ export async function publishStandalone(o: {
     uploaded.push(key)
   }
   log(`segments: ${uploaded.length} uploaded, ${skipped.length} already there`)
+  const complements = await putComplements({ bucket, outDir, models: [model], log })
+  uploaded.push(...complements.uploaded)
+  skipped.push(...complements.skipped)
   for (const id of ids) {
     if (!(await bucket.has(V3_KEYS.seg(id)))) throw new Error(`Segment ${id} is not in the bucket after its upload; no catalog was put`)
   }

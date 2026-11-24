@@ -16,7 +16,12 @@
  *  - `import`: `readTransfer`; every whole, verified segment goes to `segments/<id>.seg`, the catalogs to `catalog-<name>.seg`. A cut
  *    file imports its whole entries and lists the missing ones. A catalog that is cut (or any defect of the file) is exit 1 and nothing
  *    is written. A segment already there with other bytes is an error (ids are hashes) and nothing is written; a catalog is replaced.
- *    Entries whose status is not ok, and complements (no place for them in the folder shape), are not written and are listed.
+ *    Entries whose status is not ok are not written and are listed.
+ *  - Complements travel in the file and are kept in the folder as `complements/<id>.<kind>` (the shape `build-v3` writes): `export` takes
+ *    from the folder (`--from`, and `--common` for the common catalog) the complements the exported catalogs list, checking their length
+ *    and sha256 against the catalog (`update` leaves out the ones the `--base` catalogs list); `import` writes one under the kind the
+ *    catalogs of the file give it, and lists in `complements` the ones it did not write (no catalog of the file lists them). A complement
+ *    whose bytes fail the id of the index is in `rejected` and makes `complete` false (as a segment).
  *
  *  - `import --trusted <hex>` (repeatable, a raw Ed25519 public key) and `--keys <dir>` (a folder of `*.pub` files, one hex key each) give the
  *    keys the catalogs of the file must verify against, through the TS reader (a local-origin catalog in a file is rejected too): before
@@ -26,9 +31,10 @@
  *
  * Stdout: one JSON line. Exit 0 ok, 1 failure, 2 usage.
  */
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path'
-import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, readTransfer, writeTransfer, type BuiltSegment, type KnownTables } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, readTransfer, writeTransfer, type BuiltSegment, type ComplementFile, type KnownTables } from '@bt-synergy/language-pack-v3'
 
 class UsageError extends Error {}
 
@@ -40,6 +46,8 @@ type Io = { log: (line: string) => void; error: (line: string) => void; out?: (l
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(path))
 const same = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((v, i) => v === b[i])
+/** A complement kind is a file extension of the folder (`complements/<id>.<kind>`): a name that cannot leave it. */
+const KIND = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 function flagsOf(argv: string[], allowed: string[], repeatable: string[] = []): Map<string, string[]> {
   const flags = new Map<string, string[]>()
@@ -88,11 +96,18 @@ async function exportFile(argv: string[], io: Io): Promise<number> {
   if (catalogFiles.length === 0) throw new Error(`${from} has no catalog-*.seg`)
   const catalogs: BuiltSegment[] = []
   const wanted = new Map<string, { class: string; dir: string }>()
+  const wantedComplements = new Map<string, { kind: string; size: number; dir: string }>()
   const addCatalog = async (file: string, dir: string): Promise<void> => {
     const c = await asBuilt(read(file), 'catalog')
     if (c.seg.h.class !== 'catalog') throw new Error(`${file} is not a catalog`)
     catalogs.push(c)
-    for (const e of catalogView(c.seg).segments) wanted.set(hex(e.id), { class: e.class, dir })
+    const model = catalogView(c.seg)
+    for (const e of model.segments) wanted.set(hex(e.id), { class: e.class, dir })
+    for (const e of model.complements ?? []) {
+      const before = wantedComplements.get(hex(e.id))
+      if (before !== undefined && (before.kind !== e.kind || before.size !== e.size)) throw new Error(`the complement ${hex(e.id)} is listed with two kinds or sizes`)
+      wantedComplements.set(hex(e.id), { kind: e.kind, size: e.size, dir })
+    }
   }
   for (const f of catalogFiles) await addCatalog(join(from, f), from)
   if (mode === 'full') {
@@ -120,13 +135,24 @@ async function exportFile(argv: string[], io: Io): Promise<number> {
     const model = catalogView(seg)
     base.push([model.about.catalog, model.about.revision])
     for (const e of model.segments) have.add(hex(e.id))
+    for (const e of model.complements ?? []) have.add(hex(e.id))
   }
-  const entries: BuiltSegment[] = []
+  const entries: (BuiltSegment | ComplementFile)[] = []
   for (const [id, { class: className, dir }] of [...wanted].sort(([a], [b]) => (a < b ? -1 : 1))) {
     if (mode === 'update' && have.has(id)) continue
     const path = join(dir, 'segments', `${id}.seg`)
     if (!existsSync(path)) throw new Error(`the catalogs name the segment ${id} and ${path} is not there`)
     entries.push(await asBuilt(read(path), className, id))
+  }
+  for (const [id, { kind, size, dir }] of [...wantedComplements].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    if (mode === 'update' && have.has(id)) continue
+    if (!KIND.test(kind)) throw new Error(`the complement ${id} has the kind ${JSON.stringify(kind)}, which is not a file extension`)
+    const path = join(dir, 'complements', `${id}.${kind}`)
+    if (!existsSync(path)) throw new Error(`the catalogs name the complement ${id} and ${path} is not there`)
+    const bytes = read(path)
+    if (bytes.length !== size) throw new Error(`${path} has ${bytes.length} bytes and the catalog says the complement ${id} has ${size}`)
+    if (createHash('sha256').update(bytes).digest('hex') !== id) throw new Error(`${path} does not hash to the id ${id}`)
+    entries.push({ id, bytes, kind: 'complement' })
   }
   const bytes = writeTransfer({
     mode,
@@ -138,7 +164,7 @@ async function exportFile(argv: string[], io: Io): Promise<number> {
   })
   mkdirSync(dirname(resolve(out)), { recursive: true })
   writeFileSync(out, bytes)
-  io.out?.(JSON.stringify({ ok: true, mode, catalogs: catalogs.length, segments: entries.length, bytes: bytes.length, ...(mode === 'update' ? { base } : {}) }))
+  io.out?.(JSON.stringify({ ok: true, mode, catalogs: catalogs.length, segments: entries.filter((e) => !('kind' in e && e.kind === 'complement')).length, complements: entries.filter((e) => 'kind' in e && e.kind === 'complement').length, bytes: bytes.length, ...(mode === 'update' ? { base } : {}) }))
   return 0
 }
 
@@ -195,9 +221,37 @@ async function importFile(args: string[], io: Io): Promise<number> {
   const complements: string[] = []
   let unchanged = 0
   let segments = 0
+  // The kind of each complement the catalogs of the file list (a complement is kept in a file named by its kind).
+  const kinds = new Map<string, string>()
+  for (const e of entries) {
+    if (e.kind === 'segment' && e.status === 'ok' && index.catalogs.includes(e.id)) {
+      const { seg } = await readSegment(e.bytes!, { known: KNOWN.catalog, expectedClass: 'catalog' })
+      for (const c of catalogView(seg).complements ?? []) {
+        if (kinds.has(hex(c.id)) && kinds.get(hex(c.id)) !== c.kind) throw new Error(`the complement ${hex(c.id)} is listed with two kinds`)
+        kinds.set(hex(c.id), c.kind)
+      }
+    }
+  }
+  let complementsWritten = 0
   for (const e of entries) {
     if (e.kind === 'complement') {
-      complements.push(e.id)
+      const kind = kinds.get(e.id)
+      if (e.status !== 'ok') {
+        if (e.status !== 'missing') rejected.push({ id: e.id, status: e.status })
+        continue
+      }
+      if (kind === undefined || !KIND.test(kind)) {
+        complements.push(e.id)
+        continue
+      }
+      const path = join(into, 'complements', `${e.id}.${kind}`)
+      if (existsSync(path)) {
+        if (!same(read(path), e.bytes!)) throw new Error(`${path} exists with other bytes than the complement ${e.id}`)
+        unchanged++
+        continue
+      }
+      complementsWritten++
+      writes.push({ path, bytes: e.bytes! })
       continue
     }
     if (e.status !== 'ok') {
@@ -240,6 +294,7 @@ async function importFile(args: string[], io: Io): Promise<number> {
     writes.push({ path, bytes })
   }
   mkdirSync(join(into, 'segments'), { recursive: true })
+  if (complementsWritten > 0) mkdirSync(join(into, 'complements'), { recursive: true })
   const put = (w: { path: string; bytes: Uint8Array }): void => {
     const temp = `${w.path}.part`
     writeFileSync(temp, w.bytes)
@@ -262,7 +317,7 @@ async function importFile(args: string[], io: Io): Promise<number> {
     if (incomplete) holes = true
   }
   const complete = missing.length === 0 && rejected.length === 0 && kept.length === 0 && !holes
-  io.out?.(JSON.stringify({ ok: kept.length === 0, complete, mode: index.mode, catalogs, segments, unchanged, missing, rejected, complements, ...(kept.length > 0 ? { kept } : {}), ...(index.base ? { base: index.base } : {}) }))
+  io.out?.(JSON.stringify({ ok: kept.length === 0, complete, mode: index.mode, catalogs, segments, complementsWritten, unchanged, missing, rejected, complements, ...(kept.length > 0 ? { kept } : {}), ...(index.base ? { base: index.base } : {}) }))
   if (kept.length > 0) {
     io.error(`transfer-v3: the segments of the catalog ${kept.join(', ')} are not all there: the older catalog stays`)
     return 1
