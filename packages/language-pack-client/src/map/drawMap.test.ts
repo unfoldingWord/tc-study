@@ -304,7 +304,7 @@ describe('reference points', () => {
     const only = drawMap({ points: REFS, summary: S, frame: { lat: 32.6, lon: 35.8, scale: 60, width: 360, height: 240 } }) // no protagonist: fit would show the default Levant view
     expect((only.match(/class="map-dot-ref"/g) ?? []).length).toBe(2)
     expect(only).not.toContain('class="map-dot"')
-    const one = drawMap({ points: [JOPPA, ...REFS], summary: S })
+    const one = drawMap({ points: [JOPPA, ...REFS], summary: S, frame: { lat: 32.6, lon: 35.8, scale: 60, width: 360, height: 240 } }) // one protagonist alone would frame only 40 km around it
     expect(one).toContain('>Jope<')
     expect(one).toContain('class="map-dot" fill="#222222" data-id="lug:joppa"')
     expect((one.match(/class="map-dot-ref"/g) ?? []).length).toBe(2)
