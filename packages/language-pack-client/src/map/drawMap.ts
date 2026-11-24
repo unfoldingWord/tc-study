@@ -19,11 +19,11 @@
  */
 import type { Basemap } from '@bt-synergy/language-pack-v3'
 
-/** A place to draw: its point (degrees), certainty (1 low, 2 medium, 3 high), form (1 point, 2 area, 3 water, 4 height, 5 port), label and verse count. `badge`: the stop numbers of a route that pass here ("1, 12"). */
-export type MapPoint = { id: string; lat: number; lon: number; sure: 1 | 2 | 3; form: 1 | 2 | 3 | 4 | 5; label: string; verses?: number; badge?: string }
+/** A place to draw: its point (degrees), certainty (1 low, 2 medium, 3 high), form (1 point, 2 area, 3 water, 4 height, 5 port), label and verse count. `badge`: the stop numbers of a route that pass here ("1, 12"). `ref`: (a ref with `form` 2 is still drawn as a dot, never as an area name) a well-known place drawn only so the reader can find their bearings (Jerusalem on the map of Jonah 1): a small grey hollow dot with a quiet label; it never widens the frame, never gets a badge, and its label gives way to every other label. */
+export type MapPoint = { id: string; lat: number; lon: number; sure: 1 | 2 | 3; form: 1 | 2 | 3 | 4 | 5; label: string; verses?: number; badge?: string; ref?: true }
 
 /** The colors of a map, written as attributes in the SVG. */
-export type Theme = { sea: string; land: string; coast: string; lake: string; river: string; route: string; point: string; pointHollow: string; label: string; halo: string; cluster: string; clusterText: string }
+export type Theme = { sea: string; land: string; coast: string; lake: string; river: string; route: string; point: string; pointHollow: string; label: string; halo: string; cluster: string; clusterText: string; reference?: string; referenceLabel?: string }
 
 /** The default light theme. */
 export const LIGHT_THEME: Theme = {
@@ -40,6 +40,9 @@ export const LIGHT_THEME: Theme = {
   cluster: '#34495e',
   clusterText: '#ffffff',
 }
+
+/** The grey of reference points on a light map. Kept out of {@link LIGHT_THEME} on purpose: a theme without `reference` and `referenceLabel` gets these, so a map without reference points never mentions them. A dark theme must set its own `reference` and `referenceLabel` and also a dark `halo` (the label outline), or the grey text gets a white outline. #757575 is about 4:1 on the default sea and land. */
+export const LIGHT_REFERENCE = { reference: '#757575', referenceLabel: '#6b6b6b' }
 
 /** The view of a map: the center in degrees and `scale`, pixels per degree of latitude (a degree of longitude is `scale` times the cosine of the center's latitude), in a `width` x `height` picture. */
 export type Frame = { lat: number; lon: number; scale: number; width: number; height: number }
@@ -61,7 +64,9 @@ export function unproject(f: Frame, x: number, y: number): { lat: number; lon: n
  * The frame that fits the points with `margin` pixels around them: one point (or none) shows a radius of about 40 km. The scale never passes {@link MAX_SCALE}.
  * `points` empty: a default view of the Levant.
  */
-export function fit(points: readonly { lat: number; lon: number }[], width: number, height: number, margin = 28): Frame {
+export function fit(points: readonly { lat: number; lon: number; ref?: true }[], width: number, height: number, margin = 28): Frame {
+  // reference points are scenery: they never decide how much of the map is shown
+  points = points.filter((p) => p.ref !== true)
   let [minLat, maxLat, minLon, maxLon] = points.length === 0 ? [29, 38, 31, 40] : [Infinity, -Infinity, Infinity, -Infinity]
   for (const p of points) {
     minLat = Math.min(minLat, p.lat)
@@ -249,6 +254,8 @@ function clipLine(line: Pt[], b: Box): Pt[][] {
 }
 
 const DOT = 4
+/** A reference dot is smaller than a protagonist's, so it reads as a landmark and not as a place of the text. */
+const REF_DOT = 3
 const CLUSTER = 11
 
 /** The SVG text of the map. See the file's comment. */
@@ -260,6 +267,9 @@ export function drawMap(o: DrawMapOptions): string {
   if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) throw new RangeError('drawMap: the width and the height must be finite numbers above 0')
   // The theme is written into attributes: every value goes through esc once, here, so a hostile value cannot leave its attribute
   const th = Object.fromEntries(Object.entries(o.theme ?? LIGHT_THEME).map(([k, v]) => [k, esc(String(v))])) as Theme
+  // a theme written before reference points existed has no grey of its own: it gets the light greys
+  const refDotColor = th.reference ?? LIGHT_REFERENCE.reference
+  const refTextColor = th.referenceLabel ?? LIGHT_REFERENCE.referenceLabel
   const measure = o.measure ?? ((t: string): number => [...t].length * font * 0.6)
   const smooth = o.smooth ?? 1
   const pts = o.points
@@ -301,8 +311,10 @@ export function drawMap(o: DrawMapOptions): string {
   const home = new Map<string, Pt>(pts.map((p) => [p.id, proj(p.lat, p.lon)]))
   const inFrame = (at: Pt): boolean => at[0] >= box.w && at[0] <= box.e && at[1] >= box.n && at[1] <= box.s
   // a marker off the frame (and its margin) is not drawn and not counted: it may still be a stop of the route, which is drawn through `where`
-  const drawn = pts.filter((p) => p.form !== 2 && inFrame(home.get(p.id)!))
-  const areas = pts.filter((p) => p.form === 2)
+  // reference points stay apart from all of this (no ring, no circle, no count toward the 200): they are drawn where they are, under everything else
+  const refs = pts.filter((p) => p.ref === true && inFrame(home.get(p.id)!))
+  const drawn = pts.filter((p) => p.ref !== true && p.form !== 2 && inFrame(home.get(p.id)!))
+  const areas = pts.filter((p) => p.ref !== true && p.form === 2)
   const where = new Map<string, Pt>(home)
   const leaderBoxes: [number, number, number, number][] = []
   const leaders: string[] = []
@@ -360,7 +372,11 @@ export function drawMap(o: DrawMapOptions): string {
     p.sure === 3
       ? `<circle class="map-dot" fill="${th.point}" data-id="${esc(p.id)}" cx="${n1(x)}" cy="${n1(y)}" r="${DOT}"/>`
       : `<circle class="map-dot-open" data-id="${esc(p.id)}" cx="${n1(x)}" cy="${n1(y)}" r="${DOT}" fill="none" stroke="${th.pointHollow}" stroke-width="1.4"/>`
-  const dots: string[] = []
+  // reference dots go first in the image so a protagonist's dot is always on top of one
+  const dots: string[] = refs.map((p) => {
+    const [x, y] = home.get(p.id)!
+    return `<circle class="map-dot-ref" data-id="${esc(p.id)}" cx="${n1(x)}" cy="${n1(y)}" r="${REF_DOT}" fill="none" stroke="${refDotColor}" stroke-width="1"/>`
+  })
   const labelled: { p: MapPoint; at: Pt }[] = []
   if (clusterMode) {
     const cells = new Map<string, { n: number; x: number; y: number; one: MapPoint }>()
@@ -440,8 +456,8 @@ export function drawMap(o: DrawMapOptions): string {
   placed.push(...leaderBoxes)
   const inside = (r: [number, number, number, number]): boolean => r[0] >= 0 && r[2] <= W && r[1] >= 0 && r[3] <= H
   const free = (r: [number, number, number, number]): boolean => inside(r) && !placed.some((q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])
-  const text = (cls: string, x: number, y: number, anchor: string, size: number, body: string): string =>
-    `<text class="${cls}" fill="${th.label}" stroke="${th.halo}" stroke-width="3" paint-order="stroke" x="${n1(x)}" y="${n1(y)}" font-size="${size}" text-anchor="${anchor}">${body}</text>`
+  const text = (cls: string, x: number, y: number, anchor: string, size: number, body: string, color = th.label): string =>
+    `<text class="${cls}" fill="${color}" stroke="${th.halo}" stroke-width="3" paint-order="stroke" x="${n1(x)}" y="${n1(y)}" font-size="${size}" text-anchor="${anchor}">${body}</text>`
   const badges: string[] = []
   for (const { p, at: [x, y] } of labelled) {
     if (p.badge === undefined || p.badge === '') continue
@@ -478,6 +494,42 @@ export function drawMap(o: DrawMapOptions): string {
     if (!free(rect)) continue
     placed.push(rect)
     labels.push(text(area ? 'map-label map-area' : 'map-label', tx, y + font / 2 - 2, anchor, font, esc(p.label)))
+  }
+  // Reference labels come last: they only take what the protagonists left. Their dots become obstacles only now, so a reference dot never pushes a
+  // protagonist's label away. A reference label tries its usual side, the other side, above, below and the four diagonals, and is dropped only if none is free. No badge.
+  for (const p of refs) {
+    const [x, y] = home.get(p.id)!
+    placed.push([x - REF_DOT, y - REF_DOT, x + REF_DOT, y + REF_DOT])
+  }
+  const refFont = font - 1
+  for (const p of refs) {
+    if (p.label === '') continue
+    const [x, y] = home.get(p.id)!
+    const w = measure(p.label) * (refFont / font)
+    // candidate places, in order: the usual side, the other side, above, below, then the four diagonals; the first free one wins (same test as every label)
+    const up = REF_DOT + refFont / 2 + 1
+    const diag = gap - 1
+    const cands: ['r' | 'l' | 'm', number, number][] = [
+      rtl ? ['l', -gap, 0] : ['r', gap, 0],
+      rtl ? ['r', gap, 0] : ['l', -gap, 0],
+      ['m', 0, -up - 1],
+      ['m', 0, up + 1],
+      ['r', diag, -up],
+      ['l', -diag, -up],
+      ['r', diag, up],
+      ['l', -diag, up],
+    ]
+    for (const [ext, dx, dy] of cands) {
+      const tx = x + dx
+      const cy = y + dy
+      const rect: [number, number, number, number] = [ext === 'r' ? tx : ext === 'l' ? tx - w : tx - w / 2, cy - refFont / 2 - 2, ext === 'r' ? tx + w : ext === 'l' ? tx : tx + w / 2, cy + refFont / 2 + 2]
+      if (!free(rect)) continue
+      placed.push(rect)
+      // text-anchor start runs left in a right-to-left page, so the anchor flips there
+      const anchor = ext === 'm' ? 'middle' : (ext === 'r') !== rtl ? 'start' : 'end'
+      labels.push(text('map-label map-ref', tx, cy + refFont / 2 - 2, anchor, refFont, esc(p.label), refTextColor))
+      break
+    }
   }
   parts.push(...badges, ...labels)
   return (
