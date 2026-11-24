@@ -206,7 +206,7 @@ Build with `VITE_TCS_PACKS=staging`, `vite preview`, built-in browser: en Titus 
 
 ## Final review
 
-Three Opus reviewers in parallel (`.claude/lp3-controller.md`, "Reviews"), each with its part of `git diff origin/master..HEAD`, the ledger's deferred items and the rulings:
+Changed on 2026-11-24 to Abel's review model (Elephant Goldfish; Codex no longer reviews). The session that runs the plan is the elephant and never reviews its own work. The reviewers are fresh Sonnet subagents (goldfish) that did not see the work: each gets only this plan, its part of `git diff origin/master..HEAD`, the ledger's deferred items and the rulings, and says what is wrong, unclear or missing. Area 1 is a key piece (a data format): it gets two goldfish separately, one of them Opus or Fable. After fixes, a new goldfish re-reviews what changed, until clean. The areas:
 
 1. **Rebuilding the text:** `language-pack-v3/src/read/usfm.ts`, `rows/scriptureRows.ts`. Against the source USFM: every marker kind, alignment, ketiv/qere, footnotes, poetry, RTL. Questions: can a verse lose words or alignment; are all the language's Bibles written.
 2. **Helps, articles and OBS rows:** `rows/helpsRows.ts`, `rows/articleRows.ts`, `rows/obsRows.ts`, `sameRows.test.ts`. Questions: does any field the panels read come out empty or different; do links still lead where they led.
