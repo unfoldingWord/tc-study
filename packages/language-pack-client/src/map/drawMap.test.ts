@@ -227,12 +227,12 @@ describe('reference points', () => {
   const NINEVEH = P('lug:nineveh', 36.36, 43.15, 'Nínive', { verses: 4 })
   const REFS = [P('lug:jerusalem', 31.78, 35.22, 'Jerusalén', { ref: true, verses: 800 }), P('lug:damascus', 33.51, 36.29, 'Damasco', { ref: true, verses: 60 })]
   const JONAH = [JOPPA, NINEVEH, ...REFS]
-  const DARK = { ...LIGHT_THEME, sea: '#101820', land: '#243040', reference: '#9aa5b1', referenceLabel: '#aab4bf' }
+  const DARK = { ...LIGHT_THEME, sea: '#101820', land: '#243040', halo: '#101820', reference: '#9aa5b1', referenceLabel: '#aab4bf' }
 
   test('a reference point is a small grey hollow dot and a smaller grey label, never bold', () => {
     const svg = drawMap({ points: JONAH, summary: S })
     expect(svg).toContain(`class="map-dot-ref" data-id="lug:jerusalem"`)
-    expect(svg).toMatch(/class="map-dot-ref"[^>]*r="3" fill="none" stroke="#8a8a8a"/)
+    expect(svg).toMatch(/class="map-dot-ref"[^>]*r="3" fill="none" stroke="#757575"/)
     expect(svg).toMatch(/class="map-label map-ref" fill="#6b6b6b"[^>]*font-size="10"[^>]*>Damasco</)
     expect(svg).not.toContain('font-weight')
     // the protagonists keep their own style
@@ -278,12 +278,11 @@ describe('reference points', () => {
     )
   })
   test('a reference point never costs a protagonist its label: every label shown without refs is still shown with them', () => {
-    const labelsOf = (svg: string) => [...svg.matchAll(/class="map-label"[^>]*>([^<]+)</g)].map((m) => m[1])
+    // full label elements (text, x, y, anchor), not just names
+    const labelsOf = (svg: string) => [...svg.matchAll(/<text class="map-label"[^>]*>[^<]+<\/text>/g)].map((m) => m[0])
     for (const [width, height] of [[360, 240], [480, 320], [200, 200]]) {
       const without = labelsOf(drawMap({ points: [JOPPA, NINEVEH], summary: S, width, height }))
       const withRefs = labelsOf(drawMap({ points: JONAH, summary: S, width, height }))
-      for (const l of without) expect(withRefs).toContain(l)
-      // refs add no protagonist label; Nineveh sits on the fitted corner (28 px margin, label needs 6 + 36), so it has no label here either way
       expect(withRefs).toEqual(without)
     }
   })
@@ -293,6 +292,39 @@ describe('reference points', () => {
     expect(m).not.toBeNull()
     const dot = svg.match(/data-id="lug:jerusalem" cx="([\d.]+)" cy="([\d.]+)"/)!
     expect(Math.abs(Number(m![2]) - Number(dot[2]))).toBeGreaterThan(5) // above or below, not beside
+  })
+  test('right to left: a reference label runs away from its dot with the anchor flipped', () => {
+    const svg = drawMap({ points: [P('lug:r', 31.78, 35.22, 'Ref', { ref: true })], summary: S, dir: 'rtl' })
+    const m = svg.match(/map-ref"[^>]*x="([\d.]+)"[^>]*text-anchor="(\w+)"/)!
+    const dot = svg.match(/cx="([\d.]+)"/)!
+    expect(Number(m[1])).toBeCloseTo(Number(dot[1]) - 6, 1)
+    expect(m[2]).toBe('start')
+  })
+  test('only reference points, and one protagonist with references', () => {
+    const only = drawMap({ points: REFS, summary: S, frame: { lat: 32.6, lon: 35.8, scale: 60, width: 360, height: 240 } }) // no protagonist: fit would show the default Levant view
+    expect((only.match(/class="map-dot-ref"/g) ?? []).length).toBe(2)
+    expect(only).not.toContain('class="map-dot"')
+    const one = drawMap({ points: [JOPPA, ...REFS], summary: S })
+    expect(one).toContain('>Jope<')
+    expect(one).toContain('class="map-dot" fill="#222222" data-id="lug:joppa"')
+    expect((one.match(/class="map-dot-ref"/g) ?? []).length).toBe(2)
+  })
+  test('the 200-point cluster cap ignores reference points', () => {
+    const many = Array.from({ length: 200 }, (_, i) => P(`lug:m${String(i).padStart(3, '0')}`, 31 + (i % 20) * 0.05, 35 + Math.floor(i / 20) * 0.05, `M${i}`))
+    const withRefs = drawMap({ points: [...many, ...REFS], summary: S, width: 800, height: 600 })
+    expect(withRefs).not.toContain('map-cluster') // 200 protagonists plus 2 refs is still not cluster mode
+    expect(drawMap({ points: [...many, P('lug:x', 31.5, 35.5, 'X')], summary: S, width: 800, height: 600 })).toContain('map-cluster')
+  })
+  test('a reference on the same pixel as a protagonist forms no ring', () => {
+    const svg = drawMap({ points: [P('lug:p', 31.78, 35.22, 'P'), P('lug:r', 31.78, 35.22, 'R', { ref: true })], summary: S })
+    expect(svg).not.toContain('map-leader')
+    expect(svg).toContain('cx="180" cy="120" r="4"')
+    expect(svg).toContain('cx="180" cy="120" r="3"')
+  })
+  test('a reference with form 2 is a dot, not an area name', () => {
+    const svg = drawMap({ points: [P('lug:a', 31.78, 35.22, 'Area', { ref: true, form: 2 })], summary: S })
+    expect(svg).toContain('class="map-dot-ref"')
+    expect(svg).not.toContain('map-area')
   })
   test('a small map like Jonah 1, in light and dark, is the saved text', () => {
     expect(drawMap({ points: JONAH, basemap: BASE, summary: 'Jonás 1', width: 360, height: 240 })).toMatchSnapshot('light')

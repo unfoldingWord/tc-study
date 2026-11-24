@@ -19,7 +19,7 @@
  */
 import type { Basemap } from '@bt-synergy/language-pack-v3'
 
-/** A place to draw: its point (degrees), certainty (1 low, 2 medium, 3 high), form (1 point, 2 area, 3 water, 4 height, 5 port), label and verse count. `badge`: the stop numbers of a route that pass here ("1, 12"). `ref`: a well-known place drawn only so the reader can find their bearings (Jerusalem on the map of Jonah 1): a small grey hollow dot with a quiet label; it never widens the frame, never gets a badge, and its label gives way to every other label. */
+/** A place to draw: its point (degrees), certainty (1 low, 2 medium, 3 high), form (1 point, 2 area, 3 water, 4 height, 5 port), label and verse count. `badge`: the stop numbers of a route that pass here ("1, 12"). `ref`: (a ref with `form` 2 is still drawn as a dot, never as an area name) a well-known place drawn only so the reader can find their bearings (Jerusalem on the map of Jonah 1): a small grey hollow dot with a quiet label; it never widens the frame, never gets a badge, and its label gives way to every other label. */
 export type MapPoint = { id: string; lat: number; lon: number; sure: 1 | 2 | 3; form: 1 | 2 | 3 | 4 | 5; label: string; verses?: number; badge?: string; ref?: true }
 
 /** The colors of a map, written as attributes in the SVG. */
@@ -41,8 +41,8 @@ export const LIGHT_THEME: Theme = {
   clusterText: '#ffffff',
 }
 
-/** The grey of reference points on a light map. Kept out of {@link LIGHT_THEME} on purpose: a theme without `reference` and `referenceLabel` gets these, so a map without reference points never mentions them. A dark theme should set its own. */
-export const LIGHT_REFERENCE = { reference: '#8a8a8a', referenceLabel: '#6b6b6b' }
+/** The grey of reference points on a light map. Kept out of {@link LIGHT_THEME} on purpose: a theme without `reference` and `referenceLabel` gets these, so a map without reference points never mentions them. A dark theme must set its own `reference` and `referenceLabel` and also a dark `halo` (the label outline), or the grey text gets a white outline. #757575 is about 4:1 on the default sea and land. */
+export const LIGHT_REFERENCE = { reference: '#757575', referenceLabel: '#6b6b6b' }
 
 /** The view of a map: the center in degrees and `scale`, pixels per degree of latitude (a degree of longitude is `scale` times the cosine of the center's latitude), in a `width` x `height` picture. */
 export type Frame = { lat: number; lon: number; scale: number; width: number; height: number }
