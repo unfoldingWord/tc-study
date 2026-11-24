@@ -11,6 +11,7 @@ import {
   FormatError,
   KNOWN,
   type BuiltSegment,
+  type ComplementFile,
   type KnownTables,
   bridgeZip,
   readSegment,
@@ -18,6 +19,7 @@ import {
   type RowSource,
   writeTransfer,
 } from '@bt-synergy/language-pack-v3'
+import { complementOk, listedComplements } from './complements'
 import { ClientError } from './errors'
 import { loadState, localCatalogIds, readStored, st, verifiedHave } from './install'
 import { activate, DEFAULT_UNITS } from './plan'
@@ -37,6 +39,8 @@ export type ImportReport = {
   missing: string[]
   activated: string[]
   waiting: { key: string; missing: string[] }[]
+  /** The ids of the complements written to the store (those a catalog of the file lists). Set by `importTransfer`. */
+  complements?: string[]
 }
 
 type Env = { store: BlobStore; trust: TrustPolicy }
@@ -193,8 +197,33 @@ export async function importTransfer(env: Env, bytes: Uint8Array, o: { confirmDo
   const checked = await checkSegments(items)
   rejected.push(...checked.rejected)
 
+  // The complements a catalog of the file lists; readTransfer has checked their sha256 against the index id, the size is checked here.
+  const listed = listedComplements(fileCats)
+  const complements: { id: string; bytes: Uint8Array }[] = []
+  for (const e of entries) {
+    if (e.kind !== 'complement') continue
+    const l = listed.get(e.id)
+    if (l === undefined || e.status === 'missing') continue
+    if (e.status !== 'ok' || e.bytes === undefined) rejected.push({ id: e.id, code: e.status })
+    // readTransfer has checked the sha256; the listing gives the size.
+    else if (e.bytes.length === l.size) complements.push({ id: e.id, bytes: e.bytes })
+    else rejected.push({ id: e.id, code: 'E_ID' })
+  }
+
   const done = await commit(env, state, fileCats, checked.ok, missing, publish)
-  return { ...done, rejected, missing }
+  // Complements are optional: they are written after the commit, so a refused file leaves the store as it was, and a store that
+  // fails on one is recorded in `rejected` (E_STORE) without throwing.
+  const written: string[] = []
+  for (const c of complements) {
+    try {
+      await st(() => env.store.put(c.id, c.bytes))
+      written.push(c.id)
+    } catch (e) {
+      if (!(e instanceof ClientError && e.code === 'E_STORE')) throw e
+      rejected.push({ id: c.id, code: 'E_STORE' })
+    }
+  }
+  return { ...done, rejected, missing, complements: written }
 }
 
 export async function importOldPack(
@@ -293,9 +322,14 @@ export function bridgeOnly(cat: VerifiedCatalog, state: InstalledState, localIds
   return only
 }
 
+/**
+ * Exports the active units of `lang` with the catalogs they come from and the complements of those catalogs that are in the store.
+ * `update` mode assumes the receiver already holds the segments the base catalogs list; complements are optional, so every stored one goes
+ * in both modes (the importer writes them). `complements: false` carries none.
+ */
 export async function exportTransfer(
   env: Env,
-  o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[] },
+  o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[]; complements?: boolean },
 ): Promise<Uint8Array> {
   const { store } = env
   if (o.mode !== 'full' && o.mode !== 'update') throw new ClientError('E_ARG', `the mode ${JSON.stringify(o.mode)} is not "full" or "update"`)
@@ -377,6 +411,12 @@ export async function exportTransfer(
       throw e
     }
   }
+  // The complements of the catalogs that are in the store (the ones not downloaded are left out); an update leaves out those the base lists.
+  const files: ComplementFile[] = []
+  for (const l of o.complements === false ? [] : listedComplements(cats).values()) {
+    const blob = await st(() => store.get(l.id))
+    if (blob !== undefined && (await complementOk(blob, l.id, l.size))) files.push({ id: l.id, bytes: blob, kind: 'complement' })
+  }
   const catalogs: BuiltSegment[] = []
   for (const c of cats) {
     const r = await readSegment(c.bytes, { known: CATALOG_TABLES, expectedClass: 'catalog', expectedId: c.id })
@@ -385,7 +425,7 @@ export async function exportTransfer(
   return writeTransfer({
     mode: o.mode,
     catalogs,
-    entries,
+    entries: [...entries, ...files],
     ...(o.mode === 'update' ? { base } : {}),
     made: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
     by: 'language-pack-client',

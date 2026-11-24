@@ -3,6 +3,7 @@
  */
 import { bookView, FormatError, KNOWN, obsView, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { patchedReader } from './patch'
+import { complementOk, listedComplements, sha256Hex } from './complements'
 import { ClientError } from './errors'
 import { catalogsOf, checkConcurrency, localCatalogIds, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
@@ -16,6 +17,15 @@ import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFil
 
 export type { InstallOptions, InstallReport, Progress } from './install'
 export type { ImportReport } from './transfer'
+
+export type FetchComplementsReport = {
+  /** Ids downloaded and stored by this call. */
+  fetched: string[]
+  /** Ids the store already held, whole. */
+  present: string[]
+  /** Complements that could not be had (network, a source without `complement`, wrong size or sha256); nothing of them is stored. */
+  missing: { id: string; kind: string; reason: string }[]
+}
 
 export type RefreshReport = {
   catalogs: InstalledCatalog[]
@@ -50,10 +60,15 @@ export interface LanguagePackClient {
   /** `concurrency`: how many segment requests run at once (default 4; `1` asks one after the other, in plan order). */
   install(lang: string, want?: Want, o?: InstallOptions): Promise<InstallReport>
   status(lang: string): Promise<Status>
+  /**
+   * Downloads the complements (files a catalog lists that are not segments: the `basemap` of the maps) of the active catalogs of `lang` and
+   * the common catalog it requires, `kinds` only when given. A complement that fails is reported in `missing`, never thrown: it is optional.
+   */
+  fetchComplements(lang: string, o?: { kinds?: string[]; signal?: AbortSignal }): Promise<FetchComplementsReport>
   prune(): Promise<{ removed: string[] }>
   verify(): Promise<{ bad: string[] }>
   importTransfer(bytes: Uint8Array, o?: { confirmDowngrade?: boolean }): Promise<ImportReport>
-  exportTransfer(o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[] }): Promise<Uint8Array>
+  exportTransfer(o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[]; complements?: boolean }): Promise<Uint8Array>
   /** Converts a format 1.1 `.langpack.zip` into a local catalog. `originals` are the original-language rows (UGNT, UHB): a book is built only with them. */
   importOldPack(zip: Uint8Array, o?: { originals?: RowSource; device?: string; now?: string; confirmDowngrade?: boolean }): Promise<ImportReport>
   /**
@@ -262,7 +277,15 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       // common catalog its units came from would make a later fix of the trust unrecoverable without the network.
       const cat = (await readStored(store, trust, entry ?? { name: '', publisher: '', revision: 0, id, origin: 'published' })) ?? (await readTolerant(id))
       if (cat === undefined) continue
-      for (const r of cat.catalog.requires ?? []) used.add(hex(r[2]))
+      for (const r of cat.catalog.requires ?? []) {
+        const rid = hex(r[2])
+        used.add(rid)
+        // The complements of a required catalog (an older common a kept unit came from) stay too: fetchComplements reads it.
+        const req = (await readStored(store, trust, { name: r[0], publisher: cat.publisher, revision: r[1], id: rid, origin: 'published' })) ?? (await st(() => store.has(rid)) ? await readTolerant(rid) : undefined)
+        if (req !== undefined) for (const cid of listedComplements([req]).keys()) used.add(cid)
+      }
+      // The complements of every kept catalog stay.
+      for (const cid of listedComplements([cat]).keys()) used.add(cid)
       if (current.has(id)) for (const s of cat.catalog.segments) used.add(hex(s.id))
     }
     const removed: string[] = []
@@ -272,6 +295,46 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       removed.push(id)
     }
     return { removed }
+  }
+
+  async function fetchComplementsNow(lang: string, opts: { kinds?: string[]; signal?: AbortSignal }): Promise<FetchComplementsReport> {
+    const state = await loadState(store)
+    const name = state.aliases?.[lang] ?? lang
+    const cats: VerifiedCatalog[] = []
+    const add = (c: VerifiedCatalog | undefined): void => {
+      if (c !== undefined && !cats.some((x) => x.id === c.id)) cats.push(c)
+    }
+    // The active catalog of the language and the catalog it requires by id; then the published ones (a language not yet active).
+    const active = await readStored(store, trust, state.active[name])
+    add(active)
+    for (const [rname, revision, rid] of active?.catalog.requires ?? []) {
+      const c = await readStored(store, trust, { name: rname, publisher: active!.publisher, revision, id: hex(rid), origin: 'published' })
+      if (c !== undefined && c.name === rname) add(c)
+    }
+    for (const c of (await catalogsOf(store, trust, state, name)).catalogs) add(c)
+    const report: FetchComplementsReport = { fetched: [], present: [], missing: [] }
+    for (const l of listedComplements(cats, opts.kinds).values()) {
+      const held = await st(() => store.get(l.id))
+      if (held !== undefined && (await complementOk(held, l.id, l.size))) {
+        report.present.push(l.id)
+        continue
+      }
+      try {
+        const source = need()
+        if (source.complement === undefined) throw new ClientError('E_ARG', 'this source cannot fetch complements')
+        const bytes = await source.complement(l.id, opts.signal ? { signal: opts.signal } : {})
+        if (!(await complementOk(bytes, l.id, l.size))) {
+          throw new ClientError('E_ID', `the complement ${l.id} is not the ${l.size} bytes with that sha256 (got ${bytes.length} bytes)`)
+        }
+        await st(() => store.put(l.id, bytes))
+        report.fetched.push(l.id)
+      } catch (e) {
+        if (opts.signal?.aborted) throw e
+        if (e instanceof ClientError && e.code === 'E_STORE') throw e
+        report.missing.push({ id: l.id, kind: l.kind, reason: e instanceof Error ? e.message : String(e) })
+      }
+    }
+    return report
   }
 
   async function readTolerant(id: string): Promise<VerifiedCatalog | undefined> {
@@ -291,14 +354,17 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     for (const entry of [...Object.values(state.active), ...Object.values(state.published)]) {
       classOf.set(entry.id, 'catalog')
       const cat = await readStored(store, trust, entry)
-      if (cat !== undefined) for (const s of cat.catalog.segments) classOf.set(hex(s.id), s.class)
+      if (cat === undefined) continue
+      for (const s of cat.catalog.segments) classOf.set(hex(s.id), s.class)
     }
     const tables = KNOWN as Record<string, Record<string, number[]> | undefined>
     const bad: string[] = []
     for (const id of await st(() => store.ids())) {
       const bytes = await st(() => store.get(id))
-      let ok = false
-      if (bytes !== undefined) {
+      // Cheap exit: a blob that is the file its id names (a complement, listed by a current catalog or left over from an older one).
+      // A damaged segment never passes: its id is the hash of the decompressed body, not of the stored bytes.
+      let ok = bytes !== undefined && (await sha256Hex(bytes)) === id
+      if (!ok && bytes !== undefined) {
         const cls = classOf.get(id)
         // A segment no stored catalog names: it is good if it reads as any known class.
         for (const known of cls !== undefined ? [tables[cls]] : Object.values(tables)) {
@@ -431,6 +497,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       }),
     install: (lang, want = {}, opts = {}) => queued(() => withIndex(() => installNow(lang, want, opts))),
     status: (lang) => queued(() => statusNow(lang)),
+    fetchComplements: (lang, opts = {}) => queued(() => fetchComplementsNow(lang, opts)),
     prune: () => queued(pruneNow),
     verify: () => queued(verifyNow),
     importTransfer: (bytes, opts = {}) => queued(() => withIndex(() => importTransfer({ store, trust }, bytes, opts))),
