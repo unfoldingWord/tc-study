@@ -283,6 +283,16 @@ describe('reference points', () => {
       drawMap({ points: POINTS, basemap: BASE, route: ['lug:jerusalem', 'lug:damascus'], summary: S }),
     )
   })
+  test('a reference point never costs a protagonist its label: every label shown without refs is still shown with them', () => {
+    const labelsOf = (svg: string) => [...svg.matchAll(/class="map-label"[^>]*>([^<]+)</g)].map((m) => m[1])
+    for (const [width, height] of [[360, 240], [480, 320], [200, 200]]) {
+      const without = labelsOf(drawMap({ points: [JOPPA, NINEVEH], summary: S, width, height }))
+      const withRefs = labelsOf(drawMap({ points: JONAH, summary: S, width, height }))
+      for (const l of without) expect(withRefs).toContain(l)
+      // refs add no protagonist label; Nineveh sits on the fitted corner (28 px margin, label needs 6 + 36), so it has no label here either way
+      expect(withRefs).toEqual(without)
+    }
+  })
   test('a small map like Jonah 1, in light and dark, is the saved text', () => {
     expect(drawMap({ points: JONAH, basemap: BASE, summary: 'Jonás 1', width: 360, height: 240 })).toMatchSnapshot('light')
     expect(drawMap({ points: JONAH, basemap: BASE, summary: 'Jonás 1', width: 360, height: 240, theme: DARK })).toMatchSnapshot('dark')
