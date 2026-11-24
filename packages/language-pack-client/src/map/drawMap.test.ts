@@ -220,3 +220,71 @@ describe('the helpers for pan and zoom', () => {
     expect(clampScale(300, bbox, 360, 240)).toBe(Math.max(min, 300))
   })
 })
+
+describe('reference points', () => {
+  // Jonah 1: Joppa and Nineveh are the places of the text; Jerusalem and Damascus are only there to find one's bearings
+  const JOPPA = P('lug:joppa', 32.05, 34.75, 'Jope', { verses: 3 })
+  const NINEVEH = P('lug:nineveh', 36.36, 43.15, 'Nínive', { verses: 4 })
+  const REFS = [P('lug:jerusalem', 31.78, 35.22, 'Jerusalén', { ref: true, verses: 800 }), P('lug:damascus', 33.51, 36.29, 'Damasco', { ref: true, verses: 60 })]
+  const JONAH = [JOPPA, NINEVEH, ...REFS]
+  const DARK = { ...LIGHT_THEME, sea: '#101820', land: '#243040', reference: '#9aa5b1', referenceLabel: '#aab4bf' }
+
+  test('a reference point is a small grey hollow dot and a smaller grey label, never bold', () => {
+    const svg = drawMap({ points: JONAH, summary: S })
+    expect(svg).toContain(`class="map-dot-ref" data-id="lug:jerusalem"`)
+    expect(svg).toMatch(/class="map-dot-ref"[^>]*r="3" fill="none" stroke="#8a8a8a"/)
+    expect(svg).toMatch(/class="map-label map-ref" fill="#6b6b6b"[^>]*font-size="10"[^>]*>Damasco</)
+    expect(svg).not.toContain('font-weight')
+    // the protagonists keep their own style
+    expect(svg).toContain('class="map-dot" fill="#222222" data-id="lug:joppa"')
+    expect(svg).toMatch(/class="map-label" fill="#222222"[^>]*font-size="11"[^>]*>Jope</)
+  })
+  test('the colors of a reference point come from the theme, light or dark, and an old theme without them still works', () => {
+    expect(drawMap({ points: JONAH, summary: S, theme: DARK })).toMatch(/class="map-dot-ref"[^>]*stroke="#9aa5b1"/)
+    const { reference: _r, referenceLabel: _l, ...old } = LIGHT_THEME
+    expect(drawMap({ points: JONAH, summary: S, theme: old })).toContain('class="map-dot-ref"')
+  })
+  test('a reference label gives way to a protagonist label, however many verses it has', () => {
+    // the reference label has 800 verses and would sit right where the protagonist's is: the protagonist stays and the reference label moves to the other side of its dot
+    const near = [P('lug:p', 31.78, 35.22, 'Protagonista', { verses: 1 }), P('lug:r', 31.7805, 35.2205, 'Referencia', { ref: true, verses: 800 })]
+    const svg = drawMap({ points: near, summary: S })
+    expect(svg).toContain('>Protagonista<')
+    expect(svg).toMatch(/map-ref"[^>]*text-anchor="end">Referencia</)
+    // with a protagonist label on each side there is no room: the reference label is dropped (Jerusalem in the Jonah map is such a case)
+    const boxed = [...near, P('lug:q', 31.7805, 35.2205 - 0.002, 'Otra', { verses: 1 })]
+    const both = drawMap({ points: boxed, summary: S })
+    expect(both).toContain('>Protagonista<')
+    expect(both).not.toContain('>Referencia<')
+    expect(drawMap({ points: JONAH, summary: S })).not.toContain('>Jerusalén<')
+  })
+  test('a reference dot never takes the place of a protagonist label', () => {
+    // the reference dot is right where the protagonist label would start; the protagonist label is still drawn
+    const pts = [P('lug:p', 31.78, 35.22, 'Protagonista'), P('lug:r', 31.78, 35.22 + 0.0017, 'Ref', { ref: true })]
+    expect(drawMap({ points: pts, summary: S })).toContain('>Protagonista<')
+  })
+  test('a reference point never has a badge', () => {
+    const pts = [P('lug:p', 31.78, 35.22, 'A', { badge: '1' }), P('lug:r', 32.5, 36, 'R', { ref: true, badge: '2' })]
+    const svg = drawMap({ points: pts, summary: S })
+    expect(svg).toContain('class="map-badge"')
+    expect(svg).not.toContain('>2<')
+  })
+  test('reference points do not widen the frame', () => {
+    const frameOf = (pts: MapPoint[]) => fit(pts, 360, 240)
+    expect(frameOf(JONAH)).toEqual(frameOf([JOPPA, NINEVEH]))
+    expect(drawMap({ points: JONAH, summary: S })).toContain(`viewBox="0 0 360 240"`)
+    // a map with a reference point far outside the frame draws the same protagonists at the same pixels
+    const far = [JOPPA, NINEVEH, P('lug:rome', 41.9, 12.5, 'Roma', { ref: true })]
+    const a = drawMap({ points: far, summary: S })
+    expect(a.replace(/<circle class="map-dot-ref"[^>]*\/>/g, '')).toBe(drawMap({ points: [JOPPA, NINEVEH], summary: S }))
+  })
+  test('a map without reference points is the same as before: the property changes nothing else', () => {
+    expect(drawMap({ points: POINTS, basemap: BASE, summary: S })).not.toContain('map-dot-ref')
+    expect(drawMap({ points: POINTS.map((p) => ({ ...p })), basemap: BASE, route: ['lug:jerusalem', 'lug:damascus'], summary: S })).toBe(
+      drawMap({ points: POINTS, basemap: BASE, route: ['lug:jerusalem', 'lug:damascus'], summary: S }),
+    )
+  })
+  test('a small map like Jonah 1, in light and dark, is the saved text', () => {
+    expect(drawMap({ points: JONAH, basemap: BASE, summary: 'Jonás 1', width: 360, height: 240 })).toMatchSnapshot('light')
+    expect(drawMap({ points: JONAH, basemap: BASE, summary: 'Jonás 1', width: 360, height: 240, theme: DARK })).toMatchSnapshot('dark')
+  })
+})
