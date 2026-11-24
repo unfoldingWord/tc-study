@@ -6,6 +6,9 @@ import { useNavigate } from 'react-router-dom'
 import { Settings as SettingsIcon, Sun, Database, Info, HardDrive } from 'lucide-react'
 import { ThemePreferenceButtons } from '../features/theme'
 import { BRAND_FULL, BRAND_SHORT } from '../config/brand'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { SectionLabel } from '../components/ui/SectionLabel'
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -28,12 +31,12 @@ export default function Settings() {
 
       <div className="max-w-4xl mx-auto px-6 py-6">
         <div className="space-y-3">
-          <div className="rounded-2xl border border-border-subtle bg-surface p-6">
+          <Card>
             <div className="mb-4 flex items-center gap-3">
               <div className="p-2 bg-highlight/40 rounded-lg">
                 <Sun className="h-4 w-4 text-accent-fg" />
               </div>
-              <h2 className="text-lg font-semibold text-fg">Appearance</h2>
+              <SectionLabel as="h2">Appearance</SectionLabel>
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
@@ -42,14 +45,14 @@ export default function Settings() {
               </div>
               <ThemePreferenceButtons />
             </div>
-          </div>
+          </Card>
 
-          <div className="rounded-2xl border border-border-subtle bg-surface p-6">
+          <Card>
             <div className="mb-4 flex items-center gap-3">
               <div className="p-2 bg-accent-soft rounded-lg">
                 <Database className="h-4 w-4 text-accent" />
               </div>
-              <h2 className="text-lg font-semibold text-fg">Storage</h2>
+              <SectionLabel as="h2">Storage</SectionLabel>
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -59,18 +62,18 @@ export default function Settings() {
                 </div>
                 <span className="text-sm font-medium text-fg">0 MB</span>
               </div>
-              <button className="text-xs font-medium text-danger hover:opacity-90 transition-colors">
+              <Button variant="danger" className="-ml-5">
                 Clear All Cache
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
 
-          <div className="rounded-2xl border border-border-subtle bg-surface p-6">
+          <Card>
             <div className="mb-4 flex items-center gap-3">
               <div className="p-2 bg-accent-soft rounded-lg">
                 <HardDrive className="h-4 w-4 text-accent" />
               </div>
-              <h2 className="text-lg font-semibold text-fg">Data Management</h2>
+              <SectionLabel as="h2">Data Management</SectionLabel>
             </div>
             <div className="space-y-4">
               <div>
@@ -79,23 +82,23 @@ export default function Settings() {
                   Manage passage sets, collections, and resources
                 </p>
               </div>
-              <button
+              <Button
+                variant="outline"
                 onClick={() => navigate('/data')}
-                className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors text-sm font-medium"
                 aria-label="Open data management"
                 data-testid="open-data-management-btn"
               >
                 Manage Data
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
 
-          <div className="rounded-2xl border border-border-subtle bg-surface p-6">
+          <Card>
             <div className="mb-4 flex items-center gap-3">
               <div className="p-2 bg-muted rounded-lg">
                 <Info className="h-4 w-4 text-fg-secondary" />
               </div>
-              <h2 className="text-lg font-semibold text-fg">About</h2>
+              <SectionLabel as="h2">About</SectionLabel>
             </div>
             <div className="space-y-2 text-sm text-fg-secondary">
               <p>
@@ -104,7 +107,7 @@ export default function Settings() {
               <p className="text-xs">Version 0.1.0</p>
               <p className="text-xs">Bible study and translation platform</p>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>
