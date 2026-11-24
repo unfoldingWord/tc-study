@@ -250,12 +250,6 @@ describe('reference points', () => {
     const svg = drawMap({ points: near, summary: S })
     expect(svg).toContain('>Protagonista<')
     expect(svg).toMatch(/map-ref"[^>]*text-anchor="end">Referencia</)
-    // with a protagonist label on each side there is no room: the reference label is dropped (Jerusalem in the Jonah map is such a case)
-    const boxed = [...near, P('lug:q', 31.7805, 35.2205 - 0.002, 'Otra', { verses: 1 })]
-    const both = drawMap({ points: boxed, summary: S })
-    expect(both).toContain('>Protagonista<')
-    expect(both).not.toContain('>Referencia<')
-    expect(drawMap({ points: JONAH, summary: S })).not.toContain('>Jerusalén<')
   })
   test('a reference dot never takes the place of a protagonist label', () => {
     // the reference dot is right where the protagonist label would start; the protagonist label is still drawn
@@ -292,6 +286,13 @@ describe('reference points', () => {
       // refs add no protagonist label; Nineveh sits on the fitted corner (28 px margin, label needs 6 + 36), so it has no label here either way
       expect(withRefs).toEqual(without)
     }
+  })
+  test('Jerusalem keeps its label next to Jope at 360x240, above or below its dot, and does not touch Jope label', () => {
+    const svg = drawMap({ points: JONAH, summary: S, width: 360, height: 240 })
+    const m = svg.match(/class="map-label map-ref"[^>]*x="([\d.]+)" y="([\d.]+)"[^>]*text-anchor="(\w+)"[^>]*>Jerusalén</)
+    expect(m).not.toBeNull()
+    const dot = svg.match(/data-id="lug:jerusalem" cx="([\d.]+)" cy="([\d.]+)"/)!
+    expect(Math.abs(Number(m![2]) - Number(dot[2]))).toBeGreaterThan(5) // above or below, not beside
   })
   test('a small map like Jonah 1, in light and dark, is the saved text', () => {
     expect(drawMap({ points: JONAH, basemap: BASE, summary: 'Jonás 1', width: 360, height: 240 })).toMatchSnapshot('light')

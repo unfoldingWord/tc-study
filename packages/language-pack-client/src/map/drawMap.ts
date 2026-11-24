@@ -496,7 +496,7 @@ export function drawMap(o: DrawMapOptions): string {
     labels.push(text(area ? 'map-label map-area' : 'map-label', tx, y + font / 2 - 2, anchor, font, esc(p.label)))
   }
   // Reference labels come last: they only take what the protagonists left. Their dots become obstacles only now, so a reference dot never pushes a
-  // protagonist's label away. A reference label tries the usual side, then the other side of its dot, and is dropped if neither is free. No badge.
+  // protagonist's label away. A reference label tries its usual side, the other side, above, below and the four diagonals, and is dropped only if none is free. No badge.
   for (const p of refs) {
     const [x, y] = home.get(p.id)!
     placed.push([x - REF_DOT, y - REF_DOT, x + REF_DOT, y + REF_DOT])
@@ -506,14 +506,28 @@ export function drawMap(o: DrawMapOptions): string {
     if (p.label === '') continue
     const [x, y] = home.get(p.id)!
     const w = measure(p.label) * (refFont / font)
-    const sides = rtl ? [-1, 1] : [1, -1]
-    for (const side of sides) {
-      const tx = x + side * gap
-      // the text runs away from its dot: right of it on side 1, left of it on side -1 (in a right-to-left page `start` runs left, so the anchor flips)
-      const rect: [number, number, number, number] = side === 1 ? [tx, y - refFont / 2 - 2, tx + w, y + refFont / 2 + 2] : [tx - w, y - refFont / 2 - 2, tx, y + refFont / 2 + 2]
+    // candidate places, in order: the usual side, the other side, above, below, then the four diagonals; the first free one wins (same test as every label)
+    const up = REF_DOT + refFont / 2 + 1
+    const diag = gap - 1
+    const cands: ['r' | 'l' | 'm', number, number][] = [
+      rtl ? ['l', -gap, 0] : ['r', gap, 0],
+      rtl ? ['r', gap, 0] : ['l', -gap, 0],
+      ['m', 0, -up - 1],
+      ['m', 0, up + 1],
+      ['r', diag, -up],
+      ['l', -diag, -up],
+      ['r', diag, up],
+      ['l', -diag, up],
+    ]
+    for (const [ext, dx, dy] of cands) {
+      const tx = x + dx
+      const cy = y + dy
+      const rect: [number, number, number, number] = [ext === 'r' ? tx : ext === 'l' ? tx - w : tx - w / 2, cy - refFont / 2 - 2, ext === 'r' ? tx + w : ext === 'l' ? tx : tx + w / 2, cy + refFont / 2 + 2]
       if (!free(rect)) continue
       placed.push(rect)
-      labels.push(text('map-label map-ref', tx, y + refFont / 2 - 2, (side === 1) !== rtl ? 'start' : 'end', refFont, esc(p.label), refTextColor))
+      // text-anchor start runs left in a right-to-left page, so the anchor flips there
+      const anchor = ext === 'm' ? 'middle' : (ext === 'r') !== rtl ? 'start' : 'end'
+      labels.push(text('map-label map-ref', tx, cy + refFont / 2 - 2, anchor, refFont, esc(p.label), refTextColor))
       break
     }
   }
